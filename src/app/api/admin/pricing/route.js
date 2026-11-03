@@ -1,7 +1,7 @@
 import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
-import PricingRule from '@/lib/db/models/PricingRule';
+import EgpPricingRule from '@/lib/db/models/EgpPricingRule';
 import { requireAuth } from '@/lib/auth/helpers';
 
 const ruleSchema = z.object({
@@ -24,7 +24,7 @@ export async function GET() {
 
   try {
     await connectDB();
-    const rules = await PricingRule.find({}).sort({ city: 1, vehicleType: 1 }).lean();
+    const rules = await EgpPricingRule.find({ currency: CURRENCY }).sort({ city: 1, vehicleType: 1 }).lean();
     return Response.json({ rules });
   } catch (err) {
     console.error('Pricing rules error:', err);
@@ -50,9 +50,8 @@ export async function PUT(request) {
 
     await connectDB();
     const { vehicleType, city, ...rest } = parsed.data;
-    const existing = await PricingRule.findOne({ vehicleType, city }).lean();
-    if (existing && existing.currency !== CURRENCY) return Response.json({ error: 'Legacy pricing requires an audited migration before replacement. EGP defaults remain active.' }, { status: 409 });
-    const rule = await PricingRule.findOneAndUpdate(
+    await EgpPricingRule.init();
+    const rule = await EgpPricingRule.findOneAndUpdate(
       { vehicleType, city },
       { vehicleType, city, ...rest, currency: CURRENCY },
       { new: true, upsert: true, runValidators: true }

@@ -1,6 +1,6 @@
 import { CURRENCY, DEFAULT_PRICING, minorUnits } from '@/lib/currency';
 import connectDB from '@/lib/db/mongodb';
-import PricingRule from '@/lib/db/models/PricingRule';
+import EgpPricingRule from '@/lib/db/models/EgpPricingRule';
 import { calculateSurgeForLocation } from './h3-redis';
 
 /**
@@ -39,7 +39,7 @@ export async function calculateFare({
   let pricing;
   try {
     await connectDB();
-    pricing = await PricingRule.findOne({
+    pricing = await EgpPricingRule.findOne({
       vehicleType,
       city,
       currency: CURRENCY,

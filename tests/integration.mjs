@@ -21,6 +21,7 @@ const { completeRide, cancelRide } = await import('../src/lib/services/ride-serv
 const { creditCheckoutSession } = await import('../src/lib/services/stripe.js');
 const { calculateFare } = await import('../src/lib/services/fare-calculator.js');
 const { default: PricingRule } = await import('../src/lib/db/models/PricingRule.js');
+const { default: EgpPricingRule } = await import('../src/lib/db/models/EgpPricingRule.js');
 const base = 'http://localhost:3188';
 const secret = randomBytes(32).toString('hex');
 const password = randomBytes(24).toString('hex');
@@ -201,10 +202,46 @@ try {
     assert.equal(earnings.currency, 'EGP'); assert.equal(earnings.today.earnings, 9.21);
     assert.ok(earnings.recentRides.some(r => r.fare.currency === 'USD'));
   });
-  await check('admin pricing cannot relabel a legacy rule', async () => {
-    const response = await request('/api/admin/pricing', cookies.admin, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ vehicleType: 'economy', city: 'default', baseFare: 20, perKmRate: 8, perMinRate: 1, minimumFare: 40, bookingFee: 5, platformCommission: 8, surgeMultiplierCap: 3 }) });
-    assert.equal(response.status, 409);
-    const legacy = await PricingRule.collection.findOne({ vehicleType: 'economy' }); assert.equal(legacy.currency, undefined); assert.equal(legacy.baseFare, 999);
+  const savedPricing = [];
+  let legacyPricing;
+  await check('all four EGP tariffs save and update alongside unchanged legacy rules', async () => {
+    for (const vehicleType of ['comfort', 'premium', 'xl']) await PricingRule.collection.insertOne({ vehicleType, city: 'default', isActive: true, baseFare: 999, perKmRate: 999 });
+    legacyPricing = await PricingRule.collection.find({}).sort({ vehicleType: 1 }).toArray();
+    assert.deepEqual((await (await request('/api/admin/pricing', cookies.admin)).json()).rules, []);
+    for (const [index, vehicleType] of ['economy', 'comfort', 'premium', 'xl'].entries()) {
+      const payload = { vehicleType, city: 'default', baseFare: 30 + index, perKmRate: 9, perMinRate: 2, minimumFare: 40, bookingFee: 6, platformCommission: 8, surgeMultiplierCap: 3 };
+      for (const baseFare of [payload.baseFare - 1, payload.baseFare]) {
+        const response = await request('/api/admin/pricing', cookies.admin, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...payload, baseFare }) });
+        assert.equal(response.status, 200);
+        const { rule } = await response.json();
+        assert.equal(rule.baseFare, baseFare); assert.equal(rule.currency, 'EGP');
+      }
+      savedPricing.push(payload);
+      const fare = await calculateFare({ vehicleType, distanceMeters: 1000, durationSeconds: 600, surgeMultiplier: 1 });
+      assert.equal(fare.total, payload.baseFare + 9 + 20 + 6);
+    }
+    assert.equal(EgpPricingRule.collection.name, 'egppricingrules');
+    assert.equal(await EgpPricingRule.countDocuments(), 4);
+    assert.deepEqual(await PricingRule.collection.find({}).sort({ vehicleType: 1 }).toArray(), legacyPricing);
+  });
+  await stop(); await start();
+  await check('saved EGP prices survive refresh and server restart and drive HTTP estimates', async () => {
+    const response = await request('/api/admin/pricing', cookies.admin);
+    assert.equal(response.status, 200);
+    const { rules } = await response.json();
+    assert.equal(rules.length, 4);
+    const estimateResponse = await request('/api/rides/estimate', cookies.rider, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pickup: { lat: 30, lng: 31 }, dropoff: { lat: 30.01, lng: 31.01 } }) });
+    assert.equal(estimateResponse.status, 200);
+    const { estimates, route } = await estimateResponse.json();
+    for (const payload of savedPricing) {
+      const stored = rules.find(rule => rule.vehicleType === payload.vehicleType);
+      for (const [field, value] of Object.entries(payload)) assert.equal(stored[field], value);
+      const fare = estimates[payload.vehicleType];
+      assert.equal(fare.baseFare, payload.baseFare);
+      assert.equal(fare.currency, 'EGP');
+      assert.equal(fare.total, Math.round((Math.max((payload.baseFare + route.distanceMeters / 1000 * payload.perKmRate + route.durationSeconds / 60 * payload.perMinRate) * fare.surgeMultiplier, payload.minimumFare) + payload.bookingFee) * 100) / 100);
+    }
+    assert.deepEqual(await PricingRule.collection.find({}).sort({ vehicleType: 1 }).toArray(), legacyPricing);
   });
   await check('production top-ups cannot mint funds when Stripe is disabled', async () => {
     const before = (await User.findById(users.rider._id)).wallet.balance;
