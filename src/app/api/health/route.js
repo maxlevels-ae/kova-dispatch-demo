@@ -12,9 +12,28 @@ export async function GET() {
   try {
     await connectDB();
     checks.mongo = mongoose.connection.readyState === 1 ? 'up' : 'down';
-  } catch {
-    checks.mongo = 'down';
-  }
+  } catch (err) {
+  const msg = String(err?.message || '').toLowerCase();
+
+  const reason =
+    err?.code === 8000 || /auth|authentication/.test(msg)
+      ? 'AUTH_FAILED'
+      : /querysrv|enotfound|dns/.test(msg)
+      ? 'DNS_ERROR'
+      : /tls|ssl|certificate/.test(msg)
+      ? 'TLS_ERROR'
+      : /timeout|server selection|econnrefused/.test(msg)
+      ? 'NETWORK_OR_IP_ACCESS'
+      : 'OTHER';
+
+  console.error('[KOVA_MONGO]', {
+    name: err?.name,
+    code: err?.code || err?.cause?.code || 'none',
+    reason
+  });
+
+  checks.mongo = 'down';
+}
 
   try {
     const pong = await redis.ping();
