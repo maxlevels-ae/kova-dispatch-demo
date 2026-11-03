@@ -12,28 +12,34 @@ export async function GET() {
   try {
     await connectDB();
     checks.mongo = mongoose.connection.readyState === 1 ? 'up' : 'down';
-  } catch (err) {
-  const msg = String(err?.message || '').toLowerCase();
+  
+} catch (err) {
+  const servers = [
+    ...(err?.reason?.servers?.values?.() || [])
+  ];
 
-  const reason =
-    err?.code === 8000 || /auth|authentication/.test(msg)
-      ? 'AUTH_FAILED'
-      : /querysrv|enotfound|dns/.test(msg)
-      ? 'DNS_ERROR'
-      : /tls|ssl|certificate/.test(msg)
-      ? 'TLS_ERROR'
-      : /timeout|server selection|econnrefused/.test(msg)
-      ? 'NETWORK_OR_IP_ACCESS'
-      : 'OTHER';
+  const details = servers.map((server) => {
+    const error = server.error;
+    const cause = error?.cause;
 
-  console.error('[KOVA_MONGO]', {
-    name: err?.name,
-    code: err?.code || err?.cause?.code || 'none',
-    reason
+    const message = String(
+      cause?.message || error?.message || ''
+    )
+      .replace(/mongodb(?:\+srv)?:\/\/\S+/gi, '[REDACTED]')
+      .slice(0, 250);
+
+    return {
+      type: server.type,
+      errorName: error?.name || 'none',
+      errorCode: error?.code || cause?.code || 'none',
+      message
+    };
   });
 
+  console.error('[KOVA_MONGO_DETAILS]', details);
   checks.mongo = 'down';
 }
+
 
   try {
     const pong = await redis.ping();

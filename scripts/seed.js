@@ -54,7 +54,7 @@ const PRICING = [
 
 async function main() {
   await mongoose.connect(MONGODB_URI);
-  console.log(`Connected: ${MONGODB_URI}`);
+  console.log('Connected to MongoDB');
 
   const db = mongoose.connection.db;
   const users = db.collection('users');
@@ -142,3 +142,4 @@ main().catch((err) => {
   console.error('Seed failed:', err);
   process.exit(1);
 });
+
