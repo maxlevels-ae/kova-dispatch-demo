@@ -5,7 +5,8 @@ import { Map as MLMap, Marker, LngLatBounds, NavigationControl } from 'maplibre-
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 /**
- * MapLibre GL map with premium light CARTO tiles (no API key).
+ * MapLibre GL map with the existing light CARTO tiles.
+ * CARTO now requires a browser-scoped basemap key, configured at build time.
  *
  * Props:
  *  - center {lat,lng}, zoom
@@ -18,13 +19,14 @@ import 'maplibre-gl/dist/maplibre-gl.css';
  *  - onClick(lngLat)
  */
 
+const CARTO_KEY = process.env.NEXT_PUBLIC_CARTO_BASEMAP_KEY;
 const MAP_STYLE = {
   version: 8,
   sources: {
     carto: {
       type: 'raster',
       tiles: ['a', 'b', 'c', 'd'].map(
-        (s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`
+        (s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png${CARTO_KEY ? `?key=${encodeURIComponent(CARTO_KEY)}` : ''}`
       ),
       tileSize: 256,
       attribution:

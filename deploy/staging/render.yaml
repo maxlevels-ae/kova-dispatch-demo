@@ -1,0 +1,73 @@
+# New resources only. Import THIS file from feat/maxride-egp-branding.
+# Never attach the existing production service to this Blueprint.
+services:
+  - type: web
+    name: maxride-staging-web
+    runtime: node
+    repo: https://github.com/maxlevels-ae/kova-dispatch-demo
+    branch: feat/maxride-egp-branding
+    region: frankfurt
+    plan: starter
+    autoDeployTrigger: off
+    buildCommand: npm ci && node scripts/build-staging.mjs
+    startCommand: node scripts/start-staging.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: APP_ENV
+        value: staging
+      - key: NEXT_PUBLIC_CARTO_BASEMAP_KEY
+        sync: false
+      - key: STAGING_MONGO_HOST
+        fromService:
+          type: pserv
+          name: maxride-staging-mongo
+          property: host
+      - key: STAGING_MONGO_PASSWORD
+        fromService:
+          type: pserv
+          name: maxride-staging-mongo
+          envVarKey: STAGING_MONGO_PASSWORD
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: maxride-staging-redis
+          property: connectionString
+      - key: NEXTAUTH_SECRET
+        generateValue: true
+      - key: STAGING_DEMO_PASSWORD
+        generateValue: true
+      - key: DEMO_WALLET_TOPUPS
+        value: "false"
+      - key: DRIVER_AUTO_APPROVE
+        value: "false"
+  - type: pserv
+    name: maxride-staging-mongo
+    runtime: docker
+    repo: https://github.com/maxlevels-ae/kova-dispatch-demo
+    branch: feat/maxride-egp-branding
+    region: frankfurt
+    plan: starter
+    autoDeployTrigger: off
+    dockerfilePath: ./deploy/staging/mongo/Dockerfile
+    dockerContext: ./deploy/staging/mongo
+    disk:
+      name: maxride-staging-mongo-data
+      mountPath: /data/db
+      sizeGB: 5
+    envVars:
+      - key: STAGING_MONGO_PASSWORD
+        generateValue: true
+      - key: STAGING_MONGO_ADMIN_PASSWORD
+        generateValue: true
+      - key: MONGO_REPLICA_KEY
+        generateValue: true
+  - type: keyvalue
+    name: maxride-staging-redis
+    region: frankfurt
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: noeviction

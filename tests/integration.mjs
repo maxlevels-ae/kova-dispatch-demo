@@ -88,6 +88,36 @@ try {
     try { await assert.rejects(new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); }), /Wrong namespace/); }
     finally { socket.disconnect(); }
   });
+  await check('ride socket membership fails closed when Redis authorization lookup fails', async () => {
+    const sockets = {};
+    const unknownRide = String(new mongoose.Types.ObjectId());
+    let leaked = false;
+    try {
+      for (const role of ['rider', 'driver', 'admin']) {
+        const { token } = await (await request('/api/auth/socket-token', cookies[role])).json();
+        const socket = io(base + '/' + role, { auth: { token }, transports: ['websocket'], reconnection: false, timeout: 10000 });
+        sockets[role] = socket;
+        await new Promise((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); });
+      }
+      // Fault only the disposable localhost Redis membership command. No mock API.
+      await redis.acl('SETUSER', 'default', '-sismember');
+      await assert.rejects(redis.sismember('qa-membership-probe', 'nobody'), /NOPERM/);
+      sockets.rider.on('driver:location', data => { if (data.rideId === unknownRide) leaked = true; });
+      sockets.rider.emit('ride:subscribe', { rideId: unknownRide });
+      await new Promise(resolve => setTimeout(resolve, 250));
+      const processed = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('GPS relay did not process the fault test')), 10000);
+        sockets.admin.once('driver:location', () => { clearTimeout(timer); resolve(); });
+      });
+      sockets.driver.emit('driver:location', { lat: 30, lng: 31, rideId: unknownRide });
+      await processed;
+      await new Promise(resolve => setTimeout(resolve, 100));
+      assert.equal(leaked, false, 'Redis failure must never grant membership to an unknown ride');
+    } finally {
+      await redis.acl('SETUSER', 'default', '+sismember');
+      for (const socket of Object.values(sockets)) socket.disconnect();
+    }
+  });
   await check('driver online/offline API remains functional with EGP wallet', async () => {
     const online = await request('/api/drivers/me/status', cookies.driver, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ online: true, location: { lat: 30, lng: 31 } }) });
     assert.equal(online.status, 200);

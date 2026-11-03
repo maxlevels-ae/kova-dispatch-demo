@@ -125,12 +125,12 @@ async function removeDriverFromIndex(profileId) {
 /** Is this user a participant of the ride? (set by ride-service in Redis) */
 async function isRideMember(rideId, userId) {
   const redis = await getRedis();
-  if (!redis) return true; // fail open in dev when Redis is down
+  if (!redis) return false; // Never grant private ride access without authorization.
   try {
     const member = await redis.sismember(`ride:members:${rideId}`, String(userId));
     return member === 1;
   } catch {
-    return true;
+    return false;
   }
 }
 

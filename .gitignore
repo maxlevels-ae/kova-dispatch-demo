@@ -44,3 +44,8 @@ next-env.d.ts
 # credentials (never commit)
 *service-account*.json
 *-credentials.json
+
+# Local browser QA artifacts and browser binaries
+/.cache/
+/test-results/
+/playwright-report/

@@ -54,6 +54,12 @@ export default function useRiderRide({ onEvent } = {}) {
     };
   }, []);
 
+  // A page refresh can connect the socket before the active-ride request returns.
+  // Subscribe when that ride arrives as well as when the transport reconnects.
+  useEffect(() => {
+    if (socket && isConnected && ride?.id) socket.emit('ride:subscribe', { rideId: ride.id });
+  }, [socket, isConnected, ride?.id]);
+
   // ── Socket wiring ──
   useEffect(() => {
     if (!socket) return undefined;

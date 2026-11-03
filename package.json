@@ -18,7 +18,10 @@
     "test": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs --test tests/regression.test.mjs",
     "audit:currency": "node scripts/financial-inventory.mjs",
     "test:http": "node tests/http-smoke.mjs",
-    "test:integration": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs tests/integration.mjs"
+    "test:integration": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs tests/integration.mjs",
+    "test:staging": "node --env-file=.env.staging.qa tests/staging-browser.mjs",
+    "test:staging-config": "node --test tests/staging-config.test.mjs",
+    "validate:staging": "node scripts/validate-staging-blueprint.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1054.0",
@@ -35,15 +38,19 @@
     "next-auth": "5.0.0-beta.32",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "sharp": "^0.35.5",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "stripe": "^22.5.0",
-    "zod": "^4.4.3",
-    "sharp": "^0.35.5"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.4.4",
+    "js-yaml": "^5.5.0",
     "typescript": "5.9"
   }
 }

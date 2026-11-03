@@ -1,0 +1,595 @@
+{
+  "date": "2026-11-03T23:08:26.398Z",
+  "mode": "full",
+  "target": "http://localhost:3190",
+  "node": "v22.23.4",
+  "browserRenderer": "ANGLE (Intel, Intel(R) UHD Graphics (0x00009B41) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "hostedDeploymentVerified": false,
+  "visualDefects": [
+    "CARTO basemap requires a configured key; placeholder tiles remain visible."
+  ],
+  "checks": [
+    "seed is idempotent and preserves existing wallets and credentials",
+    "health: MongoDB, Redis and Socket.IO up",
+    "admin browser login and redirect",
+    "rider browser login and redirect",
+    "driver browser login and redirect",
+    "/admin app redirect and refresh",
+    "non-admin branding write is forbidden",
+    "payments and demo top-ups are disabled",
+    "real payouts are disabled",
+    "logo upload, preview and persistent save",
+    "public header, footer, login, signup and dashboards use saved logo",
+    "replace logo and preserve it after application restart",
+    "mobile branding and settings have no horizontal overflow",
+    "restore default branding and fallback",
+    "driver goes online with real geolocation",
+    "real destination search and EGP estimate",
+    "booking dispatches a real offer and driver accepts",
+    "GPS updates arrive live at rider over WebSocket",
+    "arrival, PIN start and trip completion through driver UI",
+    "EGP settlement reconciles wallets, ledger and one payment",
+    "EGP receipts, wallets, earnings and admin financial screens",
+    "no browser JavaScript errors"
+  ],
+  "browserErrors": [],
+  "socketDiagnostics": [
+    {
+      "role": "rider",
+      "value": "42/rider,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "rider",
+      "value": "42/rider,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "driver",
+      "value": "42/driver,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "driver",
+      "value": "42/driver,[\"driver:location\",{\"lat\":40.7484,\"lng\":-73.9857,\"heading\":null,\"speed\":null,\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "rider",
+      "value": "42/rider,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "rider",
+      "value": "42/rider,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "rider",
+      "value": "42/rider,[\"ride:subscribe\",{\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "driver",
+      "value": "42/driver,[\"driver:location\",{\"lat\":40.749,\"lng\":-73.985,\"heading\":null,\"speed\":null,\"rideId\":\"6aea69575593e59668b4c9b0\"}]"
+    },
+    {
+      "role": "driver",
+      "value": "42/driver,[\"driver:location\",{\"lat\":40.749,\"lng\":-73.985,\"heading\":null,\"speed\":null}]"
+    }
+  ],
+  "apiDiagnostics": [
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/rides/active",
+      "status": 200,
+      "hasRide": true,
+      "hasToken": false,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "rider",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "driver",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/session",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": false,
+      "authenticated": true
+    },
+    {
+      "role": "admin",
+      "path": "/api/auth/socket-token",
+      "status": 200,
+      "hasRide": false,
+      "hasToken": true,
+      "authenticated": false
+    }
+  ],
+  "navigationTimings": [
+    {
+      "path": "/dashboard",
+      "status": 200,
+      "responseStartMs": 52.208
+    }
+  ]
+}
