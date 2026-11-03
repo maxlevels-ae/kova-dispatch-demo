@@ -2,7 +2,7 @@
  * H3 Hexagonal Spatial Index — Core Module
  *
  * Wraps Uber's h3-js library to provide hexagonal spatial indexing
- * for the Kova rideshare platform. Used for:
+ * for the Maxride rideshare platform. Used for:
  *   - Driver location indexing (Redis-backed)
  *   - k-Ring expansion for progressive driver search
  *   - Demand heatmap cells for surge pricing

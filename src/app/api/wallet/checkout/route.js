@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/helpers';
 import { getStripe, isStripeEnabled, creditCheckoutSession } from '@/lib/services/stripe';
@@ -5,8 +6,8 @@ import { getStripe, isStripeEnabled, creditCheckoutSession } from '@/lib/service
 const checkoutSchema = z.object({
   amount: z
     .number()
-    .min(5, 'Minimum top-up is $5')
-    .max(1000, 'Maximum top-up is $1,000'),
+    .min(5, 'Minimum top-up is EGP 5')
+    .max(1000, 'Maximum top-up is EGP 1,000'),
 });
 
 // POST /api/wallet/checkout — create a Stripe Checkout session for a top-up
@@ -15,7 +16,7 @@ export async function POST(request) {
   if (error) return error;
 
   if (!isStripeEnabled()) {
-    return Response.json({ error: 'Card payments are not configured' }, { status: 501 });
+    return Response.json({ error: 'Card payments are disabled pending Egypt merchant verification' }, { status: 501 });
   }
 
   try {
@@ -40,10 +41,10 @@ export async function POST(request) {
       line_items: [
         {
           price_data: {
-            currency: 'usd',
+            currency: CURRENCY.toLowerCase(),
             unit_amount: amountCents,
             product_data: {
-              name: 'Kova wallet top-up',
+              name: 'Maxride wallet top-up',
               description: 'Funds are available for rides immediately after payment',
             },
           },
@@ -71,8 +72,8 @@ export async function GET(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
 
-  if (!isStripeEnabled()) {
-    return Response.json({ error: 'Card payments are not configured' }, { status: 501 });
+  if (!getStripe()) {
+    return Response.json({ error: 'Card payments are disabled pending Egypt merchant verification' }, { status: 501 });
   }
 
   try {

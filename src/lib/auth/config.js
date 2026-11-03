@@ -71,7 +71,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
       if (trigger === 'update' && session) {
         token.name = session.name || token.name;
-        token.role = session.role || token.role;
+        // Role is issued by the server at sign-in; client session updates cannot change it.
         token.avatar = session.avatar ?? token.avatar;
       }
 

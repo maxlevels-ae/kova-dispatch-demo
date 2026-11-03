@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Privacy Policy',
-  description: 'How Kova collects, uses and protects your data.',
+  description: 'How Maxride collects, uses and protects your data.',
 };
 
 export default function PrivacyPage() {
@@ -10,7 +10,7 @@ export default function PrivacyPage() {
       <p className="updated">Last updated: August 12, 2026</p>
 
       <p>
-        This policy explains what data Kova collects, why we collect it, and
+        This policy explains what data Maxride collects, why we collect it, and
         the choices you have. We collect the minimum needed to run a safe,
         reliable ride platform — and nothing is sold to advertisers.
       </p>

@@ -1,10 +1,10 @@
-# Kova — premium ride-hailing platform
+# Maxride — premium ride-hailing platform
 
 A full-stack, realtime Uber-style platform: rider app, driver app and admin
 console in one Next.js 16 codebase. No paid map APIs — maps, geocoding and
 routing all run on free, keyless services.
 
-Kova is open source under the [MIT licence](LICENSE) and listed on
+Maxride is open source under the [MIT licence](LICENSE) and listed on
 [Nucleus](https://nucleus.harakumo.com/-/explore).
 
 ## Stack
@@ -107,9 +107,9 @@ explains each one.
 - **Geo (optional):** `OSRM_URL` and `PHOTON_URL` replace the free public
   routing and geocoding instances, which have no SLA.
 
-## Run Kova on Harakumo
+## Run Maxride on Harakumo
 
-Kova is a Node server (`server.js` runs Next.js and Socket.IO in one
+Maxride is a Node server (`server.js` runs Next.js and Socket.IO in one
 process), so on Harakumo it runs as a **server app** (Pro plan and up), not a
 static site.
 

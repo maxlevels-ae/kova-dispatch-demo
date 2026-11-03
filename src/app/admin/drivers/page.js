@@ -102,7 +102,7 @@ function DriversAdmin() {
                   <td className="tiny">{VEHICLE_LABELS[d.vehicle?.type] || '—'}</td>
                   <td className="small mono-nums">{d.stats?.totalTrips || 0}</td>
                   <td className="small mono-nums">{(d.stats?.averageRating ?? 5).toFixed(1)}</td>
-                  <td className="small mono-nums">{money(d.stats?.totalEarnings || 0)}</td>
+                  <td className="small mono-nums">{money(d.stats?.totalEarnings || 0, d.stats?.currency ?? null)}</td>
                   <td>
                     {d.isApproved ? (
                       d.isOnline

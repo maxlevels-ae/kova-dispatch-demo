@@ -59,7 +59,7 @@ export default function DriverTripsPage() {
               <div className="flex items-center justify-between mt-3" style={{ borderTop: '1px solid var(--ink-100)', paddingTop: 10 }}>
                 <span className="tiny muted">You earned</span>
                 <span className="small mono-nums" style={{ fontWeight: 700, color: 'var(--success)' }}>
-                  +{money(ride.fare?.driverEarnings)}
+                  +{money(ride.fare?.driverEarnings, ride.fare?.currency ?? null)}
                 </span>
               </div>
             )}

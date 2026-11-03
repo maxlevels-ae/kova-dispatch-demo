@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'Terms of Service',
-  description: 'The terms that govern your use of Kova.',
+  description: 'The terms that govern your use of Maxride.',
 };
 
 export default function TermsPage() {
@@ -11,22 +11,22 @@ export default function TermsPage() {
 
       <p>
         These Terms of Service (“Terms”) govern your access to and use of the
-        Kova platform — our website, apps and services that connect riders
-        with independent drivers. By creating an account or using Kova, you
+        Maxride platform — our website, apps and services that connect riders
+        with independent drivers. By creating an account or using Maxride, you
         agree to these Terms.
       </p>
 
       <h2>1. The service</h2>
       <p>
-        Kova is a technology platform. We match ride requests with nearby
+        Maxride is a technology platform. We match ride requests with nearby
         drivers, calculate upfront fares, process wallet payments and provide
         live trip tracking. Drivers are independent providers of
-        transportation services; Kova does not itself provide transportation.
+        transportation services; Maxride does not itself provide transportation.
       </p>
 
       <h2>2. Fair economics</h2>
       <p>
-        Kova is built driver-first. Our platform commission is a small,
+        Maxride is built driver-first. Our platform commission is a small,
         transparent percentage of each fare — published on every driver’s
         earnings screen — and exists only to cover the cost of operating the
         platform. The remainder of every fare belongs to the driver. Rider
@@ -58,7 +58,7 @@ export default function TermsPage() {
       </p>
       <ul>
         <li>
-          Ride credits are redeemable <strong>only for Kova rides</strong>. They
+          Ride credits are redeemable <strong>only for Maxride rides</strong>. They
           are not money, cannot be exchanged for cash, and cannot be
           transferred to another user or account.
         </li>
@@ -75,7 +75,7 @@ export default function TermsPage() {
       <p>
         <strong>Driver earnings</strong> are credited to the driver the moment a
         trip completes, and are withdrawn to the driver’s own bank account
-        through Stripe. Stripe collects and holds bank details directly; Kova
+        through Stripe. Stripe collects and holds bank details directly; Maxride
         does not store them. Payouts are subject to Stripe’s verification and
         typically arrive within one to two business days.
       </p>
@@ -97,7 +97,7 @@ export default function TermsPage() {
       <h2>8. Disclaimers and liability</h2>
       <p>
         The service is provided “as is”. To the maximum extent permitted by
-        law, Kova is not liable for indirect or consequential damages arising
+        law, Maxride is not liable for indirect or consequential damages arising
         from your use of the platform. Nothing in these Terms limits
         liability that cannot be limited by law.
       </p>

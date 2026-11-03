@@ -1,6 +1,6 @@
-# Kova system design
+# Maxride system design
 
-How Kova stores data, how a ride moves through the system, who may do what,
+How Maxride stores data, how a ride moves through the system, who may do what,
 the limits in the code, how it behaves when something fails, and how it would
 scale. Everything here is read from the code; file paths point at the source.
 For the parts and diagrams of the whole system see
@@ -532,7 +532,7 @@ These are not built, or are only partly built, in this code:
 
 ## How it scales
 
-Today Kova is built for one server process:
+Today Maxride is built for one server process:
 
 - `global.io` is shared between Socket.IO and the API routes, the dispatch
   loop waits on an in-process event bus, the rate limiter counts in memory,

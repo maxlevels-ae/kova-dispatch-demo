@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { CURRENCY } from '@/lib/currency';
 
 const userSchema = new mongoose.Schema(
   {
@@ -46,8 +47,8 @@ const userSchema = new mongoose.Schema(
       default: 'rider',
     },
     wallet: {
-      balance: { type: Number, default: 0, min: 0 },
-      currency: { type: String, default: 'USD' },
+      balance: { type: Number, default: 0 },
+      currency: { type: String, default: function () { return this.isNew ? CURRENCY : undefined; } },
     },
     rating: {
       average: { type: Number, default: 5.0, min: 0, max: 5 },

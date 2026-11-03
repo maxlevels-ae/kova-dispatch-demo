@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import PricingRule from '@/lib/db/models/PricingRule';
@@ -49,9 +50,11 @@ export async function PUT(request) {
 
     await connectDB();
     const { vehicleType, city, ...rest } = parsed.data;
+    const existing = await PricingRule.findOne({ vehicleType, city }).lean();
+    if (existing && existing.currency !== CURRENCY) return Response.json({ error: 'Legacy pricing requires an audited migration before replacement. EGP defaults remain active.' }, { status: 409 });
     const rule = await PricingRule.findOneAndUpdate(
       { vehicleType, city },
-      { vehicleType, city, ...rest },
+      { vehicleType, city, ...rest, currency: CURRENCY },
       { new: true, upsert: true, runValidators: true }
     ).lean();
 

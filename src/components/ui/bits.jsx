@@ -104,12 +104,10 @@ export function RideStatusBadge({ status }) {
 }
 
 export const VEHICLE_LABELS = {
-  economy: 'Kova Go',
-  comfort: 'Kova Comfort',
-  premium: 'Kova Lux',
-  xl: 'Kova XL',
+  economy: 'Maxride Go',
+  comfort: 'Maxride Comfort',
+  premium: 'Maxride Lux',
+  xl: 'Maxride XL',
 };
 
-export function money(n, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(n ?? 0);
-}
+export { money } from '@/lib/currency';

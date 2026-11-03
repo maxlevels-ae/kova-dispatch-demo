@@ -85,13 +85,7 @@ export function formatDuration(seconds) {
  * @param {string} currency
  * @returns {string}
  */
-export function formatCurrency(amount, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
+export { money as formatCurrency } from '@/lib/currency';
 
 /**
  * Format date relative to now

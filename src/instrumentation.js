@@ -11,5 +11,5 @@ export async function register() {
   startDispatchSweeper();
   startLocationFlusher();
 
-  console.log('[Kova] Background workers started (dispatch sweeper, location flusher)');
+  console.log('[Maxride] Background workers started (dispatch sweeper, location flusher)');
 }

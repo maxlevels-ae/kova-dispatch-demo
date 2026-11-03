@@ -1,4 +1,5 @@
 'use client';
+import { LATE_CANCEL_FEE, LEGACY_USD_CANCEL_FEE } from '@/lib/currency';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -42,6 +43,7 @@ export default function RiderDashboard() {
   const [estimate, setEstimate] = useState(null); // {route, estimates}
   const [estimating, setEstimating] = useState(false);
   const [vehicleType, setVehicleType] = useState('economy');
+  const [walletCurrency, setWalletCurrency] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null);
   const [booking, setBooking] = useState(false);
   const [nearby, setNearby] = useState([]);
@@ -83,6 +85,7 @@ export default function RiderDashboard() {
       if (res.ok) {
         const { user } = await res.json();
         setWalletBalance(user.wallet?.balance ?? 0);
+        setWalletCurrency(user.wallet?.currency ?? null);
       }
     } catch { /* non-blocking */ }
   }, []);
@@ -321,7 +324,7 @@ export default function RiderDashboard() {
                           </span>
                           <span className="tiny muted truncate" style={{ display: 'block' }}>{Meta.blurb}</span>
                         </span>
-                        <span className="small mono-nums" style={{ fontWeight: 700 }}>{money(fare.total)}</span>
+                        <span className="small mono-nums" style={{ fontWeight: 700 }}>{money(fare.total, fare.currency ?? null)}</span>
                       </button>
                     );
                   })}
@@ -336,7 +339,7 @@ export default function RiderDashboard() {
                     <Wallet size={16} /> Paying with wallet
                   </span>
                   <span className="tiny mono-nums muted">
-                    {walletBalance != null ? money(walletBalance) : '—'}
+                    {walletBalance != null ? money(walletBalance, walletCurrency) : '—'}
                   </span>
                 </div>
 
@@ -498,7 +501,7 @@ export default function RiderDashboard() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="muted">Fare (wallet)</span>
-                <span className="mono-nums" style={{ fontWeight: 700 }}>{money(ride.fare?.total)}</span>
+                <span className="mono-nums" style={{ fontWeight: 700 }}>{money(ride.fare?.total, ride.fare?.currency ?? null)}</span>
               </div>
             </div>
 
@@ -527,7 +530,7 @@ export default function RiderDashboard() {
 
             {ride.status === 'arrived' && (
               <p className="tiny muted mt-3 text-center">
-                Cancelling now includes a $3.00 late-cancel fee
+                Cancelling now includes a {money(ride.fare?.currency === 'EGP' ? LATE_CANCEL_FEE : LEGACY_USD_CANCEL_FEE, ride.fare?.currency ?? null)} late-cancel fee
               </p>
             )}
           </div>
@@ -588,25 +591,25 @@ export default function RiderDashboard() {
               <div className="flex items-center justify-between small">
                 <span className="muted">Base + distance + time</span>
                 <span className="mono-nums">
-                  {money((completedRide.fare?.baseFare || 0) + (completedRide.fare?.distanceFare || 0) + (completedRide.fare?.timeFare || 0))}
+                  {money((completedRide.fare?.baseFare || 0) + (completedRide.fare?.distanceFare || 0) + (completedRide.fare?.timeFare || 0), completedRide.fare?.currency ?? null)}
                 </span>
               </div>
               {completedRide.fare?.surgeFare > 0 && (
                 <div className="flex items-center justify-between small mt-1">
                   <span className="muted">Surge ({completedRide.fare.surgeMultiplier}×)</span>
-                  <span className="mono-nums">{money(completedRide.fare.surgeFare)}</span>
+                  <span className="mono-nums">{money(completedRide.fare.surgeFare, completedRide.fare?.currency ?? null)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between small mt-1">
                 <span className="muted">Booking fee</span>
-                <span className="mono-nums">{money(completedRide.fare?.bookingFee)}</span>
+                <span className="mono-nums">{money(completedRide.fare?.bookingFee, completedRide.fare?.currency ?? null)}</span>
               </div>
               <div
                 className="flex items-center justify-between mt-2"
                 style={{ borderTop: '1px solid var(--border)', paddingTop: 10, fontWeight: 700 }}
               >
                 <span>Total ({completedRide.payment?.method})</span>
-                <span className="mono-nums">{money(completedRide.fare?.total)}</span>
+                <span className="mono-nums">{money(completedRide.fare?.total, completedRide.fare?.currency ?? null)}</span>
               </div>
             </div>
 

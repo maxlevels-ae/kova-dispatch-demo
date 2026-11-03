@@ -20,12 +20,12 @@ export default function AppShell({ nav, children }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Link href="/" aria-label="Kova home">
+          <Link href="/" aria-label="Maxride home">
             <KovaLogo size={30} />
           </Link>
         </div>
 
-        <nav className="sidebar-nav" aria-label="Main">
+        <nav className={`sidebar-nav${nav.length > 6 ? ' sidebar-nav--extended' : ''}`} aria-label="Main">
           {nav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (

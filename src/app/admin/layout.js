@@ -1,22 +1,10 @@
-'use client';
-
-import { LayoutDashboard, Route, Car, Users, DollarSign, Inbox } from 'lucide-react';
-import Providers from '@/components/providers';
-import AppShell from '@/components/shell/AppShell';
-
-const NAV = [
-  { href: '/admin/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/rides', label: 'Rides', icon: Route },
-  { href: '/admin/drivers', label: 'Drivers', icon: Car },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/pricing', label: 'Pricing', icon: DollarSign },
-  { href: '/admin/support', label: 'Support', icon: Inbox },
-];
-
-export default function AdminLayout({ children }) {
-  return (
-    <Providers>
-      <AppShell nav={NAV}>{children}</AppShell>
-    </Providers>
-  );
+import { auth } from '@/lib/auth/config';
+import { redirect } from 'next/navigation';
+import { dashboardForRole } from '@/lib/auth/redirects';
+import AdminShell from '@/components/shell/AdminShell';
+export default async function AdminLayout({ children }) {
+  const session = await auth();
+  if (!session?.user) redirect('/login?callbackUrl=/admin/dashboard');
+  if (session.user.role !== 'admin') redirect(dashboardForRole(session.user.role));
+  return <AdminShell>{children}</AdminShell>;
 }

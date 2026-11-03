@@ -3,7 +3,7 @@ import ContactForm from './ContactForm';
 
 export const metadata = {
   title: 'Contact',
-  description: 'Get in touch with the Kova team.',
+  description: 'Get in touch with the Maxride team.',
 };
 
 const CHANNELS = [

@@ -26,6 +26,8 @@ export default function WalletPanel() {
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState(null);
   const [stripeEnabled, setStripeEnabled] = useState(false);
+  const [topupEnabled, setTopupEnabled] = useState(false);
+  const [limitation, setLimitation] = useState('');
   const [topupOpen, setTopupOpen] = useState(false);
   const [amount, setAmount] = useState('25');
   const [processing, setProcessing] = useState(false);
@@ -39,6 +41,8 @@ export default function WalletPanel() {
         setWallet(data.wallet);
         setTransactions(data.transactions);
         setStripeEnabled(Boolean(data.stripeEnabled));
+        setTopupEnabled(Boolean(data.topupEnabled));
+        setLimitation(data.limitation || '');
       }
     } catch {
       setTransactions([]);
@@ -69,7 +73,7 @@ export default function WalletPanel() {
         if (res.ok && data.paid) {
           toast(
             data.credited
-              ? `${money(data.amount)} added to your wallet`
+              ? `${money(data.amount, data.currency ?? null)} added to your wallet`
               : 'Payment received — balance updated',
             'success',
             5000
@@ -158,7 +162,7 @@ export default function WalletPanel() {
               }}
               className="mono-nums"
             >
-              {wallet ? money(Math.abs(wallet.balance)) : '—'}
+              {wallet ? money(Math.abs(wallet.balance), wallet.currency ?? null) : '—'}
             </div>
           </div>
           <Wallet size={36} style={{ opacity: 0.35 }} />
@@ -166,10 +170,10 @@ export default function WalletPanel() {
 
         {owes && (
           <p className="small mt-3" style={{ color: '#fca5a5' }}>
-            You owe {money(Math.abs(wallet.balance))} — top up to book rides again.
+            You owe {money(Math.abs(wallet.balance), wallet.currency ?? null)} — top up to book rides again.
           </p>
         )}
-        <button className="btn btn-gold mt-4" onClick={() => setTopupOpen(true)}>
+        <button className="btn btn-gold mt-4" disabled={!stripeEnabled && !topupEnabled} onClick={() => setTopupOpen(true)}>
           <Plus size={17} /> Add funds
         </button>
       </div>
@@ -209,15 +213,16 @@ export default function WalletPanel() {
               </div>
               <div className="text-right">
                 <div className="small mono-nums" style={{ fontWeight: 700, color: credit ? 'var(--success)' : 'var(--text)' }}>
-                  {credit ? '+' : ''}{money(t.amount)}
+                  {credit ? '+' : ''}{money(t.amount, t.currency ?? null)}
                 </div>
-                <div className="tiny muted mono-nums">{money(t.balanceAfter)}</div>
+                <div className="tiny muted mono-nums">{money(t.balanceAfter, t.currency ?? null)}</div>
               </div>
             </div>
           );
         })}
       </div>
 
+      {limitation && <p className="small muted mt-4">{limitation}</p>}
       <Modal open={topupOpen} onClose={() => setTopupOpen(false)} title="Add funds">
         <div className="flex-col gap-4">
           <div className="flex gap-2">
@@ -228,7 +233,7 @@ export default function WalletPanel() {
                 style={{ padding: '10px 0', justifyContent: 'center' }}
                 onClick={() => setAmount(String(a))}
               >
-                <span className="small" style={{ fontWeight: 700 }}>${a}</span>
+                <span className="small" style={{ fontWeight: 700 }}>{money(a)}</span>
               </button>
             ))}
           </div>

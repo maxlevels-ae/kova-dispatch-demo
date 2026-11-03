@@ -1,4 +1,4 @@
-import { getStripe, isStripeEnabled, creditCheckoutSession } from '@/lib/services/stripe';
+import { getStripe, creditCheckoutSession } from '@/lib/services/stripe';
 import { syncAccountStatus } from '@/lib/services/payouts';
 
 // POST /api/webhooks/stripe — Stripe event delivery.
@@ -6,7 +6,7 @@ import { syncAccountStatus } from '@/lib/services/payouts';
 // `checkout.session.completed` (wallet top-ups) and `account.updated` (driver
 // payouts) events, using the same signing secret as STRIPE_WEBHOOK_SECRET.
 export async function POST(request) {
-  if (!isStripeEnabled() || !process.env.STRIPE_WEBHOOK_SECRET) {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
     return Response.json({ error: 'Webhook not configured' }, { status: 501 });
   }
 
@@ -41,7 +41,7 @@ export async function POST(request) {
       const result = await creditCheckoutSession(event.data.object);
       console.log(
         `[Stripe] checkout.session.completed ${event.data.object.id}:`,
-        result.credited ? `credited $${result.amount}` : result.reason
+        result.credited ? `credited ${result.currency} ${result.amount}` : result.reason
       );
     }
     return Response.json({ received: true });

@@ -1,3 +1,4 @@
+import { PAYMENT_LIMITATION, COUNTRY, CURRENCY } from '@/lib/currency';
 import connectDB from '@/lib/db/mongodb';
 import Driver from '@/lib/db/models/Driver';
 import User from '@/lib/db/models/User';
@@ -23,7 +24,7 @@ export { PayoutError };
  * none of it touches our servers.
  */
 export async function createOnboardingLink({ driverUserId, origin }) {
-  if (!isStripeEnabled()) throw new PayoutError('Payouts are not configured', 501);
+  if (!isStripeEnabled()) throw new PayoutError(PAYMENT_LIMITATION, 501);
   const stripe = getStripe();
 
   await connectDB();
@@ -39,14 +40,14 @@ export async function createOnboardingLink({ driverUserId, origin }) {
     try {
       account = await stripe.accounts.create({
         type: 'express',
-        country: 'US',
+        country: COUNTRY,
         email: user?.email || undefined,
         business_type: 'individual',
         capabilities: {
           transfers: { requested: true },
         },
         business_profile: {
-          product_description: 'Rideshare driver on the Kova platform',
+          product_description: 'Rideshare driver on the Maxride platform',
           mcc: '4121', // taxicabs & limousines
         },
         metadata: {
@@ -121,12 +122,14 @@ export async function getPayoutStatus(driverUserId) {
 
   return {
     configured: isStripeEnabled(),
+    limitation: PAYMENT_LIMITATION,
+    currency: user?.wallet?.currency || null,
     connected: Boolean(accountId),
     detailsSubmitted,
     payoutsEnabled,
     balance,
     minPayout: MIN_PAYOUT,
-    canCashOut: payoutsEnabled && balance >= MIN_PAYOUT,
+    canCashOut: isStripeEnabled() && payoutsEnabled && balance >= MIN_PAYOUT,
     lastPayoutAt: driver?.payouts?.lastPayoutAt || null,
   };
 }
@@ -140,7 +143,7 @@ export async function getPayoutStatus(driverUserId) {
  * driver's bank details.
  */
 export async function cashOut({ driverUserId, amount }) {
-  if (!isStripeEnabled()) throw new PayoutError('Payouts are not configured', 501);
+  if (!isStripeEnabled()) throw new PayoutError(PAYMENT_LIMITATION, 501);
   const stripe = getStripe();
 
   await connectDB();
@@ -157,7 +160,7 @@ export async function cashOut({ driverUserId, amount }) {
 
   const requested = amount == null ? balance : round2(amount);
   if (requested < MIN_PAYOUT) {
-    throw new PayoutError(`Minimum payout is $${MIN_PAYOUT.toFixed(2)}`, 400);
+    throw new PayoutError(`Minimum payout is EGP ${MIN_PAYOUT.toFixed(2)}`, 400);
   }
   if (requested > balance) {
     throw new PayoutError('Amount exceeds your available earnings', 400);
@@ -176,9 +179,9 @@ export async function cashOut({ driverUserId, amount }) {
     transfer = await stripe.transfers.create(
       {
         amount: Math.round(requested * 100),
-        currency: 'usd',
+        currency: CURRENCY.toLowerCase(),
         destination: driver.payouts.stripeAccountId,
-        description: 'Kova driver earnings',
+        description: 'Maxride driver earnings',
         metadata: { driverUserId: String(driverUserId) },
       },
       // Idempotency: same driver + amount + minute can't double-send

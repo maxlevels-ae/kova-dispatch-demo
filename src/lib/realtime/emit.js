@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 /**
  * Socket.IO emit helpers for API routes and services.
  *
@@ -72,7 +73,6 @@ export function joinDriverToRide(userId, rideId) {
  */
 export function rideBus() {
   if (!global.__rideBus) {
-    const { EventEmitter } = require('events');
     const bus = new EventEmitter();
     bus.setMaxListeners(1000);
     global.__rideBus = bus;

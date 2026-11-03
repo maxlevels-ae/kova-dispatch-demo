@@ -31,7 +31,7 @@ export default function DriverDashboard() {
     if (type === 'rider-cancelled') {
       toast(
         data?.compensation
-          ? `Rider cancelled — ${money(data.compensation)} compensation added`
+          ? `Rider cancelled — ${money(data.compensation, data.currency ?? null)} compensation added`
           : 'Rider cancelled the trip',
         'info',
         5000
@@ -234,7 +234,7 @@ export default function DriverDashboard() {
                 {ride.status === 'in_progress' && 'Trip in progress'}
               </span>
               <span className="small mono-nums" style={{ fontWeight: 700 }}>
-                {money(ride.fare?.driverEarnings)}
+                {money(ride.fare?.driverEarnings, ride.fare?.currency ?? null)}
               </span>
             </div>
 
@@ -345,7 +345,7 @@ export default function DriverDashboard() {
                   )}
                 </span>
                 <span style={{ fontWeight: 800, fontSize: '1.15rem' }} className="mono-nums">
-                  {money(offer.earnings)}
+                  {money(offer.earnings, offer.currency ?? null)}
                 </span>
               </div>
             </div>
@@ -405,7 +405,7 @@ export default function DriverDashboard() {
         {receipt && (
           <div className="text-center">
             <div style={{ fontSize: '2.4rem', fontWeight: 800 }} className="mono-nums">
-              {money(receipt.fare?.driverEarnings)}
+              {money(receipt.fare?.driverEarnings, receipt.fare?.currency ?? null)}
             </div>
             <p className="small muted mt-1 mb-4">
               earned this trip · paid to your wallet

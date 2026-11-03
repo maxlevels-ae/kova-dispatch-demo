@@ -79,7 +79,7 @@ export default function AdminRidesPage() {
                   </td>
                   <td className="tiny">{VEHICLE_LABELS[r.vehicleType] || r.vehicleType}</td>
                   <td className="small mono-nums" style={{ fontWeight: 600 }}>
-                    {r.status === 'completed' ? money(r.fare?.total) : '—'}
+                    {r.status === 'completed' ? money(r.fare?.total, r.fare?.currency ?? null) : '—'}
                   </td>
                   <td><RideStatusBadge status={r.status} /></td>
                 </tr>

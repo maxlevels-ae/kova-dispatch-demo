@@ -1,6 +1,8 @@
+import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import mongoose from 'mongoose';
 import connectDB from '@/lib/db/mongodb';
+import Ride from '@/lib/db/models/Ride';
 import Driver from '@/lib/db/models/Driver';
 import { requireAuth } from '@/lib/auth/helpers';
 
@@ -29,6 +31,12 @@ export async function GET(request) {
       Driver.countDocuments(query),
     ]);
 
+    const totals = await Ride.aggregate([
+      { $match: { driverId: { $in: drivers.map(d => d.userId?._id).filter(Boolean) }, status: 'completed', 'fare.currency': CURRENCY } },
+      { $group: { _id: '$driverId', earnings: { $sum: '$fare.driverEarnings' } } },
+    ]);
+    const earnings = new Map(totals.map(t => [String(t._id), t.earnings]));
+    for (const d of drivers) d.stats = { ...d.stats, totalEarnings: earnings.get(String(d.userId?._id)) || 0, currency: CURRENCY };
     return Response.json({
       drivers,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },

@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import connectDB from '@/lib/db/mongodb';
 import Ride from '@/lib/db/models/Ride';
 import User from '@/lib/db/models/User';
@@ -42,7 +43,7 @@ export async function GET() {
       Ride.countDocuments({ createdAt: { $gte: today } }),
       Ride.countDocuments({ status: { $in: ['searching', 'accepted', 'arrived', 'in_progress'] } }),
       Ride.aggregate([
-        { $match: { status: 'completed', completedAt: { $gte: today } } },
+        { $match: { status: 'completed', 'fare.currency': CURRENCY, completedAt: { $gte: today } } },
         {
           $group: {
             _id: null,
@@ -61,10 +62,10 @@ export async function GET() {
         .limit(8)
         .populate('riderId', 'name')
         .populate('driverId', 'name')
-        .select('status pickup.address dropoff.address fare.total vehicleType createdAt')
+        .select('status pickup.address dropoff.address fare.total fare.currency vehicleType createdAt')
         .lean(),
       Ride.aggregate([
-        { $match: { status: 'completed', completedAt: { $gte: daysAgo(6) } } },
+        { $match: { status: 'completed', 'fare.currency': CURRENCY, completedAt: { $gte: daysAgo(6) } } },
         {
           $group: {
             _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } },
@@ -84,6 +85,8 @@ export async function GET() {
     ]);
 
     return Response.json({
+      currency: CURRENCY,
+      financialScope: 'EGP only; historical currencies remain in ride history',
       ridesToday,
       activeRides,
       revenueToday: revenueAgg[0]?.revenue || 0,

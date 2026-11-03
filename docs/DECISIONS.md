@@ -1,4 +1,4 @@
-# Kova decisions
+# Maxride decisions
 
 One entry per decision that can be seen in the code and README. The git
 history starts at the open-source release on 2026-10-13, so earlier dates are
@@ -142,7 +142,7 @@ README gives for the one taken.
   10 percent platform commission. Surge comes from H3 demand and supply and is
   capped per rule (default 3x).
 - **Options:** Fixed fares; rules in the database; rules in code.
-- **Why:** The code comment calls Kova driver-first: drivers keep about 90
+- **Why:** The code comment calls Maxride driver-first: drivers keep about 90
   percent or more of each fare. Admins can change rules without a deploy, and
   the defaults keep pricing working on an empty database.
 
@@ -194,9 +194,9 @@ README gives for the one taken.
 
 ## 2026-10-13 · Open source under MIT
 
-- **Decision:** Publish Kova under the MIT licence and list it on Nucleus.
+- **Decision:** Publish Maxride under the MIT licence and list it on Nucleus.
 - **Options:** Keep it private; a copyleft licence; MIT.
-- **Why:** The README presents Kova as a complete ride-hailing platform that
+- **Why:** The README presents Maxride as a complete ride-hailing platform that
   anyone can run on their own Node host, and lists it on Nucleus' explore
   page. MIT is a permissive licence; the reason for choosing it over others
   is not recorded.

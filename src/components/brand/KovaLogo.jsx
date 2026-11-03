@@ -1,5 +1,8 @@
+'use client';
+import { useBranding } from '@/context/BrandingProvider';
+import { usePathname } from 'next/navigation';
 /**
- * Kova — brand mark (ink monogram with gold route dot)
+ * Maxride — brand mark (ink monogram with gold route dot)
  */
 
 export function KovaIcon({ size = 32, className = '' }) {
@@ -39,12 +42,16 @@ export function KovaIcon({ size = 32, className = '' }) {
 }
 
 export function KovaLogo({ size = 32, showText = true, className = '', light = false }) {
+  const { branding } = useBranding();
+  const pathname = usePathname();
+  const logo = (pathname === '/login' || pathname === '/signup') ? branding.loginLogo || branding.logo : branding.logo;
   return (
     <span
       className={className}
       style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}
     >
-      <KovaIcon size={size} />
+      {logo ? /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={logo} alt={branding.name} width={size} height={size} style={{ objectFit: 'contain' }} /> : <KovaIcon size={size} />}
       {showText && (
         <span
           style={{
@@ -53,9 +60,13 @@ export function KovaLogo({ size = 32, showText = true, className = '', light = f
             letterSpacing: '-0.03em',
             color: light ? '#FAFAF9' : '#0C0A09',
             lineHeight: 1,
+            maxWidth: 'min(45vw, 240px)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}
         >
-          kova
+          {branding.name}
         </span>
       )}
     </span>

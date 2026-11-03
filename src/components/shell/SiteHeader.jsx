@@ -18,7 +18,7 @@ export default function SiteHeader() {
         style={{ maxWidth: 1120, margin: '0 auto', padding: '14px 24px' }}
         aria-label="Primary"
       >
-        <Link href="/" aria-label="Kova home">
+        <Link href="/" aria-label="Maxride home">
           <KovaLogo size={32} />
         </Link>
         <div className="flex items-center gap-3">

@@ -184,7 +184,7 @@ export default function ProfileCard({ children }) {
             )}
           </FieldRow>
           <FieldRow label="Wallet">
-            <span className="mono-nums" style={{ fontWeight: 700 }}>{money(user.wallet?.balance)}</span>
+            <span className="mono-nums" style={{ fontWeight: 700 }}>{money(user.wallet?.balance, user.wallet?.currency ?? null)}</span>
           </FieldRow>
           <FieldRow label="Member since">
             {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}

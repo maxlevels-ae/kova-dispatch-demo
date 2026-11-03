@@ -96,7 +96,7 @@ export default function AdminDashboard() {
     <div className="content-pad">
       <div className="flex items-center justify-between mb-6 wrap gap-3">
         <div>
-          <h1 className="page-title">Overview</h1>
+          <h1 className="page-title">Overview</h1><p className="tiny muted">Financial summaries in EGP. Historical amounts retain their recorded currency in ride history.</p>
           <p className="page-sub">Platform health in real time</p>
         </div>
         <div className="flex gap-2 wrap">

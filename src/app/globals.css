@@ -565,6 +565,11 @@ textarea.input { padding: 12px 16px; resize: vertical; min-height: 80px; }
     align-items: center;
   }
 
+  /* Keep the additional admin Settings tab within narrow screens. */
+  .sidebar-nav--extended { min-width: 0; }
+  .sidebar-nav--extended .nav-item { min-width: 0; padding-inline: 2px; flex: 1 1 0; }
+  .sidebar-nav--extended .nav-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .nav-item.active { background: transparent; color: var(--text); }
   .nav-item.active svg { color: var(--gold-600); }
 

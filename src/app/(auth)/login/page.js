@@ -3,9 +3,10 @@
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { KovaLogo } from '@/components/brand/KovaLogo';
+import { safeCallback } from '@/lib/auth/redirects';
 import LegalFooter from '@/components/shell/LegalFooter';
 
 function LoginForm() {
@@ -40,14 +41,15 @@ function LoginForm() {
 
     // Full navigation so the proxy routes by role (rider/driver/admin)
     const callbackUrl = searchParams.get('callbackUrl');
-    window.location.href = callbackUrl || '/dashboard';
+    const session = await getSession();
+    window.location.href = safeCallback(callbackUrl, session?.user?.role, window.location.origin);
   }
 
   return (
     <div className="auth-page">
       <div className="auth-card animate-in">
         <div className="flex justify-center mb-6">
-          <Link href="/" aria-label="Kova home">
+          <Link href="/" aria-label="Maxride home">
             <KovaLogo size={38} />
           </Link>
         </div>
@@ -122,7 +124,7 @@ function LoginForm() {
         </form>
 
         <p className="text-center small muted mt-6">
-          New to Kova?{' '}
+          New to Maxride?{' '}
           <Link href="/signup" style={{ fontWeight: 600, color: 'var(--text)' }}>
             Create an account
           </Link>

@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import Driver from '@/lib/db/models/Driver';
@@ -62,6 +63,7 @@ export async function POST(request) {
       // Defensive: a driver carrying an outstanding balance must settle up
       // before driving again.
       const user = await User.findById(session.user.id).select('wallet').lean();
+      if (user?.wallet?.currency !== CURRENCY) return Response.json({ error: 'Wallet requires currency review before accepting EGP rides.', code: 'CURRENCY_REVIEW' }, { status: 409 });
       const balance = user?.wallet?.balance ?? 0;
       if (balance < MAX_DRIVER_DEBT) {
         return Response.json(

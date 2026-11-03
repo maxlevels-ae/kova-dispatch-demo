@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { KovaIcon } from '@/components/brand/KovaLogo';
+import { KovaLogo } from '@/components/brand/KovaLogo';
 
 const COLUMNS = [
   {
@@ -46,10 +46,7 @@ export default function SiteFooter() {
         >
           <div>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-              <KovaIcon size={30} />
-              <span style={{ fontWeight: 700, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>
-                kova
-              </span>
+              <KovaLogo size={30} />
             </span>
             <p className="small muted mt-3" style={{ maxWidth: 260, lineHeight: 1.6 }}>
               Premium ride-hailing with upfront fares, live tracking and
@@ -92,7 +89,7 @@ export default function SiteFooter() {
           className="flex items-center justify-between wrap gap-3"
           style={{ borderTop: '1px solid var(--border)', marginTop: 40, paddingTop: 20 }}
         >
-          <span className="tiny muted">© {new Date().getFullYear()} Kova. All rights reserved.</span>
+          <span className="tiny muted">© {new Date().getFullYear()} Maxride. All rights reserved.</span>
           <div className="flex gap-4 tiny muted">
             <Link href="/terms">Terms</Link>
             <Link href="/privacy">Privacy</Link>

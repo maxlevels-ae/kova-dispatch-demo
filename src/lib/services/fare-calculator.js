@@ -1,3 +1,4 @@
+import { CURRENCY, DEFAULT_PRICING, minorUnits } from '@/lib/currency';
 import connectDB from '@/lib/db/mongodb';
 import PricingRule from '@/lib/db/models/PricingRule';
 import { calculateSurgeForLocation } from './h3-redis';
@@ -5,44 +6,11 @@ import { calculateSurgeForLocation } from './h3-redis';
 /**
  * Default pricing rules (fallback if none exist in DB).
  *
- * Kova is driver-first: the platform keeps a small single-digit commission
+ * Maxride is driver-first: the platform keeps a small single-digit commission
  * (just enough to run the service), drivers keep ~90%+ of every fare, and
  * base rates are kept below big-app pricing so rides stay affordable.
  */
-const DEFAULT_PRICING = {
-  economy: {
-    baseFare: 2.0,
-    perKmRate: 1.0,
-    perMinRate: 0.15,
-    minimumFare: 4.0,
-    bookingFee: 0.5,
-    platformCommission: 8,
-  },
-  comfort: {
-    baseFare: 3.0,
-    perKmRate: 1.5,
-    perMinRate: 0.25,
-    minimumFare: 6.5,
-    bookingFee: 0.75,
-    platformCommission: 8,
-  },
-  premium: {
-    baseFare: 5.0,
-    perKmRate: 2.5,
-    perMinRate: 0.4,
-    minimumFare: 12.0,
-    bookingFee: 1.0,
-    platformCommission: 10,
-  },
-  xl: {
-    baseFare: 4.0,
-    perKmRate: 1.8,
-    perMinRate: 0.3,
-    minimumFare: 8.0,
-    bookingFee: 0.75,
-    platformCommission: 8,
-  },
-};
+
 
 /**
  * Calculate fare for a ride.
@@ -74,6 +42,7 @@ export async function calculateFare({
     pricing = await PricingRule.findOne({
       vehicleType,
       city,
+      currency: CURRENCY,
       isActive: true,
     }).lean();
   } catch (err) {
@@ -122,8 +91,8 @@ export async function calculateFare({
   const total = subtotal + pricing.bookingFee;
 
   // Platform fee
-  const platformFee = total * (pricing.platformCommission / 100);
-  const driverEarnings = total - platformFee;
+  const platformFee = round(round(total) * (pricing.platformCommission / 100));
+  const driverEarnings = round(total) - platformFee;
 
   const result = {
     baseFare: round(pricing.baseFare),
@@ -136,7 +105,7 @@ export async function calculateFare({
     driverEarnings: round(driverEarnings),
     total: round(total),
     estimatedTotal: round(total),
-    currency: 'USD',
+    currency: CURRENCY,
   };
 
   // Include H3 surge details if available
@@ -191,5 +160,5 @@ export async function getAllFareEstimates({
 }
 
 function round(num) {
-  return Math.round(num * 100) / 100;
+  return minorUnits(num) / 100;
 }

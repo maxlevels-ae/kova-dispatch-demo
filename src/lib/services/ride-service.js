@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta } from '@/lib/currency';
 import crypto from 'crypto';
 import connectDB from '@/lib/db/mongodb';
 import redis from '@/lib/db/redis';
@@ -27,7 +29,7 @@ import {
 } from '@/lib/realtime/emit';
 
 /** Fee charged when a rider cancels after the driver has already arrived. */
-const LATE_CANCEL_FEE = 3.0;
+const LATE_CANCEL_FEE = LEGACY_USD_CANCEL_FEE;
 
 class RideError extends Error {
   constructor(message, status = 400) {
@@ -143,6 +145,7 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType }) {
   });
 
   const rider = await User.findById(riderId).select('wallet').lean();
+  if (!sameCurrency(rider?.wallet?.currency, CURRENCY)) throw new RideError('Your wallet requires currency review before booking EGP rides. Existing funds are unchanged.', 409);
   const balance = rider?.wallet?.balance ?? 0;
 
   // An outstanding balance (unpaid cancellation fee, or a fare that couldn't
@@ -201,6 +204,10 @@ export async function acceptRide({ rideId, driverUserId }) {
   if (!driver) throw new RideError('Driver profile not found', 404);
   if (!driver.isApproved) throw new RideError('Your driver account is not approved yet', 403);
 
+  const offeredRide = await Ride.findById(rideId).lean();
+  const driverWallet = await User.findById(driverUserId).select('wallet').lean();
+  if (!sameCurrency(offeredRide?.fare?.currency, driverWallet?.wallet?.currency)) throw new RideError('Wallet currency does not match this ride; contact support for currency review.', 409);
+
   const holdsOffer = await verifyOfferHolder(rideId, driver._id);
   if (!holdsOffer) {
     throw new RideError('This request was already taken or expired', 409);
@@ -210,7 +217,7 @@ export async function acceptRide({ rideId, driverUserId }) {
   const claimedDriver = await Driver.findOneAndUpdate(
     { _id: driver._id, currentRideId: null },
     { currentRideId: rideId },
-    { new: true }
+    { returnDocument: 'after' }
   );
   if (!claimedDriver) throw new RideError('You already have an active ride', 409);
 
@@ -229,7 +236,7 @@ export async function acceptRide({ rideId, driverUserId }) {
         },
       },
     },
-    { new: true }
+    { returnDocument: 'after' }
   );
 
   if (!ride) {
@@ -288,7 +295,7 @@ export async function declineOffer({ rideId, driverUserId }) {
 
 // ─── Trip progression ─────────────────────────────────────────────────────────
 
-async function transition({ rideId, driverUserId, from, to, extra = {}, note }) {
+async function transition({ rideId, driverUserId, from, to, extra = {}, note, dbSession }) {
   const ride = await Ride.findOneAndUpdate(
     { _id: rideId, driverId: driverUserId, status: from },
     {
@@ -296,7 +303,7 @@ async function transition({ rideId, driverUserId, from, to, extra = {}, note }) 
       ...extra,
       $push: { timeline: { status: to, timestamp: new Date(), note } },
     },
-    { new: true }
+    { returnDocument: 'after', session: dbSession, updatePipeline: true }
   );
   if (!ride) {
     throw new RideError(`Cannot move ride to "${to}" — check the current status`, 409);
@@ -352,88 +359,98 @@ export async function startRide({ rideId, driverUserId, pin }) {
 export async function completeRide({ rideId, driverUserId }) {
   await connectDB();
 
-  const ride = await transition({
-    rideId,
-    driverUserId,
-    from: 'in_progress',
-    to: 'completed',
-    extra: { completedAt: new Date() },
-  });
-
-  // Actual trip duration (distance stays the quoted route)
-  ride.route.actualDurationSeconds = Math.round(
-    (ride.completedAt - ride.startedAt) / 1000
-  );
-
-  // ── Settle payment ──────────────────────────────────────────────
-  const total = ride.fare.total;
-  const driverEarnings = ride.fare.driverEarnings;
-
-  // Charge the rider's wallet. The balance is allowed to go negative if it
-  // dropped since booking — the trip happened, so the fare is owed and they
-  // must settle before booking again (enforced in createRide).
-  const rider = await User.findByIdAndUpdate(
-    ride.riderId,
-    { $inc: { 'wallet.balance': -total } },
-    { new: true }
-  );
-  const shortfall = rider ? rider.wallet.balance < 0 : false;
-
-  if (rider) {
-    await WalletTransaction.create({
-      userId: ride.riderId,
-      type: 'ride_payment',
-      amount: -total,
-      balanceAfter: rider.wallet.balance,
-      rideId: ride._id,
-      note: `Ride to ${ride.dropoff.address}`.slice(0, 200),
+  const { ride, shortfall } = await mongoose.connection.transaction(async dbSession => {
+    const current = await Ride.findOne({ _id: rideId, driverId: driverUserId }).session(dbSession).lean();
+    if (!current) throw new RideError('Ride not found', 404);
+    const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId] } }).select('wallet').session(dbSession).lean();
+    if (wallets.length !== 2 || wallets.some(u => !sameCurrency(u.wallet?.currency, current.fare?.currency))) throw new RideError('Settlement requires currency review. Balances are unchanged.', 409);
+    const ride = await transition({
+      rideId,
+      driverUserId,
+      from: 'in_progress',
+      dbSession,
+      to: 'completed',
+      extra: { completedAt: new Date() },
     });
-  }
 
-  // Credit the driver their share regardless — they did the work, and any
-  // rider shortfall is a platform receivable, not the driver's problem.
-  const driverUser = await User.findByIdAndUpdate(
-    ride.driverId,
-    { $inc: { 'wallet.balance': driverEarnings } },
-    { new: true }
-  );
-  if (driverUser) {
-    await WalletTransaction.create({
-      userId: ride.driverId,
-      type: 'ride_earning',
-      amount: driverEarnings,
-      balanceAfter: driverUser.wallet.balance,
-      rideId: ride._id,
-      note: `Trip earnings`,
-    });
-  }
+    // Actual trip duration (distance stays the quoted route)
+    ride.route.actualDurationSeconds = Math.round(
+      (ride.completedAt - ride.startedAt) / 1000
+    );
 
-  ride.payment.status = 'captured';
-  await ride.save();
+    // ── Settle payment ──────────────────────────────────────────────
+    const total = ride.fare.total;
+    const driverEarnings = ride.fare.driverEarnings;
 
-  await Payment.create({
-    rideId: ride._id,
-    riderId: ride.riderId,
-    driverId: ride.driverId,
-    amount: total,
-    currency: ride.fare.currency?.toLowerCase() || 'usd',
-    platformFee: ride.fare.platformFee,
-    driverPayout: driverEarnings,
-    status: 'succeeded',
-    method: 'wallet',
-  });
+    // Charge the rider's wallet. The balance is allowed to go negative if it
+    // dropped since booking — the trip happened, so the fare is owed and they
+    // must settle before booking again (enforced in createRide).
+    const rider = await User.findByIdAndUpdate(
+      ride.riderId,
+      walletDelta(-total),
+      { returnDocument: 'after', session: dbSession, updatePipeline: true }
+    );
+    const shortfall = rider ? rider.wallet.balance < 0 : false;
 
-  // ── Free the driver & update stats ──────────────────────────────
-  await Driver.updateOne(
-    { _id: ride.driverProfileId },
-    {
-      currentRideId: null,
-      $inc: {
-        'stats.totalTrips': 1,
-        'stats.totalEarnings': driverEarnings,
-      },
+    if (rider) {
+      await WalletTransaction.create([{
+        currency: ride.fare.currency,
+        userId: ride.riderId,
+        type: 'ride_payment',
+        amount: -total,
+        balanceAfter: rider.wallet.balance,
+        rideId: ride._id,
+        note: `Ride to ${ride.dropoff.address}`.slice(0, 200),
+      }], { session: dbSession });
     }
-  );
+
+    // Credit the driver their share regardless — they did the work, and any
+    // rider shortfall is a platform receivable, not the driver's problem.
+    const driverUser = await User.findByIdAndUpdate(
+      ride.driverId,
+      walletDelta(driverEarnings),
+      { returnDocument: 'after', session: dbSession, updatePipeline: true }
+    );
+    if (driverUser) {
+      await WalletTransaction.create([{
+        currency: ride.fare.currency,
+        userId: ride.driverId,
+        type: 'ride_earning',
+        amount: driverEarnings,
+        balanceAfter: driverUser.wallet.balance,
+        rideId: ride._id,
+        note: `Trip earnings`,
+      }], { session: dbSession });
+    }
+
+    ride.payment.status = 'captured';
+    await ride.save({ session: dbSession });
+
+    await Payment.create([{
+      rideId: ride._id,
+      riderId: ride.riderId,
+      driverId: ride.driverId,
+      amount: total,
+      currency: ride.fare.currency,
+      platformFee: ride.fare.platformFee,
+      driverPayout: driverEarnings,
+      status: 'succeeded',
+      method: 'wallet',
+    }], { session: dbSession });
+
+    // ── Free the driver & update stats ──────────────────────────────
+    await Driver.updateOne(
+      { _id: ride.driverProfileId },
+      {
+        currentRideId: null,
+        $inc: {
+          'stats.totalTrips': 1,
+        },
+      }, { session: dbSession }
+    );
+
+    return { ride, shortfall };
+  });
 
   emitToRide(rideId, 'ride:completed', {
     rideId: String(ride._id),
@@ -462,11 +479,15 @@ export async function cancelRide({ rideId, userId, role, reason }) {
       ? { _id: rideId, riderId: userId, status: { $in: ['searching', 'accepted', 'arrived'] } }
       : { _id: rideId, driverId: userId, status: { $in: ['accepted', 'arrived'] } };
 
-  const ride = await Ride.findOne(match);
+  let ride = await Ride.findOne(match);
   if (!ride) {
     throw new RideError('This ride can no longer be cancelled', 409);
   }
 
+  if (role === 'rider' && ride.status === 'arrived') {
+    const wallets = await User.find({ _id: { $in: [ride.riderId, ride.driverId].filter(Boolean) } }).select('wallet').lean();
+    if (!['EGP', 'USD'].includes(ride.fare?.currency) || wallets.some(u => !sameCurrency(u.wallet?.currency, ride.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
+  }
   const hadDriver = Boolean(ride.driverProfileId);
 
   if (role === 'driver') {
@@ -503,65 +524,36 @@ export async function cancelRide({ rideId, userId, role, reason }) {
     return ride;
   }
 
-  // Rider cancel
-  signalDispatch(String(ride._id), 'cancelled');
-
-  let cancellationFee = 0;
-  if (ride.status === 'arrived') {
-    cancellationFee = LATE_CANCEL_FEE;
-  }
-
-  ride.status = 'cancelled';
-  ride.cancelledBy = 'rider';
-  ride.cancellationReason = reason || '';
-  ride.fare.cancellationFee = cancellationFee;
-  ride.payment.status = cancellationFee > 0 ? 'captured' : 'waived';
-  ride.timeline.push({
-    status: 'cancelled',
-    timestamp: new Date(),
-    note: reason || 'Cancelled by rider',
-  });
-  await ride.save();
-
-  // Charge the late-cancel fee. The balance may go negative — the rider must
-  // clear it before booking again, so the fee is always collectable and the
-  // driver is always compensated.
-  if (cancellationFee > 0) {
-    const rider = await User.findByIdAndUpdate(
-      ride.riderId,
-      { $inc: { 'wallet.balance': -cancellationFee } },
-      { new: true }
-    );
-    if (rider) {
-      await WalletTransaction.create({
-        userId: ride.riderId,
-        type: 'cancellation_fee',
-        amount: -cancellationFee,
-        balanceAfter: rider.wallet.balance,
-        rideId: ride._id,
-        note: 'Late cancellation fee',
-      });
-    }
-    // Compensate the driver who already drove to the pickup
-    if (hadDriver && ride.driverId) {
-      const driverShare = round2(cancellationFee * 0.8);
-      const driverUser = await User.findByIdAndUpdate(
-        ride.driverId,
-        { $inc: { 'wallet.balance': driverShare } },
-        { new: true }
-      );
-      if (driverUser) {
-        await WalletTransaction.create({
-          userId: driverUser._id,
-          type: 'ride_earning',
-          amount: driverShare,
-          balanceAfter: driverUser.wallet.balance,
-          rideId: ride._id,
-          note: 'Cancellation compensation',
-        });
+  // Commit status, wallet deltas and ledger together. The status predicate plus
+  // transaction write conflict prevents concurrent cancellations charging twice.
+  const settled = await mongoose.connection.transaction(async dbSession => {
+    const current = await Ride.findOne(match).session(dbSession);
+    if (!current) throw new RideError('This ride can no longer be cancelled', 409);
+    const cancellationFee = current.status === 'arrived' ? (current.fare.currency === CURRENCY ? EGP_CANCEL_FEE : LATE_CANCEL_FEE) : 0;
+    if (cancellationFee) {
+      const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId].filter(Boolean) } }).session(dbSession).lean();
+      if (wallets.length !== (current.driverId ? 2 : 1) || wallets.some(u => !sameCurrency(u.wallet?.currency, current.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
+      const deltas = [{ id: current.riderId, amount: -cancellationFee, type: 'cancellation_fee', note: 'Late cancellation fee' }];
+      if (current.driverId) deltas.push({ id: current.driverId, amount: round2(cancellationFee * 0.8), type: 'ride_earning', note: 'Cancellation compensation' });
+      for (const delta of deltas) {
+        const user = await User.findByIdAndUpdate(delta.id, walletDelta(delta.amount), { returnDocument: 'after', session: dbSession, updatePipeline: true });
+        await WalletTransaction.create([{ userId: delta.id, currency: current.fare.currency, amount: delta.amount, type: delta.type, note: delta.note, balanceAfter: user.wallet.balance, rideId: current._id }], { session: dbSession });
       }
     }
-  }
+    if (cancellationFee) {
+      const driverPayout = current.driverId ? round2(cancellationFee * 0.8) : 0;
+      await Payment.create([{ rideId: current._id, riderId: current.riderId, driverId: current.driverId, amount: cancellationFee, currency: current.fare.currency, platformFee: round2(cancellationFee - driverPayout), driverPayout, status: 'succeeded', method: 'wallet', metadata: { kind: 'cancellation' } }], { session: dbSession });
+    }
+    current.status = 'cancelled'; current.cancelledBy = 'rider'; current.cancellationReason = reason || '';
+    current.fare.cancellationFee = cancellationFee;
+    current.payment.status = cancellationFee > 0 ? 'captured' : 'waived';
+    current.timeline.push({ status: 'cancelled', timestamp: new Date(), note: reason || 'Cancelled by rider' });
+    await current.save({ session: dbSession });
+    return current;
+  });
+  ride = settled;
+  const cancellationFee = settled.fare.cancellationFee;
+  signalDispatch(String(ride._id), 'cancelled');
 
   // Free the driver
   if (hadDriver) {
@@ -573,6 +565,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
       rideId: String(ride._id),
       cancelledBy: 'rider',
       reason: reason || '',
+      currency: ride.fare.currency,
       compensation: cancellationFee > 0 ? round2(cancellationFee * 0.8) : 0,
     });
     leaveRideRoom('/driver', String(ride.driverId), String(ride._id));
@@ -661,7 +654,7 @@ export async function addRideMessage({ rideId, userId, role, text }) {
   const ride = await Ride.findOneAndUpdate(
     { ...match, status: { $in: ['accepted', 'arrived', 'in_progress'] } },
     { $push: { messages: { from: role, text: text.slice(0, 500), at: new Date() } } },
-    { new: true }
+    { returnDocument: 'after' }
   );
   if (!ride) throw new RideError('No active ride to message', 404);
 

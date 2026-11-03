@@ -263,6 +263,6 @@ app.prepare().then(() => {
       process.exit(1);
     })
     .listen(port, bindHost, () => {
-      console.log(`\n🚀 Kova running at http://${hostname}:${port}  (H3: ${h3 ? 'on' : 'off'})\n`);
+      console.log(`\n🚀 Maxride running at http://${hostname}:${port}  (H3: ${h3 ? 'on' : 'off'})\n`);
     });
 });

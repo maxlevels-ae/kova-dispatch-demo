@@ -75,6 +75,7 @@ const driverSchema = new mongoose.Schema(
       default: null,
     },
     stats: {
+      currency: { type: String },
       totalTrips: { type: Number, default: 0 },
       totalEarnings: { type: Number, default: 0 },
       totalOnlineHours: { type: Number, default: 0 },

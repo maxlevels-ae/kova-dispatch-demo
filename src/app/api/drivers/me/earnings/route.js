@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import mongoose from 'mongoose';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
@@ -39,6 +40,7 @@ export async function GET(request) {
           $match: {
             driverId: driverObjectId,
             status: 'completed',
+            'fare.currency': CURRENCY,
             completedAt: { $gte: today },
           },
         },
@@ -55,6 +57,7 @@ export async function GET(request) {
           $match: {
             driverId: driverObjectId,
             status: 'completed',
+            'fare.currency': CURRENCY,
             completedAt: { $gte: week },
           },
         },
@@ -70,7 +73,7 @@ export async function GET(request) {
       Ride.find({ driverId: driverUserId, status: 'completed' })
         .sort({ completedAt: -1 })
         .limit(10)
-        .select('pickup.address dropoff.address fare.driverEarnings fare.total payment.method completedAt route.distanceMeters')
+        .select('pickup.address dropoff.address fare.currency fare.driverEarnings fare.total payment.method completedAt route.distanceMeters')
         .lean(),
       WalletTransaction.find({ userId: driverUserId })
         .sort({ createdAt: -1 })
@@ -78,9 +81,15 @@ export async function GET(request) {
         .lean(),
     ]);
 
+    const lifetime = await Ride.aggregate([
+      { $match: { driverId: driverObjectId, status: 'completed', 'fare.currency': CURRENCY } },
+      { $group: { _id: null, total: { $sum: '$fare.driverEarnings' } } },
+    ]);
     return Response.json({
-      wallet: user?.wallet || { balance: 0, currency: 'USD' },
-      stats: driver?.stats || {},
+      currency: CURRENCY,
+      financialScope: 'EGP only; historical currencies remain in trip history',
+      wallet: user?.wallet || { balance: 0, currency: null },
+      stats: { ...driver?.stats, totalEarnings: lifetime[0]?.total || 0, currency: CURRENCY },
       today: todayAgg[0] || { earnings: 0, trips: 0 },
       week: {
         total: weekAgg.reduce((s, d) => s + d.earnings, 0),

@@ -102,7 +102,7 @@ function SignupForm() {
     <div className="auth-page">
       <div className="auth-card animate-in">
         <div className="flex justify-center mb-6">
-          <Link href="/" aria-label="Kova home">
+          <Link href="/" aria-label="Maxride home">
             <KovaLogo size={38} />
           </Link>
         </div>

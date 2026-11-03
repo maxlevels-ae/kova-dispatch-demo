@@ -41,7 +41,7 @@ export default function RidesPage() {
   return (
     <div className="content-pad">
       <h1 className="page-title">My rides</h1>
-      <p className="page-sub mb-6">Every trip you’ve taken with Kova</p>
+      <p className="page-sub mb-6">Every trip you’ve taken with Maxride</p>
 
       <div className="segmented mb-6" role="tablist">
         {FILTERS.map((f) => (
@@ -88,7 +88,7 @@ export default function RidesPage() {
             <div className="flex items-center justify-between mt-3" style={{ borderTop: '1px solid var(--ink-100)', paddingTop: 10 }}>
               <span className="tiny muted">{VEHICLE_LABELS[ride.vehicleType] || ride.vehicleType}</span>
               <span className="flex items-center gap-1 small" style={{ fontWeight: 700 }}>
-                {ride.status === 'completed' ? money(ride.fare?.total) : ride.status === 'cancelled' && ride.fare?.cancellationFee > 0 ? money(ride.fare.cancellationFee) : '—'}
+                {ride.status === 'completed' ? money(ride.fare?.total, ride.fare?.currency ?? null) : ride.status === 'cancelled' && ride.fare?.cancellationFee > 0 ? money(ride.fare.cancellationFee, ride.fare?.currency ?? null) : '—'}
                 <ChevronRight size={15} style={{ color: 'var(--ink-400)' }} />
               </span>
             </div>

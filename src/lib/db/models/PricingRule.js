@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
+import { CURRENCY } from '@/lib/currency';
 
 const pricingRuleSchema = new mongoose.Schema(
   {
+    currency: { type: String, default: function () { return this.isNew ? CURRENCY : undefined; } },
     vehicleType: {
       type: String,
       enum: ['economy', 'comfort', 'premium', 'xl'],
@@ -15,26 +17,26 @@ const pricingRuleSchema = new mongoose.Schema(
     baseFare: {
       type: Number,
       required: true,
-      default: 2.5,
+      default: 20,
     },
     perKmRate: {
       type: Number,
       required: true,
-      default: 1.5,
+      default: 8,
     },
     perMinRate: {
       type: Number,
       required: true,
-      default: 0.25,
+      default: 1,
     },
     minimumFare: {
       type: Number,
       required: true,
-      default: 5.0,
+      default: 40,
     },
     bookingFee: {
       type: Number,
-      default: 1.0,
+      default: 5,
     },
     platformCommission: {
       type: Number,

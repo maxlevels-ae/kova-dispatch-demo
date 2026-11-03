@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { CURRENCY, PAYMENT_LIMITATION, walletDelta } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
@@ -9,7 +11,7 @@ const topupSchema = z.object({
   amount: z
     .number()
     .positive('Amount must be positive')
-    .max(1000, 'Maximum top-up is $1,000'),
+    .max(1000, 'Maximum top-up is EGP 1,000'),
 });
 
 // GET /api/wallet — balance + transaction history
@@ -32,9 +34,11 @@ export async function GET(request) {
     ]);
 
     return Response.json({
-      wallet: user?.wallet || { balance: 0, currency: 'USD' },
+      wallet: user?.wallet || { balance: 0, currency: null },
       transactions,
       stripeEnabled: isStripeEnabled(),
+      topupEnabled: process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && user?.wallet?.currency === CURRENCY,
+      limitation: PAYMENT_LIMITATION,
     });
   } catch (err) {
     console.error('Wallet error:', err);
@@ -48,9 +52,9 @@ export async function POST(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
 
-  if (isStripeEnabled()) {
+  if (process.env.DEMO_WALLET_TOPUPS !== 'true' || process.env.NODE_ENV === 'production' || isStripeEnabled()) {
     return Response.json(
-      { error: 'Top-ups are processed by card — use the Add funds button' },
+      { error: 'Top-ups are disabled pending Egypt payment verification' },
       { status: 409 }
     );
   }
@@ -68,19 +72,17 @@ export async function POST(request) {
     const amount = Math.round(parsed.data.amount * 100) / 100;
 
     await connectDB();
-    const user = await User.findByIdAndUpdate(
-      session.user.id,
-      { $inc: { 'wallet.balance': amount } },
-      { new: true }
-    );
-
-    const txn = await WalletTransaction.create({
-      userId: session.user.id,
-      type: 'topup',
-      amount,
-      balanceAfter: user.wallet.balance,
-      note: 'Wallet top-up',
+    const result = await mongoose.connection.transaction(async dbSession => {
+      const user = await User.findOneAndUpdate(
+        { _id: session.user.id, 'wallet.currency': CURRENCY },
+        walletDelta(amount), { returnDocument: 'after', session: dbSession, updatePipeline: true }
+      );
+      if (!user) return null;
+      const [txn] = await WalletTransaction.create([{ userId: session.user.id, type: 'topup', amount, currency: CURRENCY, balanceAfter: user.wallet.balance, note: 'Demo wallet top-up' }], { session: dbSession });
+      return { user, txn };
     });
+    if (!result) return Response.json({ error: 'Wallet currency requires review. Balance unchanged.' }, { status: 409 });
+    const { user, txn } = result;
 
     return Response.json({ wallet: user.wallet, transaction: txn }, { status: 201 });
   } catch (err) {

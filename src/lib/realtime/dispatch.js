@@ -144,6 +144,7 @@ async function runCascade(rideId) {
       distanceMeters: ride.route.distanceMeters,
       durationSeconds: ride.route.durationSeconds,
       earnings: ride.fare.driverEarnings,
+        currency: ride.fare.currency,
       surgeMultiplier: ride.fare.surgeMultiplier,
       distanceToPickupMeters: Math.round(candidate.distance || 0),
       etaMinutes,

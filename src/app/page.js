@@ -7,7 +7,7 @@ import SiteHeader from '@/components/shell/SiteHeader';
 import SiteFooter from '@/components/shell/SiteFooter';
 
 export const metadata = {
-  title: 'Kova — Ride with confidence',
+  title: 'Maxride — Ride with confidence',
 };
 
 const FEATURES = [
@@ -44,10 +44,10 @@ const FEATURES = [
 ];
 
 const TIERS = [
-  { icon: Car, name: 'Kova Go', text: 'Everyday rides, great value' },
-  { icon: Car, name: 'Kova Comfort', text: 'Newer cars, extra legroom' },
-  { icon: Crown, name: 'Kova Lux', text: 'Top drivers, premium cars' },
-  { icon: Users, name: 'Kova XL', text: 'Room for up to six' },
+  { icon: Car, name: 'Maxride Go', text: 'Everyday rides, great value' },
+  { icon: Car, name: 'Maxride Comfort', text: 'Newer cars, extra legroom' },
+  { icon: Crown, name: 'Maxride Lux', text: 'Top drivers, premium cars' },
+  { icon: Users, name: 'Maxride XL', text: 'Room for up to six' },
 ];
 
 const STEPS = [
@@ -111,7 +111,7 @@ export default function LandingPage() {
               <span className="flex items-center gap-2 small muted">
                 <Route size={15} /> 4.8 km
               </span>
-              <span style={{ fontWeight: 800, fontSize: '1.2rem' }} className="mono-nums">$11.20</span>
+              <span style={{ fontWeight: 800, fontSize: '1.2rem' }} className="mono-nums">EGP 112.00</span>
             </div>
           </div>
           <div style={{ height: 8, borderRadius: 4, background: 'var(--ink-100)', marginTop: 22, overflow: 'hidden' }}>
@@ -123,7 +123,7 @@ export default function LandingPage() {
       {/* ── Features ── */}
       <section style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 1120, margin: '0 auto', padding: '72px 24px' }}>
-          <span className="eyebrow">Why Kova</span>
+          <span className="eyebrow">Why Maxride</span>
           <h2 style={{ fontSize: '2rem', marginTop: 10, maxWidth: 480 }}>
             Everything a great ride should be
           </h2>

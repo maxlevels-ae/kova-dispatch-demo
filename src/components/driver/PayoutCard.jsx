@@ -61,7 +61,8 @@ function PayoutCardInner() {
     }
   }
 
-  if (!status?.configured) return null;
+  if (!status) return null;
+  if (!status.configured) return <div className="card card-pad mb-4 small muted">{status.limitation}</div>;
 
   // ── Not connected yet ──
   if (!status.connected || !status.detailsSubmitted) {
@@ -74,7 +75,7 @@ function PayoutCardInner() {
           <div className="flex-1">
             <h3 style={{ fontSize: '1.05rem' }}>Get paid to your bank</h3>
             <p className="tiny muted mt-1">
-              Add your bank details once — Stripe handles it securely, and Kova
+              Add your bank details once — Stripe handles it securely, and Maxride
               never sees your account number.
             </p>
           </div>
@@ -95,7 +96,7 @@ function PayoutCardInner() {
           <div className="small" style={{ fontWeight: 700 }}>Stripe is verifying your details</div>
           <div className="tiny muted mt-1">
             This usually takes a few minutes. You keep earning meanwhile — your
-            balance is {money(status.balance)}.
+            balance is {money(status.balance, status.currency ?? null)}.
           </div>
         </div>
         <button className="btn btn-secondary btn-sm" onClick={() => act('onboard')} disabled={busy}>
@@ -112,7 +113,7 @@ function PayoutCardInner() {
         <div>
           <div className="tiny muted">Available to withdraw</div>
           <div className="stat-value mono-nums" style={{ fontSize: '1.9rem' }}>
-            {money(status.balance)}
+            {money(status.balance, status.currency ?? null)}
           </div>
           <div className="tiny muted mt-1">
             {status.lastPayoutAt

@@ -1,5 +1,6 @@
 import { DM_Sans } from 'next/font/google';
 import './globals.css';
+import { BrandingProvider } from '@/context/BrandingProvider';
 
 const dmSans = DM_Sans({
   subsets: ['latin'],
@@ -13,26 +14,26 @@ const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 export const metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Kova — Ride with confidence',
-    template: '%s · Kova',
+    default: 'Maxride — Ride with confidence',
+    template: '%s · Maxride',
   },
   description:
     'Premium ride-hailing where drivers keep 90%+ of every fare. Upfront pricing, live tracking and PIN-verified pickups.',
-  applicationName: 'Kova',
-  keywords: ['ride-hailing', 'taxi', 'rideshare', 'transportation', 'kova', 'kovaride'],
-  authors: [{ name: 'Kova' }],
+  applicationName: 'Maxride',
+  keywords: ['ride-hailing', 'taxi', 'rideshare', 'transportation', 'maxride'],
+  authors: [{ name: 'Maxride' }],
   openGraph: {
-    title: 'Kova — Ride with confidence',
+    title: 'Maxride — Ride with confidence',
     description:
       'Drivers keep 90%+ of every fare. Upfront pricing, live tracking, PIN-verified pickups.',
-    siteName: 'Kova',
+    siteName: 'Maxride',
     url: BASE_URL,
     type: 'website',
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Kova — Ride with confidence',
+    title: 'Maxride — Ride with confidence',
     description: 'Drivers keep 90%+ of every fare. Upfront pricing, live tracking.',
   },
   robots: {
@@ -51,7 +52,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={dmSans.variable}>
-      <body>{children}</body>
+      <body><BrandingProvider>{children}</BrandingProvider></body>
     </html>
   );
 }

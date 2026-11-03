@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { safeCallback, dashboardForRole } from '@/lib/auth/redirects';
 import { auth } from '@/lib/auth/config';
 
 // Routes that require authentication
@@ -9,7 +10,7 @@ const driverRoutes = ['/driver'];
 const riderRoutes = ['/dashboard', '/rides', '/wallet'];
 
 // ─── Per-IP limits on the unauthenticated auth and contact endpoints ────────
-// POST only. Held in this process's memory, which is exact for Kova's single
+// POST only. Held in this process's memory, which is exact for Maxride's single
 // server process (see README: run exactly one instance). The contact route
 // also keeps its own Redis counter as a second layer.
 const RATE_LIMITS = {
@@ -89,20 +90,13 @@ export default async function proxy(request) {
   // Redirect unauthenticated users to login
   if (isProtected && !session) {
     const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    loginUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 
   // Redirect authenticated users away from auth pages
   if (isAuthRoute && session) {
-    const role = session.user?.role;
-    if (role === 'admin') {
-      return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-    }
-    if (role === 'driver') {
-      return NextResponse.redirect(new URL('/driver/dashboard', request.url));
-    }
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL(safeCallback(request.nextUrl.searchParams.get('callbackUrl'), session.user?.role, request.nextUrl.origin), request.url));
   }
 
   // Role-based access control
@@ -111,12 +105,12 @@ export default async function proxy(request) {
 
     // Admin routes - only admins
     if (adminRoutes.some((r) => pathname.startsWith(r)) && role !== 'admin') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL(dashboardForRole(role), request.url));
     }
 
     // Driver routes - only drivers
     if (driverRoutes.some((r) => pathname.startsWith(r)) && role !== 'driver') {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+      return NextResponse.redirect(new URL(dashboardForRole(role), request.url));
     }
 
     // Rider routes - send drivers/admins to their own home

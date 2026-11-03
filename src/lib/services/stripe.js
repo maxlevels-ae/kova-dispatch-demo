@@ -1,17 +1,19 @@
+import mongoose from 'mongoose';
+import { sameCurrency, walletDelta } from '@/lib/currency';
 import Stripe from 'stripe';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
 import WalletTransaction from '@/lib/db/models/WalletTransaction';
 
 export function isStripeEnabled() {
-  return Boolean(process.env.STRIPE_SECRET_KEY);
+  return false; // Egypt merchant/payment capabilities have not been verified.
 }
 
 let client = null;
 
 /** Lazily-initialized Stripe client (null when not configured). */
 export function getStripe() {
-  if (!isStripeEnabled()) return null;
+  if (!process.env.STRIPE_SECRET_KEY) return null;
   if (!client) {
     client = new Stripe(process.env.STRIPE_SECRET_KEY);
   }
@@ -38,36 +40,14 @@ export async function creditCheckoutSession(session) {
 
   await connectDB();
 
-  // Already applied? (webhook and return page can race — ref is unique)
-  const existing = await WalletTransaction.findOne({ ref: session.id }).lean();
-  if (existing) {
-    return { credited: false, reason: 'already_credited' };
-  }
-
-  const user = await User.findByIdAndUpdate(
-    userId,
-    { $inc: { 'wallet.balance': amount } },
-    { new: true }
-  );
-  if (!user) return { credited: false, reason: 'user_not_found' };
-
-  try {
-    await WalletTransaction.create({
-      userId,
-      type: 'topup',
-      amount,
-      balanceAfter: user.wallet.balance,
-      note: 'Card top-up (Stripe)',
-      ref: session.id,
-    });
-  } catch (err) {
-    if (err?.code === 11000) {
-      // Lost the race with the other path — undo our duplicate credit
-      await User.findByIdAndUpdate(userId, { $inc: { 'wallet.balance': -amount } });
-      return { credited: false, reason: 'already_credited' };
-    }
-    throw err;
-  }
-
-  return { credited: true, amount, balance: user.wallet.balance };
+  // Atomically credit the original session currency, never convert legacy payments.
+  return mongoose.connection.transaction(async dbSession => {
+    const existing = await WalletTransaction.findOne({ ref: session.id }).session(dbSession).lean();
+    if (existing) return { credited: false, reason: 'already_credited' };
+    const user = await User.findById(userId).session(dbSession).lean();
+    if (!sameCurrency(user?.wallet?.currency, session.currency)) throw new Error('Payment currency requires manual reconciliation');
+    const updated = await User.findOneAndUpdate({ _id: userId, 'wallet.currency': user.wallet.currency }, walletDelta(amount), { returnDocument: 'after', session: dbSession, updatePipeline: true });
+    await WalletTransaction.create([{ userId, type: 'topup', amount, currency: session.currency.toUpperCase(), balanceAfter: updated.wallet.balance, note: 'Card top-up (Stripe)', ref: session.id }], { session: dbSession });
+    return { credited: true, amount, currency: session.currency.toUpperCase(), balance: updated.wallet.balance };
+  });
 }

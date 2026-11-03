@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
+import { CURRENCY } from '@/lib/currency';
 
 const walletTransactionSchema = new mongoose.Schema(
   {
+    currency: { type: String, default: function () { return this.isNew ? CURRENCY : undefined; } },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

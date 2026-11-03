@@ -1,6 +1,6 @@
-# Kova architecture
+# Maxride architecture
 
-Kova is a ride-hailing platform with three apps in one Next.js 16 codebase:
+Maxride is a ride-hailing platform with three apps in one Next.js 16 codebase:
 a rider app, a driver app and an admin console. A single Node process
 (`server.js`) serves the Next.js pages and API routes and hosts the Socket.IO
 server, so API routes can push realtime events directly. MongoDB holds the
@@ -197,7 +197,7 @@ through Stripe Checkout and are credited by the webhook or by the return page,
 whichever arrives first. Drivers are credited their share in the same wallet
 and cash out to a bank account through Stripe Connect Express transfers. When
 Stripe is not configured, the wallet hands out instant demo credits and
-payouts are disabled. Kova never sees card or bank details.
+payouts are disabled. Maxride never sees card or bank details.
 
 ## Storage
 

@@ -78,7 +78,7 @@ export default function AdminUsersPage() {
                   </td>
                   <td><span className={`badge ${ROLE_BADGE[u.role] || 'badge-neutral'}`}>{u.role}</span></td>
                   <td className="small mono-nums">{(u.rating?.average ?? 5).toFixed(1)}</td>
-                  <td className="small mono-nums">{money(u.wallet?.balance || 0)}</td>
+                  <td className="small mono-nums">{money(u.wallet?.balance || 0, u.wallet?.currency ?? null)}</td>
                   <td className="tiny muted">{new Date(u.createdAt).toLocaleDateString()}</td>
                   <td className="tiny muted">{u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) : '—'}</td>
                 </tr>

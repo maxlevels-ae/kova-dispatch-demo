@@ -1,3 +1,4 @@
+import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/db/mongodb';
@@ -55,6 +56,7 @@ export async function POST(request) {
       name,
       username,
       passwordHash,
+      wallet: { balance: 0, currency: CURRENCY },
       role,
     });
 
@@ -64,6 +66,7 @@ export async function POST(request) {
       await Driver.create({
         userId: user._id,
         isApproved: autoApprove,
+        stats: { currency: CURRENCY },
       });
     }
 

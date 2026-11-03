@@ -47,7 +47,7 @@ export async function GET() {
         email: user.email || '',
         avatar: user.avatar || '',
         role: user.role,
-        wallet: user.wallet || { balance: 0, currency: 'USD' },
+        wallet: user.wallet || { balance: 0, currency: null },
         rating: user.rating,
         savedPlaces: user.savedPlaces || [],
         createdAt: user.createdAt,

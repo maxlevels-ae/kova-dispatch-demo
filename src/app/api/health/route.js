@@ -4,7 +4,7 @@ import redis from '@/lib/db/redis';
 
 /**
  * GET /api/health — liveness/readiness probe for the host and uptime monitors.
- * Returns 200 only when MongoDB and Redis are both reachable.
+ * Returns 200 only when MongoDB, Redis and Socket.IO are all available.
  */
 export async function GET() {
   const checks = { mongo: 'down', redis: 'down', socket: global.io ? 'up' : 'down' };
@@ -48,7 +48,7 @@ export async function GET() {
     checks.redis = 'down';
   }
 
-  const healthy = checks.mongo === 'up' && checks.redis === 'up';
+  const healthy = checks.mongo === 'up' && checks.redis === 'up' && checks.socket === 'up';
 
   return Response.json(
     {

@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { CURRENCY } from '@/lib/currency';
 
 const paymentSchema = new mongoose.Schema(
   {
@@ -22,7 +23,7 @@ const paymentSchema = new mongoose.Schema(
     },
     currency: {
       type: String,
-      default: 'usd',
+      default: function () { return this.isNew ? CURRENCY : undefined; },
     },
     platformFee: {
       type: Number,

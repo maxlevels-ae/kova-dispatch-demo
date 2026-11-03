@@ -18,7 +18,7 @@ export default function LegalFooter({ className = '' }) {
       <Link href="/contact" style={{ textDecoration: 'underline' }}>
         Contact
       </Link>
-      <span>© {new Date().getFullYear()} Kova</span>
+      <span>© {new Date().getFullYear()} Maxride</span>
     </div>
   );
 }

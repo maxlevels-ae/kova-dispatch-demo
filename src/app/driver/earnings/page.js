@@ -54,7 +54,7 @@ export default function EarningsPage() {
 
   return (
     <div className="content-pad" style={{ maxWidth: 860 }}>
-      <h1 className="page-title">Earnings</h1>
+      <h1 className="page-title">Earnings</h1><p className="tiny muted">Financial summaries in EGP. Historical amounts retain their recorded currency in ride history.</p>
       <p className="page-sub mb-6">Your money at a glance</p>
 
       <PayoutCard />
@@ -66,10 +66,10 @@ export default function EarningsPage() {
         >
           <div>
             <div className="small" style={{ fontWeight: 700, color: 'var(--danger)' }}>
-              Outstanding balance: {money(Math.abs(data.wallet.balance))}
+              Outstanding balance: {money(Math.abs(data.wallet.balance), data.wallet.currency ?? null)}
             </div>
             <div className="tiny muted mt-1">
-              Top up to clear it — driving is paused below $25 owed.
+              Top up to clear it — driving is paused below EGP 25 owed.
             </div>
           </div>
           <Link href="/driver/wallet" className="btn btn-primary btn-sm">Settle up</Link>
@@ -89,7 +89,7 @@ export default function EarningsPage() {
         </div>
         <div className="card card-pad stat">
           <span className="stat-label">All time</span>
-          <span className="stat-value">{money(data.stats.totalEarnings || 0)}</span>
+          <span className="stat-value">{money(data.stats.totalEarnings || 0, data.stats.currency ?? null)}</span>
           <span className="tiny muted">{data.stats.totalTrips || 0} trips</span>
         </div>
       </div>
@@ -166,7 +166,7 @@ export default function EarningsPage() {
                 </div>
               </div>
               <span className="small mono-nums" style={{ fontWeight: 700, color: 'var(--success)' }}>
-                +{money(r.fare?.driverEarnings)}
+                +{money(r.fare?.driverEarnings, r.fare?.currency ?? null)}
               </span>
             </div>
           ))}
