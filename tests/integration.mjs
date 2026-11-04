@@ -196,6 +196,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
+  if (!process.argv.includes("--maps-only")) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -259,6 +260,7 @@ try {
       const sockets = {};
       const unknownRide = String(new mongoose.Types.ObjectId());
       let leaked = false;
+      await Driver.updateOne({_id:driver._id},{$set:{isOnline:true}});
       try {
         for (const role of ["rider", "driver", "admin"]) {
           const { token } = await (
@@ -311,6 +313,7 @@ try {
         );
       } finally {
         await redis.acl("SETUSER", "default", "+sismember");
+        await Driver.updateOne({_id:driver._id},{$set:{isOnline:false}});
         for (const socket of Object.values(sockets)) socket.disconnect();
       }
     },
@@ -1063,9 +1066,7 @@ try {
         await page
           .getByRole("button", { name: "Save changes", exact: true })
           .click();
-        await expect(
-          page.getByRole("status").filter({ hasText: "Settings saved." }),
-        ).toBeVisible();
+        await expect(page.locator(".settings-save-confirmation")).toBeVisible();
         await page.reload();
         await nav.getByRole("button", { name: "Bookings & Dispatch" }).click();
         await expect(
@@ -1164,11 +1165,7 @@ try {
         await page
           .getByRole("button", { name: "Save changes", exact: true })
           .click();
-        await expect(
-          page
-            .getByRole("status")
-            .filter({ hasText: "Paymob configuration saved." }),
-        ).toBeVisible();
+        await expect(page.locator(".settings-save-confirmation")).toBeVisible();
         await page.screenshot({
           path: "docs/qa/settings-provider-360.png",
           fullPage: true,
@@ -1184,24 +1181,65 @@ try {
         await expect(
           page.getByLabel("Merchant / account ID", { exact: true }),
         ).toHaveValue("browser-qa");
-        await page.getByLabel('Settings section',{exact:true}).selectOption('branding');
-        await page.getByLabel('Company / brand display name').fill('Maxride QA');
-        await page.getByRole('button',{name:'Save changes',exact:true}).click();
-        await expect(page.getByRole('status').filter({hasText:'Branding saved.'})).toBeVisible();
-        await page.reload();await expect(page.getByLabel('Company / brand display name')).toHaveValue('Maxride QA');
-        await page.getByLabel('Settings section',{exact:true}).selectOption('pricing');
-        await page.getByLabel('Base fare (EGP)',{exact:true}).fill('24');
-        await page.getByRole('button',{name:'Save changes',exact:true}).click();
-        await expect(page.getByRole('status').filter({hasText:'Economy pricing saved.'})).toBeVisible();
-        await page.reload();await page.getByLabel('Settings section',{exact:true}).selectOption('pricing');
-        await expect(page.getByLabel('Base fare (EGP)',{exact:true})).toHaveValue('24');
-        await page.getByLabel('Base fare (EGP)',{exact:true}).fill('25');
-        await page.screenshot({path:'docs/qa/settings-savebar-360.png',fullPage:true});
-        await page.getByRole('button',{name:'Discard',exact:true}).click();
+        await page
+          .getByLabel("Settings section", { exact: true })
+          .selectOption("branding");
+        await page
+          .getByLabel("Company / brand display name")
+          .fill("Maxride QA");
+        await page
+          .getByRole("button", { name: "Save changes", exact: true })
+          .click();
+        await expect(page.locator(".settings-save-confirmation")).toBeVisible();
+        await page.reload();
+        await expect(
+          page.getByLabel("Company / brand display name"),
+        ).toHaveValue("Maxride QA");
+        await page
+          .getByLabel("Settings section", { exact: true })
+          .selectOption("pricing");
+        await page.getByLabel("Base fare (EGP)", { exact: true }).fill("24");
+        await page
+          .getByRole("button", { name: "Save changes", exact: true })
+          .click();
+        await expect(page.locator(".settings-save-confirmation")).toBeVisible();
+        await page.reload();
+        await page
+          .getByLabel("Settings section", { exact: true })
+          .selectOption("pricing");
+        await expect(
+          page.getByLabel("Base fare (EGP)", { exact: true }),
+        ).toHaveValue("24");
+        await page.getByLabel("Base fare (EGP)", { exact: true }).fill("25");
+        await page.screenshot({
+          path: "docs/qa/settings-savebar-360.png",
+          fullPage: true,
+        });
+        await page
+          .getByRole("button", { name: "Discard", exact: true })
+          .click();
         assert.deepEqual(errors, []);
       } finally {
         await browser.close();
       }
+    },
+  );
+  }
+  await check(
+    "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
+    async () => {
+      const { mapBrowserChecks } = await import("./maps-browser.mjs");
+      await mapBrowserChecks({
+        makeRide,
+        base,
+        cookies,
+        driver,
+        Driver,
+        redis,
+        request,
+        start,
+        stop,
+      });
     },
   );
   console.log(

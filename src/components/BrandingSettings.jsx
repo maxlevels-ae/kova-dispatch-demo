@@ -1,4 +1,8 @@
 "use client";
+import {
+  useSettingsFeedback,
+  SettingsSaveConfirmation,
+} from "./settings/SettingsFeedback";
 /* eslint-disable @next/next/no-img-element -- Validated inline logo previews cannot use image optimization. */
 import { useEffect, useRef, useState } from "react";
 import { useBranding } from "@/context/BrandingProvider";
@@ -29,6 +33,7 @@ export default function BrandingSettings({ onDirty, localization }) {
       })
       .catch((e) => setMessage(e.message));
   }, []);
+  const feedback = useSettingsFeedback("branding");
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   useSettingsDirty("branding", dirty, onDirty);
   async function choose(key, file) {
@@ -80,7 +85,8 @@ export default function BrandingSettings({ onDirty, localization }) {
       setBranding(d);
       setDraft(d);
       setSaved(d);
-      setMessage("Branding saved.");
+      setMessage("");
+      feedback.confirm();
       setErrors({});
     } catch (e) {
       setMessage(e.message);
@@ -92,6 +98,12 @@ export default function BrandingSettings({ onDirty, localization }) {
   if (!draft) return <p role="status">{message || "Loading branding…"}</p>;
   return (
     <form onSubmit={save} noValidate>
+      <SettingsSaveConfirmation
+        savedAt={feedback.savedAt}
+        dirty={dirty}
+        busy={busy}
+        message={message}
+      />
       <p role="status" className="settings-feedback">
         {message}
       </p>

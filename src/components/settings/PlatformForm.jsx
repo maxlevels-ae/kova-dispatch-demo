@@ -1,4 +1,9 @@
 "use client";
+import {
+  useSettingsFeedback,
+  SettingsSaveConfirmation,
+} from "./SettingsFeedback";
+import MapsFields from "./MapsFields";
 import { useRef, useState } from "react";
 import { categories, events, schemas } from "@/lib/settings-schema";
 import {
@@ -131,49 +136,6 @@ const forms = {
       ],
     ],
   ],
-  maps: [
-    [
-      "Operating city and country",
-      "The service area used by booking policies.",
-      [
-        ["city", "Operating city", "text"],
-        ["country", "Operating country", "text"],
-      ],
-    ],
-    [
-      "Maps and routing provider",
-      "The existing map renderer stays active. The OSRM endpoint is managed on the server.",
-      [
-        [
-          "routingMode",
-          "Routing provider",
-          "select",
-          [
-            { value: "osrm", label: "OSRM road routing" },
-            { value: "estimate", label: "Distance estimate" },
-          ],
-        ],
-      ],
-    ],
-    [
-      "Service boundaries",
-      "Define a rectangular service area using latitude and longitude.",
-      [
-        ["south", "Southern latitude", "number", -90, 90],
-        ["north", "Northern latitude", "number", -90, 90],
-        ["west", "Western longitude", "number", -180, 180],
-        ["east", "Eastern longitude", "number", -180, 180],
-      ],
-    ],
-    [
-      "Pickup and dropoff restrictions",
-      "Apply the boundary independently at each end of a trip.",
-      [
-        ["restrictPickup", "Restrict pickups to boundary", "toggle"],
-        ["restrictDropoff", "Restrict dropoffs to boundary", "toggle"],
-      ],
-    ],
-  ],
   security: [
     [
       "Access control",
@@ -226,10 +188,14 @@ export default function PlatformForm({
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const lock = useRef(false);
+  const feedback = useSettingsFeedback(id);
   const dirty = JSON.stringify(value) !== JSON.stringify(saved);
   useSettingsDirty(id, dirty, onDirty);
   const change = (key, v) => {
-    setValue((d) => ({ ...d, [key]: v }));
+    setValue((d) => ({
+      ...d,
+      ...(typeof key === "object" ? key : { [key]: v }),
+    }));
     setErrors({});
     setMessage("");
   };
@@ -267,7 +233,9 @@ export default function PlatformForm({
       setSaved(parsed.data);
       setValue(parsed.data);
       onSaved(id, d.revision);
-      setMessage("Settings saved.");
+      if (id === "maps") window.dispatchEvent(new Event("maxride:maps-saved"));
+      setMessage("");
+      feedback.confirm();
     } catch (e) {
       setMessage(e.message);
     } finally {
@@ -277,6 +245,12 @@ export default function PlatformForm({
   }
   return (
     <form onSubmit={save} noValidate>
+      <SettingsSaveConfirmation
+        savedAt={feedback.savedAt}
+        dirty={dirty}
+        busy={busy}
+        message={message}
+      />
       <div role="status" className="settings-feedback">
         {message}
       </div>
@@ -285,7 +259,15 @@ export default function PlatformForm({
           {errors._form}
         </p>
       )}
-      {forms[id].map(([title, description, fields]) => (
+      {id === "maps" && (
+        <MapsFields
+          value={value}
+          onChange={change}
+          busy={busy}
+          errors={errors}
+        />
+      )}
+      {(id === "maps" ? [] : forms[id]).map(([title, description, fields]) => (
         <SettingsSection key={title} title={title} description={description}>
           <div className="settings-fields">
             {fields.map(([key, label, type, options, max]) =>

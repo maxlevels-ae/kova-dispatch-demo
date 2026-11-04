@@ -1,4 +1,8 @@
 "use client";
+import {
+  useSettingsFeedback,
+  SettingsSaveConfirmation,
+} from "./settings/SettingsFeedback";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowUpRight, CreditCard, Plug } from "lucide-react";
 import { providerSchema } from "@/lib/provider-config";
@@ -40,6 +44,7 @@ export default function ProviderSettings({ kind, onDirty }) {
     providers.some(changed),
     onDirty,
   );
+  const feedback = useSettingsFeedback(selected);
   const p = providers.find((p) => p.id === selected);
   function edit(key, value) {
     setProviders((ps) =>
@@ -80,9 +85,8 @@ export default function ProviderSettings({ kind, onDirty }) {
       const updated = { ...p, value: parsed.data, revision: d.revision };
       setProviders((ps) => ps.map((x) => (x.id === p.id ? updated : x)));
       setSaved((ps) => ps.map((x) => (x.id === p.id ? updated : x)));
-      setMessage(
-        `${p.name} configuration saved. External processing remains disabled.`,
-      );
+      setMessage("");
+      feedback.confirm();
     } catch (e) {
       setMessage(e.message);
     } finally {
@@ -95,6 +99,12 @@ export default function ProviderSettings({ kind, onDirty }) {
       <p role="status" className="settings-feedback">
         {message}
       </p>
+      <SettingsSaveConfirmation
+        savedAt={feedback.savedAt}
+        dirty={p ? changed(p) : false}
+        busy={busy}
+        message={message}
+      />
       {!loaded && (
         <SettingsEmptyState title="Provider directory unavailable or loading">
           Reload this page to retry if loading does not complete.

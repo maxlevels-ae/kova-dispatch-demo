@@ -143,7 +143,7 @@ export default function DriverDashboard() {
   }, [ride, position]);
 
   const needsVehicle = profile && !profile.vehicle?.plate;
-  const center = position || { lat: 40.7128, lng: -74.006 };
+  const center = position || undefined;
 
   return (
     <div className="ride-page">

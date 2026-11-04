@@ -117,21 +117,33 @@ export function SettingsField({ label, hint, error, children, ...props }) {
     </div>
   );
 }
-export function SettingsSelect({ label, options, ...props }) {
+export function SettingsSelect({ label, options, error, ...props }) {
   const id = useId();
   return (
     <div className="settings-field">
       <label htmlFor={id}>{label}</label>
-      <select className="input" id={id} {...props}>
+      <select
+        className="input"
+        id={id}
+        {...props}
+        aria-invalid={!!error}
+        aria-describedby={error ? `${id}-error` : undefined}
+      >
         {options.map((o) => (
           <option
             key={typeof o === "string" ? o : o.value}
             value={typeof o === "string" ? o : o.value}
+            disabled={typeof o === "object" && o.disabled}
           >
             {typeof o === "string" ? o : o.label}
           </option>
         ))}
       </select>
+      {error && (
+        <p id={`${id}-error`} className="settings-error">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

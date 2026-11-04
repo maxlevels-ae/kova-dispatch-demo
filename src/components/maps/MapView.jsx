@@ -1,43 +1,21 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { Map as MLMap, Marker, LngLatBounds, NavigationControl } from 'maplibre-gl';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import { useEffect, useRef, useState } from "react";
+import {
+  Map as MLMap,
+  Marker,
+  LngLatBounds,
+  NavigationControl,
+  Popup,
+  setWorkerUrl,
+} from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
-/**
- * MapLibre GL map with the existing light CARTO tiles.
- * CARTO now requires a browser-scoped basemap key, configured at build time.
- *
- * Props:
- *  - center {lat,lng}, zoom
- *  - pickup / dropoff {lat,lng} — pin markers
- *  - routeGeometry [[lng,lat],...] — drawn as an ink line
- *  - drivers [{id, location:{lat,lng}}] — nearby cars (dots)
- *  - driverPosition {lat,lng,heading} — the assigned driver (animated)
- *  - userPosition {lat,lng} — rider's own dot
- *  - fit — when true, fits bounds to pickup/dropoff/route
- *  - onClick(lngLat)
- */
-
-const CARTO_KEY = process.env.NEXT_PUBLIC_CARTO_BASEMAP_KEY;
-const MAP_STYLE = {
-  version: 8,
-  sources: {
-    carto: {
-      type: 'raster',
-      tiles: ['a', 'b', 'c', 'd'].map(
-        (s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png${CARTO_KEY ? `?key=${encodeURIComponent(CARTO_KEY)}` : ''}`
-      ),
-      tileSize: 256,
-      attribution:
-        '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-    },
-  },
-  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
-};
+import { useMapSettings } from "./useMapSettings";
+import { basemapStyle, mapRequest, cartoConfigured } from "@/lib/map-config";
 
 function el(className, html) {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.className = className;
   if (html) div.innerHTML = html;
   return div;
@@ -53,8 +31,10 @@ const SQUARE_SVG =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 
 export default function MapView({
-  center = { lat: 40.7128, lng: -74.006 },
-  zoom = 13,
+  center: requestedCenter,
+  zoom: requestedZoom,
+  autoFitDrivers = false,
+  showDriverNames = false,
   pickup,
   dropoff,
   routeGeometry,
@@ -63,13 +43,30 @@ export default function MapView({
   userPosition,
   fit = false,
   onClick,
-  className = '',
+  className = "",
   style,
 }) {
+  const config = useMapSettings();
+  const center = requestedCenter || config.center;
+  const zoom = requestedZoom ?? config.settings.initialZoom;
+  const [mapState, setMapState] = useState("loading");
+  const [mapError, setMapError] = useState("");
+  const [fallback, setFallback] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const driverAnimations = useRef(new Map());
+  const selectedProvider = fallback
+    ? "openfreemap"
+    : config.settings.basemapProvider;
+  const selectedStyle = fallback ? "standard" : config.settings.mapStyle;
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const readyRef = useRef(false);
-  const markersRef = useRef({ pickup: null, dropoff: null, driver: null, user: null });
+  const markersRef = useRef({
+    pickup: null,
+    dropoff: null,
+    driver: null,
+    user: null,
+  });
   const driverDotsRef = useRef(new Map());
   const animRef = useRef(null);
   // Latest route geometry — the style 'load' handler reads this so a route
@@ -84,15 +81,22 @@ export default function MapView({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return undefined;
 
+    // MapLibre 6 uses a separate module worker. Serve its matching shared module
+    // from public assets rather than resolving relative to a Next.js chunk.
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
     const map = new MLMap({
       container: containerRef.current,
-      style: MAP_STYLE,
+      style: basemapStyle("openfreemap", "standard"),
+      transformRequest: mapRequest,
       center: [center.lng, center.lat],
       zoom,
       attributionControl: { compact: true },
     });
 
-    map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
+    map.addControl(
+      new NavigationControl({ showCompass: false }),
+      "bottom-right",
+    );
 
     const applyRoute = () => {
       readyRef.current = drawRoute(map, routeGeomRef.current);
@@ -101,10 +105,20 @@ export default function MapView({
     // The style may finish loading before OR after this handler is attached,
     // and a style reload wipes custom sources — so react to both events and
     // let drawRoute() re-create anything missing (it is idempotent).
-    map.on('load', applyRoute);
-    map.on('styledata', applyRoute);
+    map.on("load", applyRoute);
+    map.on("idle", () => {
+      if (map.areTilesLoaded())
+        setMapState((current) => (current === "error" ? current : "ready"));
+    });
+    map.on("error", () => {
+      setMapState("error");
+      setMapError(
+        "The basemap could not load. Check your connection or use OpenFreeMap Standard.",
+      );
+    });
+    map.on("style.load", () => map.once("idle", applyRoute));
 
-    map.on('click', (e) => {
+    map.on("click", (e) => {
       onClickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     });
 
@@ -121,20 +135,45 @@ export default function MapView({
       cancelAnimationFrame(animRef.current);
       // Markers belong to this map instance — drop them so a remount
       // (StrictMode/HMR) recreates them on the new map.
-      markersRef.current = { pickup: null, dropoff: null, driver: null, user: null };
+      markersRef.current = {
+        pickup: null,
+        dropoff: null,
+        driver: null,
+        user: null,
+      };
       driverDotsRef.current.clear();
+      driverAnimations.current.forEach((id) => cancelAnimationFrame(id));
+      driverAnimations.current.clear();
       try {
         map.remove();
       } catch (err) {
         // remove() can throw when torn down mid-load; never let that block
         // the next mount from creating a fresh map.
-        console.warn('[MapView] map.remove() failed:', err?.message);
+        console.warn("[MapView] map.remove() failed:", err?.message);
       }
       if (mapRef.current === map) mapRef.current = null;
       readyRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    setMapState("loading");
+    setMapError("");
+    if (selectedProvider === "carto" && !cartoConfigured) {
+      setMapError("CARTO has no configured key. OpenFreeMap is being used.");
+    }
+    map.setStyle(basemapStyle(selectedProvider, selectedStyle));
+    const timer = setTimeout(() => {
+      if (!map.areTilesLoaded()) {
+        setMapState("error");
+        setMapError("Map loading timed out. Retry OpenFreeMap Standard.");
+      }
+    }, 25000);
+    return () => clearTimeout(timer);
+  }, [selectedProvider, selectedStyle, retry]);
 
   // ── Pickup / dropoff / user markers ──
   function syncMarker(key, pos, make) {
@@ -156,18 +195,18 @@ export default function MapView({
   }
 
   useEffect(() => {
-    syncMarker('pickup', pickup, () => el('marker-pin pickup', PIN_SVG));
+    syncMarker("pickup", pickup, () => el("marker-pin pickup", PIN_SVG));
   }, [pickup?.lat, pickup?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    syncMarker('dropoff', dropoff, () => el('marker-pin dropoff', SQUARE_SVG));
+    syncMarker("dropoff", dropoff, () => el("marker-pin dropoff", SQUARE_SVG));
   }, [dropoff?.lat, dropoff?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    syncMarker('user', userPosition, () => {
-      const dot = el('');
+    syncMarker("user", userPosition, () => {
+      const dot = el("");
       dot.style.cssText =
-        'width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.3)';
+        "width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.3)";
       return dot;
     });
   }, [userPosition?.lat, userPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -187,7 +226,7 @@ export default function MapView({
     const target = [driverPosition.lng, driverPosition.lat];
 
     if (!markers.driver) {
-      markers.driver = new Marker({ element: el('marker-driver', CAR_SVG) })
+      markers.driver = new Marker({ element: el("marker-driver", CAR_SVG) })
         .setLngLat(target)
         .addTo(map);
       return;
@@ -210,38 +249,97 @@ export default function MapView({
     animRef.current = requestAnimationFrame(step);
   }, [driverPosition?.lat, driverPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Nearby driver dots ──
+  // Authorized admin metadata is optional; rider nearby payloads stay anonymous.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const dots = driverDotsRef.current;
     const seen = new Set();
-
     for (const d of drivers) {
       if (!d?.location) continue;
       seen.add(d.id);
-      const lngLat = [d.location.lng, d.location.lat];
-      if (dots.has(d.id)) {
-        dots.get(d.id).setLngLat(lngLat);
+      const target = [d.location.lng, d.location.lat];
+      let marker = dots.get(d.id);
+      if (!marker) {
+        const element = el("marker-driver", CAR_SVG);
+        element.setAttribute("role", "button");
+        element.tabIndex = 0;
+        marker = new Marker({ element }).setLngLat(target).addTo(map);
+        dots.set(d.id, marker);
+        element.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            marker.togglePopup();
+          }
+        });
       } else {
-        const m = new Marker({
-          element: el('marker-driver', CAR_SVG),
-        })
-          .setLngLat(lngLat)
-          .addTo(map);
-        m.getElement().style.opacity = '0.85';
-        m.getElement().style.transform += ' scale(0.85)';
-        dots.set(d.id, m);
+        cancelAnimationFrame(driverAnimations.current.get(d.id));
+        const from = marker.getLngLat();
+        const start = performance.now();
+        const step = (now) => {
+          const t = Math.min(1, (now - start) / 800);
+          const eased = 1 - (1 - t) ** 3;
+          marker.setLngLat([
+            from.lng + (target[0] - from.lng) * eased,
+            from.lat + (target[1] - from.lat) * eased,
+          ]);
+          if (t < 1)
+            driverAnimations.current.set(d.id, requestAnimationFrame(step));
+        };
+        driverAnimations.current.set(d.id, requestAnimationFrame(step));
+      }
+      const element = marker.getElement();
+      element.setAttribute(
+        "aria-label",
+        d.name ? "Driver " + d.name : "Nearby vehicle",
+      );
+      element.querySelector(".map-driver-name")?.remove();
+      if (showDriverNames && d.name) {
+        const label = el("map-driver-name");
+        label.textContent = d.name;
+        element.appendChild(label);
+      }
+      if (d.name) {
+        const content = el("map-driver-popup");
+        const title = document.createElement("strong");
+        title.textContent = d.name;
+        content.appendChild(title);
+        for (const text of [
+          [d.vehicle?.make, d.vehicle?.model, d.vehicle?.plate]
+            .filter(Boolean)
+            .join(" · ") ||
+            d.vehicle?.type ||
+            "Vehicle",
+          d.status === "on_trip" ? "On a trip" : "Available",
+        ]) {
+          const row = document.createElement("div");
+          row.textContent = text;
+          content.appendChild(row);
+        }
+        const time = document.createElement("small");
+        time.textContent =
+          "Last GPS update: " + new Date(d.timestamp).toLocaleTimeString();
+        content.appendChild(time);
+        if (marker.getPopup()) marker.getPopup().setDOMContent(content);
+        else marker.setPopup(new Popup({ offset: 22 }).setDOMContent(content));
       }
     }
-
-    for (const [id, marker] of dots) {
+    for (const [id, marker] of dots)
       if (!seen.has(id)) {
+        cancelAnimationFrame(driverAnimations.current.get(id));
+        driverAnimations.current.delete(id);
         marker.remove();
         dots.delete(id);
       }
+    if (autoFitDrivers && drivers.length) {
+      const points = drivers.map((d) => [d.location.lng, d.location.lat]);
+      const bounds = points.reduce(
+        (b, p) => b.extend(p),
+        new LngLatBounds(points[0], points[0]),
+      );
+      map.fitBounds(bounds, { padding: 70, maxZoom: 15, duration: 700 });
     }
-  }, [drivers]);
+  }, [drivers, autoFitDrivers, showDriverNames]);
 
   // ── Route line ──
   useEffect(() => {
@@ -264,15 +362,20 @@ export default function MapView({
     if (driverPosition) points.push([driverPosition.lng, driverPosition.lat]);
     if (routeGeometry?.length) points.push(...routeGeometry);
     if (points.length < 2) {
-      if (points.length === 1) map.easeTo({ center: points[0], zoom: 15, duration: 600 });
+      if (points.length === 1)
+        map.easeTo({ center: points[0], zoom: 15, duration: 600 });
       return;
     }
 
     const bounds = points.reduce(
       (b, p) => b.extend(p),
-      new LngLatBounds(points[0], points[0])
+      new LngLatBounds(points[0], points[0]),
     );
-    map.fitBounds(bounds, { padding: { top: 80, bottom: 80, left: 60, right: 60 }, duration: 700, maxZoom: 16 });
+    map.fitBounds(bounds, {
+      padding: { top: 80, bottom: 80, left: 60, right: 60 },
+      duration: 700,
+      maxZoom: 16,
+    });
     // driverPosition is intentionally not a dep — refitting on every GPS
     // ping would make the camera jitter. It's included in bounds whenever
     // a route/endpoint change triggers a refit.
@@ -283,15 +386,45 @@ export default function MapView({
     const map = mapRef.current;
     if (!map || fit || pickup || dropoff) return;
     map.easeTo({ center: [center.lng, center.lat], zoom, duration: 600 });
-  }, [center.lat, center.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [center.lat, center.lng, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div
-      ref={containerRef}
-      className={className}
-      style={{ width: '100%', height: '100%', ...style }}
-      aria-label="Map"
-    />
+      className={"map-frame " + className}
+      style={style}
+      data-map-state={mapState}
+      data-map-provider={selectedProvider}
+    >
+      <div
+        ref={containerRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          opacity: mapState === "error" ? 0.25 : 1,
+        }}
+        aria-label="Map"
+      />
+      {(mapState === "error" || mapError || config.error) && (
+        <div className="map-notice" role="alert">
+          {mapError || config.error}
+          <br />
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              setFallback(true);
+              setRetry((n) => n + 1);
+            }}
+          >
+            Use OpenFreeMap Standard
+          </button>
+        </div>
+      )}
+      {mapState === "loading" && !mapError && (
+        <div className="map-notice" role="status">
+          Loading map…
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -302,16 +435,20 @@ export default function MapView({
  * style isn't ready, so callers can simply try again on the next style event.
  */
 function drawRoute(map, geometry) {
+  if (!geometry?.length) {
+    try { map.getSource("route")?.setData({type:"FeatureCollection",features:[]}); } catch {}
+    return false;
+  }
   const data = {
-    type: 'Feature',
-    geometry: { type: 'LineString', coordinates: geometry || [] },
+    type: "Feature",
+    geometry: { type: "LineString", coordinates: geometry || [] },
   };
 
   try {
     // Fast path: once the source exists, updating it never needs the style to
     // be "loaded" — isStyleLoaded() stays false while tiles stream in, so
     // gating on it here would drop routes indefinitely.
-    const existing = map.getSource('route');
+    const existing = map.getSource("route");
     if (existing) {
       existing.setData(data);
       return true;
@@ -330,29 +467,33 @@ function drawRoute(map, geometry) {
   if (!styleReady) return false;
 
   try {
-    map.addSource('route', { type: 'geojson', data });
-    if (!map.getLayer('route-casing')) {
+    map.addSource("route", { type: "geojson", data });
+    if (!map.getLayer("route-casing")) {
       map.addLayer({
-        id: 'route-casing',
-        type: 'line',
-        source: 'route',
-        paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.9 },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        id: "route-casing",
+        type: "line",
+        source: "route",
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": 7,
+          "line-opacity": 0.9,
+        },
+        layout: { "line-cap": "round", "line-join": "round" },
       });
     }
-    if (!map.getLayer('route-line')) {
+    if (!map.getLayer("route-line")) {
       map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        paint: { 'line-color': '#1c1917', 'line-width': 4 },
-        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        id: "route-line",
+        type: "line",
+        source: "route",
+        paint: { "line-color": "#1c1917", "line-width": 4 },
+        layout: { "line-cap": "round", "line-join": "round" },
       });
     }
 
     return true;
   } catch (err) {
-    console.warn('[MapView] route draw failed:', err?.message);
+    console.warn("[MapView] route draw failed:", err?.message);
     return false;
   }
 }

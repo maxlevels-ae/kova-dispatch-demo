@@ -1,3 +1,4 @@
+import { cartoConfigured, cityCenter } from "@/lib/map-config";
 import { validSettingsOrigin } from "@/lib/settings-origin";
 import { readSettingsJSON } from "@/lib/settings-http";
 import { requireAuth } from "@/lib/auth/helpers";
@@ -46,6 +47,7 @@ export async function PUT(request) {
         },
         { status: 400 },
       );
+    if(section === 'maps' && parsed.data.basemapProvider === 'carto' && !cartoConfigured) return Response.json({error:'CARTO requires a configured browser basemap API key. Choose OpenFreeMap.'},{status:400});
     await getSettings();
     const row = await PlatformSettings.findOneAndUpdate(
       { _id: section, revision },
@@ -73,7 +75,7 @@ export async function PUT(request) {
         { error: "Settings changed. Reload before saving." },
         { status: 409 },
       );
-    return Response.json({ revision: row.revision });
+    return Response.json({ revision: row.revision, savedAt: row.updatedAt, ...(section === "maps" ? { center: cityCenter(parsed.data) } : {}) });
   } catch (e) {
     if (e.status)
       return Response.json({ error: e.message }, { status: e.status });

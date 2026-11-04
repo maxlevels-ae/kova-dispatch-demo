@@ -247,7 +247,7 @@ export default function RiderDashboard() {
     };
   }, [phase, ride, driverPosition, pickup, dropoff, estimate, nearby, geo]);
 
-  const center = geo || { lat: 40.7128, lng: -74.006 };
+  const center = geo || undefined;
 
   return (
     <div className="ride-page">

@@ -21,7 +21,10 @@
     "test:integration": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs tests/integration.mjs",
     "test:staging": "node --env-file=.env.staging.qa tests/staging-browser.mjs",
     "test:staging-config": "node --test tests/staging-config.test.mjs",
-    "validate:staging": "node scripts/validate-staging-blueprint.mjs"
+    "validate:staging": "node scripts/validate-staging-blueprint.mjs",
+    "prebuild": "node scripts/prepare-map-worker.mjs",
+    "predev": "node scripts/prepare-map-worker.mjs",
+    "predev:next": "node scripts/prepare-map-worker.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1054.0",

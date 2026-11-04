@@ -1,3 +1,4 @@
+import { mapDefaults, egyptLocations } from "./map-config.js";
 import { z } from "zod";
 const number = (min, max) => z.number().finite().min(min).max(max);
 export const categories = ["economy", "comfort", "premium", "xl"];
@@ -35,6 +36,7 @@ export const defaults = {
     maxDebtEGP: 25,
   },
   maps: {
+    ...mapDefaults,
     routingMode: "osrm",
     city: "Cairo",
     country: "Egypt",
@@ -94,8 +96,30 @@ export const schemas = {
   maps: z
     .object({
       routingMode: z.enum(["osrm", "estimate"]),
+      basemapProvider: z.enum(["openfreemap", "carto"]).default("openfreemap"),
+      mapStyle: z.enum(["standard", "light", "dark"]).default("standard"),
+      governorate: z.enum(Object.keys(egyptLocations)).default("Cairo"),
+      initialZoom: z
+        .union([
+          z.literal(8),
+          z.literal(10),
+          z.literal(12),
+          z.literal(14),
+          z.literal(16),
+        ])
+        .default(12),
+      autoFitDrivers: z.boolean().default(true),
+      showVehicleMarkers: z.boolean().default(true),
+      showDriverNames: z.boolean().default(false),
+      driverStatusFilter: z
+        .enum(["all", "available", "on_trip"])
+        .default("all"),
+      vehicleCategoryFilter: z.enum(["all", ...categories]).default("all"),
+      locationRefreshSeconds: z
+        .union([z.literal(5), z.literal(15), z.literal(30), z.literal(60)])
+        .default(15),
       city: z.string().trim().min(1).max(80),
-      country: z.string().trim().min(1).max(80),
+      country: z.literal("Egypt"),
       restrictPickup: z.boolean(),
       restrictDropoff: z.boolean(),
       south: number(-90, 90),
@@ -107,7 +131,11 @@ export const schemas = {
     .refine(
       (v) => v.south < v.north && v.west < v.east,
       "Invalid service boundary",
-    ),
+    )
+    .refine((v) => Object.hasOwn(egyptLocations[v.governorate] || {}, v.city), {
+      message: "Choose a city in the selected governorate",
+      path: ["city"],
+    }),
   notifications: z
     .object({
       enabledEvents: z.array(z.enum(events)).max(events.length),

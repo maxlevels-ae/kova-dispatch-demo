@@ -159,3 +159,54 @@ test("settings origin trusts configured HTTPS origins behind Render, never forwa
     true,
   );
 });
+
+import {
+  egyptLocations,
+  cityCenter,
+  mapDefaults,
+  basemapStyle,
+} from "../src/lib/map-config.js";
+test("map catalogue validates dependent cities, backward-compatible defaults and supported controls", () => {
+  assert.equal(Object.keys(egyptLocations).length, 27);
+  assert.deepEqual(cityCenter(mapDefaults), { lat: 30.0444, lng: 31.2357 });
+  assert.equal(
+    basemapStyle("openfreemap", "standard"),
+    "https://tiles.openfreemap.org/styles/liberty",
+  );
+  for (const mapStyle of ["standard", "light", "dark"])
+    assert.equal(
+      schemas.maps.safeParse({ ...defaults.maps, mapStyle }).success,
+      true,
+    );
+  for (const patch of [
+    { governorate: "Alexandria", city: "Cairo" },
+    { country: "US" },
+    { basemapProvider: "unknown" },
+    { initialZoom: 100 },
+    { locationRefreshSeconds: 1 },
+    { driverStatusFilter: "offline" },
+    { vehicleCategoryFilter: "unknown" },
+  ])
+    assert.equal(
+      schemas.maps.safeParse({ ...defaults.maps, ...patch }).success,
+      false,
+    );
+  const old = {
+    routingMode: "osrm",
+    city: "Cairo",
+    country: "Egypt",
+    south: 22,
+    north: 32,
+    west: 25,
+    east: 37,
+    restrictPickup: false,
+    restrictDropoff: false,
+  };
+  assert.equal(schemas.maps.parse(old).basemapProvider, "openfreemap");
+  for (const [governorate, cities] of Object.entries(egyptLocations))
+    for (const city of Object.keys(cities))
+      assert.equal(
+        schemas.maps.safeParse({ ...defaults.maps, governorate, city }).success,
+        true,
+      );
+});

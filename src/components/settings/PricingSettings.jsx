@@ -1,4 +1,8 @@
 "use client";
+import {
+  useSettingsFeedback,
+  SettingsSaveConfirmation,
+} from "./SettingsFeedback";
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_PRICING } from "@/lib/currency";
 import {
@@ -76,6 +80,7 @@ export default function PricingSettings({ onDirty }) {
       })
       .catch((e) => setMessage(e.message));
   }, []);
+  const feedback = useSettingsFeedback(tier);
   const changed = (t) =>
     rules && JSON.stringify(rules[t]) !== JSON.stringify(saved[t]);
   useSettingsDirty(
@@ -118,7 +123,8 @@ export default function PricingSettings({ onDirty }) {
       if (!r.ok) throw Error(d.error);
       setRules((rs) => ({ ...rs, [tier]: d.rule }));
       setSaved((rs) => ({ ...rs, [tier]: d.rule }));
-      setMessage(`${names[tier]} pricing saved.`);
+      setMessage("");
+      feedback.confirm();
     } catch (e) {
       setMessage(e.message);
     } finally {
@@ -129,6 +135,12 @@ export default function PricingSettings({ onDirty }) {
   if (!rules) return <p role="status">{message || "Loading pricing…"}</p>;
   return (
     <form onSubmit={save} noValidate>
+      <SettingsSaveConfirmation
+        savedAt={feedback.savedAt}
+        dirty={changed(tier)}
+        busy={busy}
+        message={message}
+      />
       <p role="status" className="settings-feedback">
         {message}
       </p>
