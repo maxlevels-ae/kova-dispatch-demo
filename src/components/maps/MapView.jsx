@@ -54,6 +54,7 @@ export default function MapView({
   const center = requestedCenter || config.center;
   const zoom = requestedZoom ?? config.settings.initialZoom;
   const [mapState, setMapState] = useState("loading");
+  const [routeReady, setRouteReady] = useState(false);
   useI18n();
   const [mapError, setMapError] = useState("");
   const [fallback, setFallback] = useState(false);
@@ -106,6 +107,7 @@ export default function MapView({
 
     const applyRoute = () => {
       readyRef.current = drawRoute(map, routeGeomRef.current);
+      setRouteReady(readyRef.current);
     };
 
     // The style may finish loading before OR after this handler is attached,
@@ -113,6 +115,9 @@ export default function MapView({
     // let drawRoute() re-create anything missing (it is idempotent).
     map.on("load", applyRoute);
     map.on("idle", () => {
+      // A first route may arrive during a camera move while tiles are pending.
+      // Retry once ready; do not setData on every idle (that creates a loop).
+      if (routeGeomRef.current?.length && !readyRef.current) applyRoute();
       if (map.areTilesLoaded())
         setMapState((current) => (current === "error" ? current : "ready"));
     });
@@ -122,7 +127,11 @@ export default function MapView({
         "The basemap could not load. Check your connection or use OpenFreeMap Standard.",
       );
     });
-    map.on("style.load", () => map.once("idle", applyRoute));
+    map.on("style.load", () => {
+      readyRef.current = false;
+      setRouteReady(false);
+      applyRoute();
+    });
 
     map.on("click", (e) => {
       onClickRef.current?.({ lat: e.lngLat.lat, lng: e.lngLat.lng });
@@ -355,6 +364,7 @@ export default function MapView({
     // drawRoute self-guards on style readiness; if the style isn't up yet the
     // 'load'/'styledata' handlers will re-apply routeGeomRef.
     readyRef.current = drawRoute(map, routeGeometry);
+    setRouteReady(readyRef.current);
   }, [routeGeometry]);
 
   // ── Fit bounds ──
@@ -385,7 +395,7 @@ export default function MapView({
     // driverPosition is intentionally not a dep — refitting on every GPS
     // ping would make the camera jitter. It's included in bounds whenever
     // a route/endpoint change triggers a refit.
-  }, [fit, pickup?.lat, dropoff?.lat, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fit, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Recenter when no fit target ──
   useEffect(() => {
@@ -399,6 +409,7 @@ export default function MapView({
       className={"map-frame " + className}
       style={style}
       data-map-state={mapState}
+      data-route-state={routeGeometry?.length ? (routeReady ? "drawn" : "pending") : "none"}
       data-map-provider={selectedProvider}
     >
       <div
