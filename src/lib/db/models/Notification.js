@@ -10,6 +10,13 @@ const schema = new mongoose.Schema(
     event: String,
     text: String,
     readAt: Date,
+    rideId: mongoose.Schema.Types.ObjectId,
+    href: String,
+    expiresAt: Date,
+    role: String,
+    pushStatus: String,
+    pushError: String,
+    pushAttemptAt: Date,
   },
   { timestamps: true },
 );

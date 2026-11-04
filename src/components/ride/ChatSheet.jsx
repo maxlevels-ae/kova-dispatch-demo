@@ -13,6 +13,7 @@ export default function ChatSheet({ rideId, role, messages, open, onClose, count
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
   const toast = useToast();
+  const pendingId=useRef(null);
 
   useEffect(() => {
     if (open && listRef.current) {
@@ -25,17 +26,19 @@ export default function ChatSheet({ rideId, role, messages, open, onClose, count
     const trimmed = text.trim();
     if (!trimmed || sending) return;
     setSending(true);
+    pendingId.current ||= crypto.randomUUID();
     try {
       const res = await fetch(`/api/rides/${rideId}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: trimmed }),
+        body: JSON.stringify({ text: trimmed,clientId:pendingId.current }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         toast(data.error || 'Message failed to send', 'error');
       } else {
         setText('');
+        pendingId.current=null;
       }
     } catch {
       toast('Message failed to send', 'error');
@@ -90,7 +93,7 @@ export default function ChatSheet({ rideId, role, messages, open, onClose, count
             const mine = m.from === role;
             return (
               <div
-                key={i}
+                key={m._id||m.id||i}
                 style={{
                   alignSelf: mine ? 'flex-end' : 'flex-start',
                   maxWidth: '80%',
@@ -104,6 +107,7 @@ export default function ChatSheet({ rideId, role, messages, open, onClose, count
                 }}
               >
                 {m.text}
+                <small style={{display:'block',opacity:.7,fontSize:10}}>{new Date(m.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small>
               </div>
             );
           })}
@@ -119,7 +123,7 @@ export default function ChatSheet({ rideId, role, messages, open, onClose, count
           className="input flex-1"
           style={{ minHeight: 42 }}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {pendingId.current=null;setText(e.target.value);}}
           placeholder="Type a message…"
           maxLength={500}
           aria-label="Message"

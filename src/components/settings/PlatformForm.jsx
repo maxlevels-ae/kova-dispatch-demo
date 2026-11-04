@@ -4,6 +4,7 @@ import {
   SettingsSaveConfirmation,
 } from "./SettingsFeedback";
 import MapsFields from "./MapsFields";
+import NotificationControls from '@/components/NotificationControls';
 import { useRef, useState } from "react";
 import { categories, events, schemas } from "@/lib/settings-schema";
 import {
@@ -331,6 +332,12 @@ export default function PlatformForm({
       ))}
       {id === "notifications" && (
         <>
+          <SettingsSection title="Sound and browser alerts" description="Global sound switches apply to all users. Browser permission and subscriptions apply to this signed-in browser.">
+            <SettingsToggle label="Driver new booking sound" checked={value.driverSound} onChange={v=>change('driverSound',v)} disabled={busy}/>
+            <SettingsToggle label="Rider trip sound" checked={value.riderSound} onChange={v=>change('riderSound',v)} disabled={busy}/>
+            <SettingsToggle label="Message sounds" checked={value.messageSound} onChange={v=>change('messageSound',v)} disabled={busy}/>
+            <NotificationControls/>
+          </SettingsSection>
           <SettingsSection
             title="Delivery channels"
             description="External delivery requires a verified integration."
@@ -341,7 +348,7 @@ export default function PlatformForm({
                   <div key={c}>
                     <strong>{c}</strong>
                     <SettingsStatus>
-                      {i === 0 ? "Configured" : "Not configured"}
+                      {i === 0 ? "Configured" : c==='Push'?(monitoring?.providers?.push||'Checking configuration') : "Not configured"}
                     </SettingsStatus>
                   </div>
                 ),
@@ -373,6 +380,7 @@ export default function PlatformForm({
           </SettingsSection>
           <SettingsSection title="Delivery history and errors">
             <DeliveryHistory monitoring={monitoring} />
+            {monitoring?.notifications?.pushDeliveries?.map(n=><p className="small" key={n._id}>{human(n.event)} · Push: {n.pushStatus}{n.pushError?' — '+n.pushError:''}</p>)}
           </SettingsSection>
         </>
       )}

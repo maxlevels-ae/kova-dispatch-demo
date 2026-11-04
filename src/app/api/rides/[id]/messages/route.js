@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import {validSettingsOrigin} from '@/lib/settings-origin';
 import { requireAuth } from '@/lib/auth/helpers';
 import { addRideMessage, RideError } from '@/lib/services/ride-service';
 
 const messageSchema = z.object({
   text: z.string().trim().min(1, 'Message cannot be empty').max(500),
+  clientId:z.string().uuid().optional(),
 });
 
 // POST /api/rides/[id]/messages — send an in-ride chat message
@@ -11,6 +13,7 @@ const messageSchema = z.object({
 export async function POST(request, { params }) {
   const { session, error } = await requireAuth(['rider', 'driver']);
   if (error) return error;
+  if(!validSettingsOrigin(request))return Response.json({error:'Invalid request origin'},{status:403});
 
   try {
     const { id } = await params;
@@ -25,6 +28,7 @@ export async function POST(request, { params }) {
       userId: session.user.id,
       role: session.user.role,
       text: parsed.data.text,
+      clientId:parsed.data.clientId,
     });
 
     return Response.json({ message }, { status: 201 });

@@ -5,6 +5,10 @@ const schema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, index: true },
     event: String,
     text: String,
+    rideId: mongoose.Schema.Types.ObjectId,
+    href: String,
+    expiresAt: Date,
+    role: String,
     status: {
       type: String,
       enum: ["queued", "processing", "delivered", "failed", "suppressed"],

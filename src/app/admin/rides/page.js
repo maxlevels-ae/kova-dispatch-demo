@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Route } from 'lucide-react';
+import Link from 'next/link';
 import { RideStatusBadge, Loading, Empty, VEHICLE_LABELS, money } from '@/components/ui/bits';
 import { formatDate } from '@/lib/utils/geo';
 
@@ -73,7 +74,7 @@ export default function AdminRidesPage() {
             <tbody>
               {rides.map((r) => (
                 <tr key={r._id}>
-                  <td className="tiny muted" style={{ whiteSpace: 'nowrap' }}>{formatDate(r.createdAt)}</td>
+                  <td className="tiny muted" style={{ whiteSpace: 'nowrap' }}><Link href={'/admin/rides/'+r._id}>{formatDate(r.createdAt)}<br/>View trip details</Link></td>
                   <td className="small">{r.riderId?.name || '—'}</td>
                   <td className="small">{r.driverId?.name || <span className="muted">—</span>}</td>
                   <td className="small" style={{ maxWidth: 260 }}>

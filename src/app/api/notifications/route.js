@@ -3,6 +3,10 @@ import { requireAuth } from "@/lib/auth/helpers";
 import connectDB from "@/lib/db/mongodb";
 import Notification from "@/lib/db/models/Notification";
 import { syncNotifications } from "@/lib/notifications";
+import {validSettingsOrigin} from '@/lib/settings-origin';
+import {preferenceDefaults,preferenceSchema} from '@/lib/notification-policy';
+import {readSettingsJSON} from '@/lib/settings-http';
+import {getSettings} from '@/lib/settings';
 export async function GET() {
   const { session, error } = await requireAuth();
   if (error) return error;
@@ -10,6 +14,9 @@ export async function GET() {
     await syncNotifications(session.user.id);
     return Response.json(
       {
+        preferences:{...preferenceDefaults,...await NotificationPreference.findById(session.user.id).select('-_id -createdAt -updatedAt -__v').lean()},
+        soundPolicy:(await getSettings()).notifications,
+        unreadCount:await Notification.countDocuments({userId:session.user.id,readAt:null}),
         preference:
           (await NotificationPreference.findById(session.user.id).lean())
             ?.inApp ?? true,
@@ -30,12 +37,14 @@ export async function GET() {
 export async function PATCH(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
-  if (request.headers.get("origin") !== new URL(request.url).origin)
+  if (!validSettingsOrigin(request))
     return Response.json({ error: "Invalid origin" }, { status: 403 });
   try {
     await connectDB();
+    const body=await request.text();let id;
+    if(body){try{id=JSON.parse(body).id;}catch{return Response.json({error:'Invalid notification'},{status:400});}if(id&&!/^[a-f\d]{24}$/i.test(id))return Response.json({error:'Invalid notification'},{status:400});}
     await Notification.updateMany(
-      { userId: session.user.id, readAt: null },
+      { userId: session.user.id, readAt: null,...(id?{_id:id}:{}) },
       { $set: { readAt: new Date() } },
     );
     return Response.json({ ok: true });
@@ -50,23 +59,23 @@ export async function PATCH(request) {
 export async function PUT(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
-  if (request.headers.get("origin") !== new URL(request.url).origin)
+  if (!validSettingsOrigin(request))
     return Response.json({ error: "Invalid origin" }, { status: 403 });
   try {
-    const { inApp } = await request.json();
-    if (typeof inApp !== "boolean")
+    const parsed=preferenceSchema.safeParse(await readSettingsJSON(request));
+    if (!parsed.success)
       return Response.json({ error: "Invalid preference" }, { status: 400 });
     await connectDB();
     await NotificationPreference.findOneAndUpdate(
       { _id: session.user.id },
-      { $set: { inApp } },
+      { $set: parsed.data },
       { upsert: true },
     );
     return Response.json({ ok: true });
-  } catch {
+  } catch(e) {
     return Response.json(
-      { error: "Unable to save preference" },
-      { status: 503 },
+      { error: e.status?e.message:"Unable to save preference" },
+      { status: e.status||503 },
     );
   }
 }

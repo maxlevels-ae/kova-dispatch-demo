@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '@/context/SocketProvider';
+import {useNotifications} from '@/context/NotificationProvider';
+import {unlockAudio,playAlert,stopAlert} from '@/lib/notification-audio';
+import {closeOfferNotification} from '@/lib/browser-notification-permission';
 
 const PING_INTERVAL_MS = 3500;
 
@@ -11,6 +14,7 @@ const PING_INTERVAL_MS = 3500;
  */
 export default function useDriverState({ onEvent } = {}) {
   const { socket, isConnected } = useSocket();
+  const notifications=useNotifications();
   const [profile, setProfile] = useState(null); // Driver doc
   const [online, setOnline] = useState(false);
   const [offer, setOffer] = useState(null); // incoming ride offer
@@ -31,6 +35,20 @@ export default function useDriverState({ onEvent } = {}) {
   });
 
   const notify = useCallback((type, data) => onEventRef.current?.(type, data), []);
+  useEffect(()=>{
+    if(!offer)return;
+    const expiresAt=offer.expiresAt||new Date(offer.receivedAt+(offer.expiresInSeconds||16)*1000).toISOString();
+    const remaining=Date.parse(expiresAt)-Date.now();if(remaining<=0){setOffer(null);return;}
+    if(notifications?.preferences.driverSound&&!notifications?.preferences.muted&&notifications?.policy.driverSound!==false)playAlert({key:'offer:'+offer.offerId,offer:true,expiresAt});
+    const timer=setTimeout(()=>{stopAlert();closeOfferNotification(offer.rideId);setOffer(null);},remaining);
+    return()=>{clearTimeout(timer);stopAlert();};
+  },[offer,notifications?.preferences.driverSound,notifications?.preferences.muted,notifications?.policy.driverSound]);
+  useEffect(()=>{
+    if(!socket)return;
+    let live=true;
+    const sync=async()=>{try{const [a,o]=await Promise.all([fetch('/api/rides/active'),fetch('/api/drivers/me/offer')]);if(!live)return;if(a.ok){const d=await a.json();setRide(d.ride||null);}if(o.ok){const d=await o.json();setOffer(d.offer?{...d.offer,receivedAt:Date.now()}:null);}}catch{}};
+    socket.on('connect',sync);if(isConnected)sync();return()=>{live=false;socket.off('connect',sync);};
+  },[socket,isConnected]);
 
   // ── Initial load: profile + active ride ──
   useEffect(() => {
@@ -108,21 +126,28 @@ export default function useDriverState({ onEvent } = {}) {
     if (isConnected) subscribe();
 
     const handlers = {
+      'ride:accepted':data=>{stopAlert();closeOfferNotification(data.ride?.id);setOffer(null);setRide(data.ride);},
+      'ride:driver-arrived':data=>setRide(r=>r?.id===data.rideId?{...r,status:'arrived'}:r),
+      'ride:started':data=>setRide(r=>r?.id===data.rideId?{...r,status:'in_progress'}:r),
+      'ride:completed':data=>setRide(r=>r?.id===data.rideId?null:r),
       'ride:offer': (data) => {
         // Ignore offers while already on a trip (stale cascade edge)
         if (rideRef.current) return;
-        setOffer({ ...data, receivedAt: Date.now() });
+        setOffer(old=>old?.offerId===data.offerId?old:{ ...data, receivedAt: Date.now() });
         notify('offer', data);
       },
       'ride:offer-expired': (data) => {
+        closeOfferNotification(data.rideId);
         setOffer((o) => (o && o.rideId === data.rideId ? null : o));
         notify('offer-expired', data);
       },
       'ride:offer-withdrawn': (data) => {
+        closeOfferNotification(data.rideId);
         setOffer((o) => (o && o.rideId === data.rideId ? null : o));
         notify('offer-withdrawn', data);
       },
       'ride:cancelled': (data) => {
+        setOffer(o=>o?.rideId===data.rideId?null:o);stopAlert();
         if (rideRef.current?.id === data.rideId) {
           setRide(null);
           notify('rider-cancelled', data);
@@ -131,9 +156,10 @@ export default function useDriverState({ onEvent } = {}) {
       'ride:message': (data) => {
         setRide((r) => {
           if (!r || r.id !== data.rideId) return r;
-          return { ...r, messages: [...(r.messages || []), { from: data.from, text: data.text, at: data.at }] };
+          if((r.messages||[]).some(m=>String(m._id||m.id)===data.id))return r;
+          return { ...r, messages: [...(r.messages || []), {id:data.id, from: data.from, text: data.text, at: data.at }] };
         });
-        notify('message', data);
+        if(data.from!=='driver')notify('message', data);
       },
     };
 
@@ -172,6 +198,7 @@ export default function useDriverState({ onEvent } = {}) {
     });
 
   const goOnline = useCallback(async () => {
+    await unlockAudio();
     setBusy(true);
     try {
       const location = await getFix();
@@ -225,6 +252,8 @@ export default function useDriverState({ onEvent } = {}) {
 
   const accept = useCallback(async () => {
     if (!offer) return;
+    stopAlert();
+    closeOfferNotification(offer.rideId);
     const data = await act(offer.rideId, 'accept');
     setOffer(null);
     setRide(data.ride);
@@ -233,6 +262,8 @@ export default function useDriverState({ onEvent } = {}) {
 
   const decline = useCallback(async () => {
     if (!offer) return;
+    stopAlert();
+    closeOfferNotification(offer.rideId);
     const { rideId } = offer;
     setOffer(null);
     try {

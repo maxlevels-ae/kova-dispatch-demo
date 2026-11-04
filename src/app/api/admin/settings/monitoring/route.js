@@ -4,6 +4,7 @@ import NotificationJob from "@/lib/db/models/NotificationJob";
 import { requireAuth } from "@/lib/auth/helpers";
 import { GET as health } from "@/app/api/health/route";
 import Notification from "@/lib/db/models/Notification";
+import {pushConfiguration} from '@/lib/web-push';
 export async function GET() {
   const { error } = await requireAuth(["admin"]);
   if (error) return error;
@@ -54,6 +55,7 @@ export async function GET() {
       version: "0.1.0",
       commit: process.env.RENDER_GIT_COMMIT || null,
       notifications: {
+        pushDeliveries:result.checks.mongo==='up'?await Notification.find({pushStatus:{$exists:true}}).sort({updatedAt:-1}).limit(20).select('event pushStatus pushError updatedAt').lean():[],
         deliveries,
         queue,
         errors,
@@ -67,7 +69,7 @@ export async function GET() {
         email: "Not configured",
         sms: "Not configured",
         whatsapp: "Not configured",
-        push: "Not configured",
+          push: pushConfiguration().enabled?'VAPID configured':'Disabled — VAPID not configured',
         payments: "Restricted; eligibility and sandbox verification required",
       },
     },

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSocket } from '@/context/SocketProvider';
+import {unlockAudio} from '@/lib/notification-audio';
 
 /**
  * Owns the rider's live ride state:
@@ -29,6 +30,22 @@ export default function useRiderRide({ onEvent } = {}) {
   const notify = useCallback((type, data) => {
     onEventRef.current?.(type, data);
   }, []);
+  useEffect(()=>{
+    if(ride?.status!=='accepted')return;
+    let live=true;const update=async()=>{try{const r=await fetch(`/api/rides/${ride.id}/eta`);if(r.ok){const d=await r.json();if(live)setEtaMinutes(d.minutes);}}catch{}};
+    update();const timer=setInterval(update,20000);return()=>{live=false;clearInterval(timer);};
+  },[ride?.id,ride?.status]);
+  useEffect(()=>{
+    if(!socket)return;
+    let live=true;
+    const sync=async()=>{try{
+      const current=rideRef.current;const res=await fetch(current?.id?'/api/rides/'+current.id:'/api/rides/active');if(!res.ok||!live)return;const {ride:active}=await res.json();
+      if(active?.status==='completed'){setCompletedRide(active);setRide(null);setDriverPosition(null);}
+      else if(active&&['cancelled','no_drivers'].includes(active.status)){setRide(null);setDriverPosition(null);}
+      else {setRide(active||null);setDriverPosition(active?.driver?.location||null);}
+    }catch{}};
+    socket.on('connect',sync);if(isConnected)sync();return()=>{live=false;socket.off('connect',sync);};
+  },[socket,isConnected]);
 
   // ── Resume active ride from the server ──
   useEffect(() => {
@@ -126,9 +143,10 @@ export default function useRiderRide({ onEvent } = {}) {
       'ride:message': (data) => {
         setRide((r) => {
           if (!r || r.id !== data.rideId) return r;
-          return { ...r, messages: [...(r.messages || []), { from: data.from, text: data.text, at: data.at }] };
+          if((r.messages||[]).some(m=>String(m._id||m.id)===data.id))return r;
+          return { ...r, messages: [...(r.messages || []), {id:data.id, from: data.from, text: data.text, at: data.at }] };
         });
-        notify('message', data);
+        if(data.from!=='rider')notify('message', data);
       },
     };
 
@@ -142,6 +160,7 @@ export default function useRiderRide({ onEvent } = {}) {
 
   // ── Actions ──
   const book = useCallback(async ({ pickup, dropoff, vehicleType, scheduledAt }) => {
+    await unlockAudio();
     const res = await fetch('/api/rides', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -19,6 +19,7 @@ const rideSchema = new mongoose.Schema(
       ref: 'Driver',
       default: null,
     },
+    assignedVehicle: {make:String,model:String,color:String,plate:String,type:{type:String},imageUrl:String,year:Number},
     status: {
       type: String,
       enum: [
@@ -106,10 +107,13 @@ const rideSchema = new mongoose.Schema(
         from: { type: String, enum: ['rider', 'driver'], required: true },
         text: { type: String, required: true, maxlength: 500 },
         at: { type: Date, default: Date.now },
+        clientId: String,
+        senderId: mongoose.Schema.Types.ObjectId,
       },
     ],
     dispatch: {
       manualHold: { type: Boolean, default: false },
+      currentOffer: {id:String,userId:mongoose.Schema.Types.ObjectId,createdAt:Date,expiresAt:Date,payload:mongoose.Schema.Types.Mixed},
       offeredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Driver' }],
       declinedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Driver' }],
       offersSent: { type: Number, default: 0 },

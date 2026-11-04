@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Car, Check } from 'lucide-react';
 import ProfileCard from '@/components/profile/ProfileCard';
+import VehiclePhotoUpload from '@/components/VehiclePhotoUpload';
 import { useToast } from '@/components/ui/Toast';
 import { VEHICLE_LABELS } from '@/components/ui/bits';
 
@@ -79,6 +80,7 @@ export default function DriverProfilePage() {
           </div>
 
           <form onSubmit={saveVehicle} className="flex-col gap-4">
+            {driver&&<VehiclePhotoUpload userId={driver.userId} imageUrl={driver.vehicle?.imageUrl} onSaved={imageUrl=>setDriver(d=>({...d,vehicle:{...d.vehicle,imageUrl}}))}/>}
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="v-make">Make</label>

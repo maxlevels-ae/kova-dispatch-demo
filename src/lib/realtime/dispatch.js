@@ -1,4 +1,7 @@
 import { recordOperationalError } from '@/lib/operational-errors';
+import crypto from 'node:crypto';
+import {syncNotifications} from '@/lib/notifications';
+import TripEvent from '@/lib/db/models/TripEvent';
 import { getSettings } from '@/lib/settings';
 import connectDB from '@/lib/db/mongodb';
 import redis from '@/lib/db/redis';
@@ -133,9 +136,10 @@ async function runCascade(rideId, manual) {
 
     ride.dispatch.offeredTo.push(candidate._id);
     ride.dispatch.offersSent = (ride.dispatch.offersSent || 0) + 1;
-    await ride.save();
-
-    emitToDriver(driverUserId, 'ride:offer', {
+    const offerId=crypto.randomUUID();
+    const expiresAt=new Date(Date.now()+OFFER_TIMEOUT_MS-1000);
+    const payload={
+      offerId,expiresAt:expiresAt.toISOString(),
       rideId: String(ride._id),
       pickup: { address: ride.pickup.address, ...pickup },
       dropoff: {
@@ -153,7 +157,12 @@ async function runCascade(rideId, manual) {
       etaMinutes,
       rider: riderInfo,
       expiresInSeconds: Math.round(OFFER_TIMEOUT_MS / 1000) - 1,
-    });
+    };
+    ride.dispatch.currentOffer={id:offerId,userId:driverUserId,createdAt:new Date(),expiresAt,payload};
+    await ride.save();
+    await TripEvent.updateOne({key:offerId},{$setOnInsert:{key:offerId,rideId:ride._id,event:'offer_sent',actorId:driverUserId,details:`Offer ${ride.dispatch.offersSent}; expires ${expiresAt.toISOString()}`}},{upsert:true});
+    emitToDriver(driverUserId,'ride:offer',payload);
+    syncNotifications(driverUserId).catch(()=>recordOperationalError('notifications','OFFER_DELIVERY_FAILED'));
 
     emitToRider(String(ride.riderId), 'ride:searching-update', {
       rideId: String(ride._id),
@@ -161,6 +170,8 @@ async function runCascade(rideId, manual) {
     });
 
     const signal = await waitForSignal(rideId, OFFER_TIMEOUT_MS);
+    await TripEvent.updateOne({key:offerId+':outcome'},{$setOnInsert:{key:offerId+':outcome',rideId:ride._id,event:'offer_'+signal.type,actorId:driverUserId}},{upsert:true});
+    await Ride.updateOne({_id:rideId,'dispatch.currentOffer.id':offerId},{$unset:{'dispatch.currentOffer':1}});
 
     if (signal.type === 'accepted') {
       // Accept route already updated everything
@@ -190,6 +201,7 @@ async function runCascade(rideId, manual) {
     await recordOfferOutcome(candidate._id, false);
 
     if (signal.type === 'declined') {
+      emitToDriver(driverUserId,'ride:offer-withdrawn',{rideId:String(ride._id)});
       await Ride.updateOne(
         { _id: rideId },
         { $addToSet: { 'dispatch.declinedBy': candidate._id } }

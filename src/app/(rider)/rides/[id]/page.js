@@ -1,4 +1,5 @@
 'use client';
+import AssignedVehicleCard from '@/components/ride/AssignedVehicleCard';
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -81,19 +82,7 @@ export default function RideDetailPage() {
         </div>
       </div>
 
-      {ride.driver && (
-          <div className="card card-pad mt-4 flex items-center gap-3" style={{ flexWrap: 'wrap' }}>
-          <Avatar name={ride.driver.name} src={ride.driver.avatar} />
-            <div className="flex-1" style={{ minWidth: 120 }}>
-            <div style={{ fontWeight: 700 }}>{ride.driver.name}</div>
-            <Stars value={ride.driver.rating} />
-          </div>
-            <div className="text-right small muted" style={{ marginLeft: 'auto' }}>
-            {ride.driver.vehicle?.color} {ride.driver.vehicle?.make} {ride.driver.vehicle?.model}
-            <div className="badge badge-neutral mt-1">{ride.driver.vehicle?.plate}</div>
-          </div>
-        </div>
-      )}
+      <AssignedVehicleCard ride={ride}/>
 
       {(ride.status === 'completed' || ride.fare?.cancellationFee > 0) && (
         <div className="card card-pad mt-4">

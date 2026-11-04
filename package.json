@@ -15,7 +15,7 @@
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
     "sim:driver": "node scripts/simulate-driver.js",
-    "test": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs --test tests/regression.test.mjs tests/settings.test.mjs",
+    "test": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs --test tests/regression.test.mjs tests/settings.test.mjs tests/notifications.test.mjs",
     "audit:currency": "node scripts/financial-inventory.mjs",
     "test:http": "node tests/http-smoke.mjs",
     "test:integration": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs tests/integration.mjs",
@@ -45,6 +45,7 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "stripe": "^22.5.0",
+    "web-push": "3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {

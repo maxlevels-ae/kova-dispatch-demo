@@ -48,6 +48,9 @@ export const defaults = {
     east: 37,
   },
   notifications: {
+    driverSound:true,
+    riderSound:true,
+    messageSound:true,
     enabledEvents: [],
     templates: Object.fromEntries(
       events.map((e) => [e, e.replaceAll("_", " ")]),
@@ -138,6 +141,9 @@ export const schemas = {
     }),
   notifications: z
     .object({
+      driverSound:z.boolean().default(true),
+      riderSound:z.boolean().default(true),
+      messageSound:z.boolean().default(true),
       enabledEvents: z.array(z.enum(events)).max(events.length),
       templates: z
         .object(

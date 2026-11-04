@@ -24,6 +24,7 @@ export function SocketProvider({ children }) {
     if (status !== 'authenticated' || !userId || !role) return undefined;
 
     let cancelled = false;
+    let retryTimer;
 
     async function connect() {
       let token = null;
@@ -33,7 +34,8 @@ export function SocketProvider({ children }) {
       } catch {
         /* server not ready — socket.io will retry via reconnect below */
       }
-      if (cancelled || !token) return;
+      if(cancelled)return;
+      if(!token){retryTimer=setTimeout(connect,3000);return;}
 
       const base = process.env.NEXT_PUBLIC_SOCKET_URL || '';
       const instance = io(`${base}/${role}`, {
@@ -56,6 +58,7 @@ export function SocketProvider({ children }) {
             if (res.ok) {
               const { token: fresh } = await res.json();
               instance.auth = { token: fresh };
+              if(!cancelled)instance.connect();
             }
           } catch {
             /* retry keeps old token */
@@ -71,6 +74,7 @@ export function SocketProvider({ children }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;

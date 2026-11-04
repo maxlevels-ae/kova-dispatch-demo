@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import {createWriteStream} from 'node:fs';
 import { randomBytes } from "node:crypto";
 import assert from "node:assert/strict";
 import bcrypt from "bcryptjs";
@@ -59,9 +60,11 @@ async function start() {
       NEXTAUTH_URL: base,
       SETTINGS_PUBLIC_ORIGINS: "https://kova-dispatch-demo.onrender.com",
     },
-    stdio: "ignore",
+    stdio: ['ignore','pipe','pipe'],
     windowsHide: true,
   });
+  const log=createWriteStream('.cache/notification-test-server.log');
+  server.stdout.pipe(log);server.stderr.pipe(log);
   for (let i = 0; i < 60; i++) {
     try {
       if ((await request("/login")).status === 200) return;
@@ -1248,6 +1251,8 @@ try {
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
   if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only')) {
+    const {notificationChecks}=await import('./ride-notifications.mjs');
+    await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
     const {accountsChecks}=await import('./accounts-integration.mjs');
     await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});
   }

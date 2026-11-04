@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {validSettingsOrigin} from '@/lib/settings-origin';
 import connectDB from '@/lib/db/mongodb';
 import Driver from '@/lib/db/models/Driver';
 import { requireAuth } from '@/lib/auth/helpers';
@@ -47,6 +48,7 @@ export async function GET() {
 export async function PATCH(request) {
   const { session, error } = await requireAuth(['driver']);
   if (error) return error;
+  if(!validSettingsOrigin(request))return Response.json({error:'Invalid request origin'},{status:403});
 
   try {
     const body = await request.json();
@@ -61,7 +63,7 @@ export async function PATCH(request) {
 
     await connectDB();
 
-    const update = { vehicle: parsed.data.vehicle };
+    const update = Object.fromEntries(Object.entries(parsed.data.vehicle).map(([key,value])=>['vehicle.'+key,value]));
     if (parsed.data.license?.number) {
       update['license.number'] = parsed.data.license.number;
     }

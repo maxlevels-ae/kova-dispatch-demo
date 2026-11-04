@@ -1,4 +1,5 @@
 "use client";
+import VehiclePhotoUpload from '@/components/VehiclePhotoUpload';
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -508,6 +509,7 @@ export function AccountDetail({ id }) {
             {tab === "vehicle" && (
               <>
                 <h2>Vehicle & licence</h2>
+                 <VehiclePhotoUpload userId={data.user._id} imageUrl={data.driver?.vehicle?.imageUrl} onSaved={imageUrl=>setData(d=>({...d,driver:{...d.driver,vehicle:{...d.driver.vehicle,imageUrl}}}))}/>
                 <div className="account-grid">
                   {["make", "model", "color", "plate"].map((k) => (
                     <Field key={k} label={k[0].toUpperCase() + k.slice(1)}>
@@ -754,6 +756,7 @@ export function AccountDetail({ id }) {
           {!data.trips.length && <p className="muted">No trips yet.</p>}
           {data.trips.map((t) => (
             <div className="account-history" key={t._id}>
+                <Link href={'/admin/rides/'+t._id} className="btn btn-secondary btn-sm">View full trip details</Link>
               <strong>
                 {t.pickup?.address} → {t.dropoff?.address}
               </strong>

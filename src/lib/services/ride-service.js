@@ -1,4 +1,5 @@
 import { getSettings } from '@/lib/settings';
+import {notifyRideParticipants} from '@/lib/notifications';
 import { bookingPolicy } from '@/lib/settings-schema';
 import mongoose from 'mongoose';
 import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta, walletAccount } from '@/lib/currency';
@@ -101,7 +102,7 @@ export function serializeRide(ride, { driver, driverUser } = {}) {
           avatar: driverUser?.avatar || '',
           rating: driver.stats?.averageRating ?? 5,
           totalTrips: driver.stats?.totalTrips ?? 0,
-          vehicle: driver.vehicle,
+          vehicle: r.assignedVehicle?.plate ? r.assignedVehicle : driver.vehicle,
           location: driver.location ? coordsToLatLng(driver.location) : null,
         }
       : undefined,
@@ -226,6 +227,8 @@ export async function acceptRide({ rideId, driverUserId }) {
   if (offeredRide?.scheduledAt && new Date(offeredRide.scheduledAt) > new Date()) throw new RideError('This scheduled ride is not ready for dispatch', 409);
   if (offeredRide?.dispatch?.manualHold) throw new RideError('Ride is awaiting manual dispatch', 409);
   if (!driver.isOnline || driver.vehicle.type !== offeredRide?.vehicleType) throw new RideError('Driver is unavailable or vehicle category does not match', 409);
+  if(offeredRide?.dispatch?.currentOffer?.expiresAt && (new Date(offeredRide.dispatch.currentOffer.expiresAt)<=new Date()||String(offeredRide.dispatch.currentOffer.userId)!==String(driverUserId)))throw new RideError('This offer expired or belongs to another driver',409);
+  if(offeredRide?.dispatch?.offersSent>0&&!offeredRide.dispatch.currentOffer?.id)throw new RideError('This offer is no longer active',409);
   const driverWallet = await User.findById(driverUserId).select('wallet egpWallet').lean();
   if (!sameCurrency(offeredRide?.fare?.currency, walletAccount(driverWallet, offeredRide?.fare?.currency)?.currency)) throw new RideError('Wallet currency does not match this ride; contact support for currency review.', 409);
 
@@ -244,11 +247,12 @@ export async function acceptRide({ rideId, driverUserId }) {
 
   // Atomically claim the ride
   const ride = await Ride.findOneAndUpdate(
-    { _id: rideId, status: 'searching' },
+    { _id: rideId, status: 'searching',...(offeredRide.dispatch?.currentOffer?.id?{'dispatch.currentOffer.id':offeredRide.dispatch.currentOffer.id,'dispatch.currentOffer.expiresAt':{$gt:new Date()}}:{}) },
     {
       status: 'accepted',
       driverId: driverUserId,
       driverProfileId: driver._id,
+      assignedVehicle: driver.vehicle,
       $push: {
         timeline: {
           status: 'accepted',
@@ -300,7 +304,9 @@ export async function acceptRide({ rideId, driverUserId }) {
     ride: serializeRide(ride, { driver: claimedDriver, driverUser }),
     etaMinutes,
   });
+  emitToDriver(String(driverUserId),'ride:accepted',{ride:serializeRide(ride,{driver:claimedDriver,driverUser}),etaMinutes});
   emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'accepted' });
+  await notifyRideParticipants(ride);
 
   return { ride, driver: claimedDriver, driverUser, etaMinutes };
 }
@@ -344,6 +350,7 @@ export async function driverArrived({ rideId, driverUserId }) {
 
   emitToRide(rideId, 'ride:driver-arrived', { rideId: String(ride._id) });
   emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'arrived' });
+  await notifyRideParticipants(ride);
   return ride;
 }
 
@@ -374,6 +381,7 @@ export async function startRide({ rideId, driverUserId, pin }) {
     startedAt: ride.startedAt,
   });
   emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'in_progress' });
+  await notifyRideParticipants(ride);
   return ride;
 }
 
@@ -482,6 +490,7 @@ export async function completeRide({ rideId, driverUserId }) {
     shortfall,
   });
   emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'completed' });
+  await notifyRideParticipants(ride);
 
   leaveRideRoom('/rider', String(ride.riderId), String(ride._id));
   leaveRideRoom('/driver', String(ride.driverId), String(ride._id));
@@ -522,6 +531,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
     ride.status = 'searching';
     ride.driverId = null;
     ride.driverProfileId = null;
+    ride.assignedVehicle = undefined;
     ride.timeline.push({
       status: 'searching',
       timestamp: new Date(),
@@ -540,6 +550,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
       reason: reason || '',
     });
     emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'searching' });
+    await notifyRideParticipants(ride);
 
     startDispatch(String(ride._id));
     return ride;
@@ -593,6 +604,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
   }
 
   emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'cancelled' });
+  await notifyRideParticipants(ride);
   leaveRideRoom('/rider', String(ride.riderId), String(ride._id));
   await clearRideMembers(String(ride._id));
 
@@ -664,28 +676,31 @@ export async function getActiveRide({ userId, role }) {
 }
 
 /** Persisted chat message + realtime relay. */
-export async function addRideMessage({ rideId, userId, role, text }) {
+export async function addRideMessage({ rideId, userId, role, text, clientId }) {
   await connectDB();
 
   const match =
     role === 'rider'
       ? { _id: rideId, riderId: userId }
       : { _id: rideId, driverId: userId };
+  if(clientId){const existing=await Ride.findOne({...match,'messages.clientId':clientId}).select('messages').lean();if(existing)return existing.messages.find(m=>m.clientId===clientId);}
+  const messageId=new mongoose.Types.ObjectId();
 
   const ride = await Ride.findOneAndUpdate(
-    { ...match, status: { $in: ['accepted', 'arrived', 'in_progress'] } },
-    { $push: { messages: { from: role, text: text.slice(0, 500), at: new Date() } } },
+    { ...match, status: { $in: ['accepted', 'arrived', 'in_progress'] },'messages.499':{$exists:false},...(clientId?{'messages.clientId':{$ne:clientId}}:{}) },
+    { $push: { messages: { _id:messageId,from: role,senderId:userId, text: text.slice(0, 500), at: new Date(),clientId } } },
     { returnDocument: 'after' }
   );
-  if (!ride) throw new RideError('No active ride to message', 404);
+  if (!ride) {if(clientId){const existing=await Ride.findOne({...match,'messages.clientId':clientId}).select('messages').lean();if(existing)return existing.messages.find(m=>m.clientId===clientId);}throw new RideError('No active ride to message, or message limit reached', 409);}
 
   const message = ride.messages[ride.messages.length - 1];
   emitToRide(rideId, 'ride:message', {
     rideId: String(ride._id),
+    id:String(message._id),
     from: role,
     text: message.text,
     at: message.at,
   });
-
+  await notifyRideParticipants(ride);
   return message;
 }

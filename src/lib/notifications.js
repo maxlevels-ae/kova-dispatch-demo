@@ -6,6 +6,10 @@ import Driver from "@/lib/db/models/Driver";
 import Notification from "@/lib/db/models/Notification";
 import Ride from "@/lib/db/models/Ride";
 import { getSettings } from "@/lib/settings";
+import User from '@/lib/db/models/User';
+import {emitToUser} from '@/lib/realtime/emit';
+import {rideLink} from '@/lib/notification-policy';
+import {sendPush} from '@/lib/web-push';
 const eventMap = {
   searching: "booking_created",
   accepted: "driver_accepted",
@@ -15,17 +19,39 @@ const eventMap = {
   cancelled: "trip_cancelled",
   no_drivers: "operational_alert",
 };
+const operationalText={driver_accepted:'Your driver accepted the booking',driver_arrived:'Your driver has arrived at pickup',trip_started:'Your trip has started',trip_completed:'Your trip is complete',trip_cancelled:'The trip was cancelled',operational_alert:'No driver is currently available',driver_cancelled:'Your driver cancelled. Looking for another driver.'};
+export async function notifyRideParticipants(ride){
+ try{await syncNotifications(ride.riderId);if(ride.driverId)await syncNotifications(ride.driverId);}catch{await recordOperationalError('notifications','RIDE_RECONCILE_FAILED');}
+}
 // Reconcile durable ride timelines on read. Idempotent upserts recover after process failure.
 export async function syncNotifications(userId) {
   await Promise.all([Notification.init(), NotificationJob.init()]);
   const { notifications } = await getSettings();
   const rides = await Ride.find({
-    $or: [{ riderId: userId }, { driverId: userId }],
+    $or: [{ riderId: userId }, { driverId: userId }, {'dispatch.currentOffer.userId':userId}],
   })
     .sort({ updatedAt: -1 })
     .limit(50)
     .lean();
   const writes = [];
+  const user=await User.findById(userId).select('role').lean();
+  if(!user)return;
+  const role=user.role;
+  const enqueue=(ride,event,text,key,at,expiresAt)=>writes.push({updateOne:{filter:{key},update:{$setOnInsert:{key,userId,event,text,rideId:ride._id,role,href:rideLink(role,ride._id,event==='booking_offer'),createdAt:at||new Date(),expiresAt}},upsert:true}});
+  for(const ride of rides){
+    const offer=ride.dispatch?.currentOffer;
+    if(role==='driver'&&ride.status==='searching'&&String(offer?.userId)===String(userId)&&new Date(offer.expiresAt)>new Date())
+      enqueue(ride,'booking_offer','New ride request',`${userId}:${ride._id}:offer:${offer.id}`,offer.createdAt,offer.expiresAt);
+    if(String(ride.riderId)!==String(userId)&&String(ride.driverId)!==String(userId))continue;
+    for(const message of ride.messages||[]){
+      if(message.from===role||Date.now()-new Date(message.at)>90*86400000)continue;
+      enqueue(ride,'ride_message',`New message from your ${message.from}`,`${userId}:${ride._id}:message:${message._id}`,message.at);
+    }
+    for(const entry of ride.timeline||[]){
+      if(entry.status==='searching'&&entry.note?.startsWith('Driver cancelled')&&role==='rider')
+        enqueue(ride,'driver_cancelled',operationalText.driver_cancelled,`${userId}:${ride._id}:driver_cancelled:${new Date(entry.timestamp).getTime()}`,entry.timestamp);
+    }
+  }
   const driver = await Driver.findOne({ userId, isApproved: true }).lean();
   if (driver && notifications.enabledEvents.includes("driver_approval")) {
     const key = `${userId}:driver_approval:${driver._id}`;
@@ -47,7 +73,10 @@ export async function syncNotifications(userId) {
   for (const ride of rides)
     for (const entry of ride.timeline || []) {
       const event = eventMap[entry.status];
-      if (!event || !notifications.enabledEvents.includes(event)) continue;
+      if(String(ride.riderId)!==String(userId)&&String(ride.driverId)!==String(userId))continue;
+      if (!event || (!operationalText[event]&&!notifications.enabledEvents.includes(event))) continue;
+      // Don't tell the actor about their own cancellation or acceptance.
+      if((event==='driver_accepted'&&role==='driver')||(event==='trip_cancelled'&&ride.cancelledBy===role))continue;
       const key = `${userId}:${ride._id}:${event}:${new Date(entry.timestamp).getTime()}`;
       writes.push({
         updateOne: {
@@ -57,7 +86,8 @@ export async function syncNotifications(userId) {
               key,
               userId,
               event,
-              text: notifications.templates[event],
+              text: role==='driver'&&event==='driver_arrived'?'Pickup arrival recorded':operationalText[event]||notifications.templates[event],
+              rideId:ride._id,role,href:rideLink(role,ride._id),
               createdAt: entry.timestamp,
             },
           },
@@ -66,8 +96,9 @@ export async function syncNotifications(userId) {
       });
     }
   for (const ride of rides) {
+    if(String(ride.riderId)!==String(userId)&&String(ride.driverId)!==String(userId))continue;
     const extra = [];
-    if (ride.driverId) extra.push("driver_assigned");
+    if (ride.driverId&&!ride.timeline?.some(e=>e.status==='accepted')) extra.push("driver_assigned");
     if (ride.payment?.status === "captured") extra.push("payment_successful");
     if (ride.payment?.status === "failed") extra.push("payment_failed");
     for (const event of extra) {
@@ -82,6 +113,7 @@ export async function syncNotifications(userId) {
               userId,
               event,
               text: notifications.templates[event],
+              rideId:ride._id,role,href:rideLink(role,ride._id),
             },
           },
           upsert: true,
@@ -89,8 +121,11 @@ export async function syncNotifications(userId) {
       });
     }
   }
-  if (writes.length)
-    await NotificationJob.bulkWrite(writes, { ordered: false });
+  if (writes.length) {
+    for(const write of writes){const value=write.updateOne.update.$setOnInsert;value.createdAt ||= new Date();value.updatedAt=value.createdAt;}
+    // Reconciliation is not a new delivery attempt; preserve its recorded time.
+    await NotificationJob.bulkWrite(writes, { ordered: false,timestamps:false });
+  }
   await deliverNotifications(userId);
 }
 
@@ -121,7 +156,7 @@ export async function deliverNotifications(userId) {
       const preference = await NotificationPreference.findById(
         job.userId,
       ).lean();
-      if (preference?.inApp === false) {
+      if (preference?.inApp === false || (job.event==='ride_message'&&preference?.messages===false) || (job.event!=='ride_message'&&preference?.rideEvents===false)) {
         job.status = "suppressed";
       } else {
         await Notification.updateOne(
@@ -132,11 +167,21 @@ export async function deliverNotifications(userId) {
               userId: job.userId,
               event: job.event,
               text: job.text,
+              rideId:job.rideId,href:job.href,role:job.role,expiresAt:job.expiresAt,createdAt:job.createdAt,
             },
           },
           { upsert: true },
         );
         job.status = "delivered";
+        const notification=await Notification.findOne({key:job.key});
+        // A compare-and-set claim prevents overlapping workers from sending twice.
+        const claimed=await Notification.findOneAndUpdate({_id:notification._id,pushAttemptAt:null},{$set:{pushAttemptAt:new Date()}},{returnDocument:'after'});
+        if(claimed){
+          emitToUser('/'+(job.role||'rider'),String(job.userId),'notification:new',notification.toObject());
+          const fresh=Date.now()-new Date(job.createdAt)<300000&&(!job.expiresAt||job.expiresAt>new Date());
+          const result=fresh&&preference?.push!==false&&!preference?.muted?await sendPush(notification):{pushStatus:'suppressed'};
+          await Notification.updateOne({_id:notification._id},{$set:result});
+        }
       }
       job.lastError = undefined;
       await job.save();
@@ -178,11 +223,12 @@ async function reconcileChangedRides() {
   const rides = await Ride.find(query)
     .sort({ updatedAt: 1, _id: 1 })
     .limit(20)
-    .select("riderId driverId updatedAt")
+    .select("riderId driverId updatedAt dispatch.currentOffer")
     .lean();
   for (const ride of rides) {
     await syncNotifications(ride.riderId);
     if (ride.driverId) await syncNotifications(ride.driverId);
+    if(ride.dispatch?.currentOffer?.userId&&new Date(ride.dispatch.currentOffer.expiresAt)>new Date())await syncNotifications(ride.dispatch.currentOffer.userId);
     await NotificationCursor.findOneAndUpdate(
       { _id: "rides" },
       { $set: { at: ride.updatedAt, rideId: ride._id } },

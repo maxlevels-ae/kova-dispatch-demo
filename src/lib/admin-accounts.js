@@ -179,6 +179,7 @@ export async function editAccount(id, input, actor) {
         reviewedAt: new Date(),
       }));
       if (!driver.license.expiry) delete driver.license.expiry;
+      driver.vehicle.imageUrl=existing.vehicle.imageUrl;
       Object.assign(existing, driver);
       if (!driver.isApproved || !data.isActive) existing.isOnline = false;
       await existing.save({ session });

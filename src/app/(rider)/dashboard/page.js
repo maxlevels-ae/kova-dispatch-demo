@@ -1,4 +1,5 @@
 'use client';
+import AssignedVehicleCard from '@/components/ride/AssignedVehicleCard';
 import { LATE_CANCEL_FEE, LEGACY_USD_CANCEL_FEE } from '@/lib/currency';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -61,11 +62,8 @@ export default function RiderDashboard() {
   }, [chatOpen]);
 
   const onRideEvent = useCallback((type, data) => {
-    if (type === 'accepted') toast('Driver found — they’re on the way!', 'success');
-    if (type === 'arrived') toast('Your driver has arrived', 'success', 5000);
-    if (type === 'started') toast('Trip started — enjoy the ride', 'info');
-    if (type === 'no-drivers') toast('No drivers available right now. Please try again shortly.', 'error', 5000);
-    if (type === 'driver-cancelled') toast('Driver cancelled — finding you a new one…', 'info', 5000);
+    // Persisted inbox delivery owns operational toasts and sound; socket events
+    // still update the visible ride immediately, even when alerts are muted.
     if (type === 'completed' && data?.shortfall) {
       toast('Your wallet went negative — top up to book your next ride', 'info', 8000);
     }
@@ -444,26 +442,7 @@ export default function RiderDashboard() {
               </div>
             )}
 
-            {ride.driver && (
-              <div className="flex items-center gap-3 mb-4">
-                <Avatar name={ride.driver.name} src={ride.driver.avatar} size="lg" />
-                <div className="flex-1" style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700 }} className="truncate">{ride.driver.name}</div>
-                  <div className="flex items-center gap-2">
-                    <Stars value={ride.driver.rating} />
-                    <span className="tiny muted">{ride.driver.totalTrips} trips</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="small" style={{ fontWeight: 700 }}>
-                    {ride.driver.vehicle?.color} {ride.driver.vehicle?.make} {ride.driver.vehicle?.model}
-                  </div>
-                  <div className="badge badge-neutral mono-nums" style={{ marginTop: 4 }}>
-                    {ride.driver.vehicle?.plate}
-                  </div>
-                </div>
-              </div>
-            )}
+            <AssignedVehicleCard ride={ride} etaMinutes={etaMinutes}/>
 
             {(ride.status === 'accepted' || ride.status === 'arrived') && ride.pin && (
               <div

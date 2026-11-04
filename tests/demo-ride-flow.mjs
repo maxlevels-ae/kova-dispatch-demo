@@ -53,7 +53,9 @@ export async function demoLogin({ base, username, password }) {
             body: JSON.stringify(body),
           },
     );
-    const data = await response.json();
+    const raw = await response.text();
+    assert.ok(raw, `${path}: empty HTTP ${response.status} response`);
+    const data = JSON.parse(raw);
     assert.ok(response.ok, `${path}: ${response.status} ${data.error || ""}`);
     return data;
   };
