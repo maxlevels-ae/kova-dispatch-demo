@@ -39,7 +39,7 @@ export default function AppShell({ nav, children }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <Link href={user?.role === 'admin' ? '/admin/profile' : '/profile'} className="flex items-center gap-2 flex-1" aria-label="My profile"><Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
+            <Link href={user?.role === 'admin' ? '/admin/profile' : user?.role === 'driver' ? '/driver/profile' : '/profile'} className="flex items-center gap-2 flex-1" aria-label="My profile"><Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
             <div className="flex-1 truncate">
               <div className="small truncate" style={{ fontWeight: 600 }}>
                 {user?.name || '—'}
