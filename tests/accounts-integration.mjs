@@ -288,6 +288,7 @@ export async function accountsChecks({
     },
   );
   await check('EGP booking from a legacy USD user and inactive account rejection', async()=>{
+    assert.equal((await send(`/api/admin/users/${riderId}/wallet`,{currency:'EGP',direction:'credit',amount:500,reason:'Funding isolated booking regression',reference:'QA booking',idempotencyKey:randomUUID(),confirmed:true})).status,200);
     const settings=await getSettings();
     const pickup={...cityCenter(settings.maps),address:'QA Cairo pickup'};
     const booked=await createRide({riderId,pickup,dropoff:{lat:pickup.lat+0.005,lng:pickup.lng+0.005,address:'QA Cairo destination'},vehicleType:'economy'});

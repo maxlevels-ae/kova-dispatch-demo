@@ -17,7 +17,7 @@ const walletTransactionSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        'topup', 'manual_credit', 'manual_debit',
+        'topup', 'manual_credit', 'manual_debit', 'demo_initialization',
         'ride_payment',
         'ride_earning',
         'refund',

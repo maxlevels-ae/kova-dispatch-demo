@@ -9,6 +9,7 @@ const dbName = `maxride_qa_${Date.now()}`;
 process.env.MONGODB_URI = `mongodb://127.0.0.1:27028/${dbName}?replicaSet=rs0&directConnection=true`;
 process.env.REDIS_URL = "redis://127.0.0.1:6389";
 process.env.NODE_ENV = "production";
+process.env.DEMO_WALLET_INITIALIZATION_TEST = "true";
 const { default: mongoose } = await import("mongoose");
 const { default: connectDB } = await import("../src/lib/db/mongodb.js");
 const { default: User } = await import("../src/lib/db/models/User.js");
@@ -196,7 +197,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only")) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only")) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -1225,7 +1226,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes("--accounts-only")) await check(
+  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only")) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1242,7 +1243,11 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--maps-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only')) {
+    const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
+    await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
+  }
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only')) {
     const {accountsChecks}=await import('./accounts-integration.mjs');
     await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});
   }

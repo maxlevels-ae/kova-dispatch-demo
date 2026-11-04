@@ -46,7 +46,7 @@ export async function mapBrowserChecks({
     400,
   );
   assert.equal(
-    (await write("maps", { ...maps, locationRefreshSeconds: 5 }, revision))
+    (await write("maps", { ...maps, locationRefreshSeconds: 5, autoFitDrivers: false }, revision))
       .status,
     200,
   );
@@ -124,7 +124,9 @@ export async function mapBrowserChecks({
     const before = await marker.getAttribute("style");
     livePosition={lat:30.0454,lng:31.2377};
     socket.emit("driver:location", livePosition);
-    await expect.poll(() => marker.getAttribute("style")).not.toBe(before);
+    // Keep the camera fixed: auto-fit can hold a moving driver at the same screen pixel.
+    // A throttled GPS sample may wait for the five-second heartbeat plus animation.
+    await expect.poll(() => marker.getAttribute("style"), { timeout: 12000 }).not.toBe(before);
     await marker.click();
     await expect(page.locator(".map-driver-popup")).toContainText("QA-ONLY");
     await expect(page.locator(".map-driver-popup")).toContainText(
@@ -351,6 +353,7 @@ export async function mapBrowserChecks({
     }
     assert.deepEqual(errors, []);
   } finally {
+    clearInterval(gpsTimer);
     socket.disconnect();
     await browser.close();
   }

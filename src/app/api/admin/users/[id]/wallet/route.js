@@ -1,3 +1,4 @@
+import { demoLegacyRecord } from "@/lib/demo-wallet-initialization";
 import { readSettingsJSON } from "@/lib/settings-http";
 import mongoose from "mongoose";
 import { requireAuth } from "@/lib/auth/helpers";
@@ -30,6 +31,7 @@ export async function GET(request, { params }) {
     ]);
     return Response.json({
       accounts: walletAccounts(user),
+      legacyRecord: await demoLegacyRecord(id),
       transactions,
       page,
       pages: Math.ceil(total / 20),

@@ -1,3 +1,4 @@
+import { demoLegacyRecord } from '@/lib/demo-wallet-initialization';
 import { walletAccount, walletAccounts } from '@/lib/currency';
 import mongoose from 'mongoose';
 import { CURRENCY, PAYMENT_LIMITATION, walletDelta } from '@/lib/currency';
@@ -37,6 +38,7 @@ export async function GET(request) {
     return Response.json({
       wallet: walletAccount(user) || { balance: 0, currency: null },
       accounts: walletAccounts(user),
+      legacyRecord: await demoLegacyRecord(session.user.id),
       transactions,
       stripeEnabled: isStripeEnabled(),
       topupEnabled: process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && walletAccount(user)?.currency === CURRENCY,

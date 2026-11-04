@@ -11,6 +11,7 @@ import { formatRelativeTime } from '@/lib/utils/geo';
 const QUICK_AMOUNTS = [10, 25, 50, 100];
 
 const TXN_LABEL = {
+  demo_initialization: 'Demo EGP initialization',
   manual_credit: 'Administrator credit',
   manual_debit: 'Administrator deduction',
   topup: 'Wallet top-up',

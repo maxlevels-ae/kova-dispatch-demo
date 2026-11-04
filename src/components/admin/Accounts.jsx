@@ -848,6 +848,18 @@ function WalletAdmin({ id }) {
           </div>
         ))}
       </div>
+      {data?.legacyRecord && (
+        <p className="account-saved" role="note">
+          Original wallet preserved:{" "}
+          {money(
+            data.legacyRecord.wallet.balance,
+            data.legacyRecord.wallet.currency,
+          )}{" "}
+          · {new Date(data.legacyRecord.preservedAt).toLocaleString()} ·{" "}
+          {data.legacyRecord.operation}. This immutable snapshot is separate
+          from operational EGP funds.
+        </p>
+      )}
       <form
         inert={!!preview || busy}
         onSubmit={(e) => {
