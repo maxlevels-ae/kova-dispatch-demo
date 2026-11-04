@@ -37,3 +37,17 @@ The existing local staging configuration reports a missing CARTO basemap key. Th
 - npm run validate:staging: passed against Render's official schema.
 
 Initial external-network checks were denied by the execution sandbox. They passed after rerunning with network access. All database writes during verification used existing isolated localhost QA infrastructure; no production seeds or customer messages were sent.
+
+## Settings UX refactor — 2026-11-04
+
+Replaced wrapped tabs and database-key forms with a shared settings workspace. The existing Maxride admin sidebar remains intact. Company, Operations, Finance and Platform navigation contains all ten sections; mobile uses a labelled native selector. Shared layout, navigation, header, section, field, toggle, select, checkbox group, status, save bar and empty-state components use the existing neutral brand palette and Lucide icons.
+
+Operational forms explicitly group supported fields. Branding separates identity, regional context, logos, preview and restoration. Pricing edits one EGP service tier at a time with separate fare, surge, commission and cancellation sections. Payment and notification providers use compact directories and individual configuration panels. Monitoring uses four compact service indicators, queue summaries and operational errors; raw diagnostic JSON is collapsed by default.
+
+Drafts survive section/provider/tier navigation. Dirty markers, sticky Save/Discard controls, duplicate-submit locks, field validation and unload warnings protect edits. Managed credentials, inactive-provider enforcement, MongoDB persistence, revision checks and existing legacy currency protections are preserved. Location is edited under Maps; timezone and EGP remain platform constraints. External channels remain unconfigured; this release does not implement or activate external adapters.
+
+All four settings mutation routes (branding, platform, providers and pricing) now use one origin validator. Only configured SETTINGS_PUBLIC_ORIGINS, NEXT_PUBLIC_APP_URL, AUTH_URL, NEXTAUTH_URL or RENDER_EXTERNAL_URL establish trust. HTTPS public origins work when the internal request URL is HTTP. Host and forwarded headers cannot add trusted origins. Missing/null/malicious origins and cross-site Fetch Metadata are rejected. Production without trusted configuration fails closed; localhost development is the only implicit fallback.
+
+Executed verification: 22 unit tests; 19 HTTP smoke checks; 31 integration groups including MongoDB persistence/restart, every platform section, all provider configurations, all EGP tiers, authorization, revision conflicts, origin protection and browser tests at 360/390/768/1440. Browser checks cover all ten sections, draft retention, validation, discard and persisted branding/provider/pricing/dispatch changes. Production build passed. ESLint has zero errors and 18 warnings. Production dependency audit reports zero vulnerabilities. Test writes target disposable localhost databases only.
+
+Screenshots are stored in docs/qa/settings-{branding,dispatch,payment,monitoring}-{360,390,768,1440}.png, plus the provider detail and mobile save-bar captures. Live verification results are recorded separately after deployment.

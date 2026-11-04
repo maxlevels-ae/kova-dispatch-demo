@@ -1,3 +1,4 @@
+import { validSettingsOrigin } from "@/lib/settings-origin";
 import { readSettingsJSON } from "@/lib/settings-http";
 import { requireAuth } from "@/lib/auth/helpers";
 import connectDB from "@/lib/db/mongodb";
@@ -47,7 +48,7 @@ export async function GET() {
 export async function PUT(request) {
   const { session, error } = await requireAuth(["admin"]);
   if (error) return error;
-  if (request.headers.get("origin") !== new URL(request.url).origin)
+  if (!validSettingsOrigin(request))
     return Response.json({ error: "Invalid origin" }, { status: 403 });
   try {
     const { id, value, revision } = await readSettingsJSON(request, 8000);

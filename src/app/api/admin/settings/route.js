@@ -1,3 +1,4 @@
+import { validSettingsOrigin } from "@/lib/settings-origin";
 import { requireAuth } from '@/lib/auth/helpers';
 import connectDB from '@/lib/db/mongodb';
 import Branding from '@/lib/db/models/Branding';
@@ -6,7 +7,7 @@ import { validateLogo } from '@/lib/validate-branding';
 export async function PUT(request) {
   const { session, error } = await requireAuth(['admin']);
   if (error) return error;
-  if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid request origin' }, { status: 403 });
+  if (!validSettingsOrigin(request)) return Response.json({ error: 'Invalid request origin' }, { status: 403 });
   if (!request.headers.get('content-type')?.startsWith('application/json')) return Response.json({ error: 'Expected JSON' }, { status: 415 });
   let data;
   try {

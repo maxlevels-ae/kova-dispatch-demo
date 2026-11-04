@@ -1,26 +1,69 @@
 "use client";
-import { useEffect, useState } from "react";
-export default function ProviderSettings({ kind }) {
+import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, ArrowUpRight, CreditCard, Plug } from "lucide-react";
+import { providerSchema } from "@/lib/provider-config";
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsSelect,
+  SettingsCheckboxGroup,
+  SettingsSaveBar,
+  SettingsStatus,
+  SettingsEmptyState,
+  useSettingsDirty,
+} from "./settings/SettingsUI";
+export default function ProviderSettings({ kind, onDirty }) {
   const [providers, setProviders] = useState([]),
+    [saved, setSaved] = useState([]),
+    [selected, setSelected] = useState(null),
     [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [errors, setErrors] = useState({}),
+    [loaded, setLoaded] = useState(false);
+  const lock = useRef(false);
   useEffect(() => {
     fetch("/api/admin/settings/providers")
       .then(async (r) => {
         const d = await r.json();
         if (!r.ok) throw Error(d.error);
         setProviders(d.providers);
+        setSaved(d.providers);
+        setLoaded(true);
       })
       .catch((e) => setMessage(e.message));
   }, []);
-  function edit(id, key, value) {
+  const changed = (p) =>
+    JSON.stringify(p.value) !==
+    JSON.stringify(saved.find((s) => s.id === p.id)?.value);
+  useSettingsDirty(
+    kind === "payment" ? "payment" : "integrations",
+    providers.some(changed),
+    onDirty,
+  );
+  const p = providers.find((p) => p.id === selected);
+  function edit(key, value) {
     setProviders((ps) =>
       ps.map((p) =>
-        p.id === id ? { ...p, value: { ...p.value, [key]: value } } : p,
+        p.id === selected ? { ...p, value: { ...p.value, [key]: value } } : p,
       ),
     );
+    setErrors({});
+    setMessage("");
   }
-  async function save(p) {
+  async function save(e) {
+    e.preventDefault();
+    if (lock.current || !changed(p)) return;
+    const parsed = providerSchema.safeParse(p.value);
+    if (!parsed.success) {
+      setErrors(
+        Object.fromEntries(
+          parsed.error.issues.map((i) => [i.path.join("."), i.message]),
+        ),
+      );
+      setMessage("Review the highlighted fields.");
+      return;
+    }
+    lock.current = true;
     setBusy(true);
     try {
       const r = await fetch("/api/admin/settings/providers", {
@@ -28,130 +71,214 @@ export default function ProviderSettings({ kind }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: p.id,
-          value: p.value,
+          value: parsed.data,
           revision: p.revision,
         }),
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
-      setProviders((ps) =>
-        ps.map((x) => (x.id === p.id ? { ...x, revision: d.revision } : x)),
-      );
+      const updated = { ...p, value: parsed.data, revision: d.revision };
+      setProviders((ps) => ps.map((x) => (x.id === p.id ? updated : x)));
+      setSaved((ps) => ps.map((x) => (x.id === p.id ? updated : x)));
       setMessage(
-        `${p.value.name} saved; external processing remains disabled.`,
+        `${p.name} configuration saved. External processing remains disabled.`,
       );
     } catch (e) {
       setMessage(e.message);
     } finally {
+      lock.current = false;
       setBusy(false);
     }
   }
   return (
     <div>
-      <p role="status">{message}</p>
-      <p className="mb-4">
-        Credentials use managed server-side environment secrets. Configure the
-        named secret in the deployment environment; secret values are never
-        returned here. Activation and connection testing remain unavailable
-        until an adapter and sandbox flow are verified.
+      <p role="status" className="settings-feedback">
+        {message}
       </p>
-      <div className="grid-2">
-        {providers
-          .filter((p) => p.kind === kind)
-          .map((p) => (
-            <form
-              key={p.id}
-              className="card card-pad"
-              onSubmit={(e) => {
-                e.preventDefault();
-                save(p);
-              }}
-            >
-              <h3>
-                {p.name} · {p.status}
-              </h3>
-              <p className="small muted">Inactive · {p.connection}</p>
-              {["name", "accountId", "webhookUrl"].map((key) => (
-                <label className="field" key={key}>
-                  {key === "accountId"
-                    ? "Merchant / account ID"
-                    : key === "webhookUrl"
-                      ? "Planned webhook URL (not registered)"
-                      : "Provider display name"}
-                  <input
-                    className="input"
-                    value={p.value[key]}
-                    disabled={busy}
-                    maxLength={key === "webhookUrl" ? 500 : 120}
-                    onChange={(e) => edit(p.id, key, e.target.value)}
-                  />
-                </label>
+      {!loaded && (
+        <SettingsEmptyState title="Provider directory unavailable or loading">
+          Reload this page to retry if loading does not complete.
+        </SettingsEmptyState>
+      )}
+      {!p ? (
+        <>
+          <div className="settings-directory">
+            {providers
+              .filter((p) => p.kind === kind)
+              .map((p) => (
+                <article key={p.id}>
+                  <div className="settings-provider-icon">
+                    {kind === "payment" ? (
+                      <CreditCard size={20} />
+                    ) : (
+                      <Plug size={20} />
+                    )}
+                  </div>
+                  <div className="settings-provider-name">
+                    <h3>{p.name}</h3>
+                    <SettingsStatus>{p.status}</SettingsStatus>
+                  </div>
+                  <div className="settings-provider-meta">
+                    <span>
+                      {p.value.mode === "sandbox" ? "Sandbox" : "Live plan"}
+                    </span>
+                    <small>
+                      {kind === "payment" ? "EGP · Inactive" : "Inactive"}
+                    </small>
+                  </div>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => {
+                      setSelected(p.id);
+                      setErrors({});
+                      setMessage("");
+                    }}
+                  >
+                    Configure <ArrowUpRight size={14} />
+                  </button>
+                  {changed(p) && <small>Unsaved changes</small>}
+                </article>
               ))}
-              <label className="field">
-                Configuration mode
-                <select
-                  className="input"
-                  value={p.value.mode}
-                  disabled={busy}
-                  onChange={(e) => edit(p.id, "mode", e.target.value)}
-                >
-                  <option value="sandbox">Sandbox</option>
-                  <option value="live">Live (activation locked)</option>
-                </select>
-              </label>
-              <p>Currency: EGP</p>
-              {p.kind === "payment" && (
-                <fieldset>
-                  <legend>Planned payment methods</legend>
-                  {["card", "wallet", "cash_reference"].map((m) => (
-                    <label key={m} className="flex gap-2">
-                      <input
-                        type="checkbox"
-                        checked={p.value.methods.includes(m)}
-                        disabled={busy}
-                        onChange={(e) =>
-                          edit(
-                            p.id,
-                            "methods",
-                            e.target.checked
-                              ? [...p.value.methods, m]
-                              : p.value.methods.filter((x) => x !== m),
-                          )
-                        }
-                      />
-                      {m}
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-              <p className="tiny mt-3">
-                {p.credential}:{" "}
-                {p.credentialConfigured
-                  ? "Configured (masked)"
-                  : "Not configured"}
-              </p>
-              {p.webhookSecret && (
-                <p className="tiny">
-                  {p.webhookSecret}:{" "}
-                  {p.webhookSecretConfigured
-                    ? "Configured (masked)"
+          </div>
+          <SettingsEmptyState title="Configuration is separate from activation">
+            Credentials stay in managed server secrets. Connections remain
+            inactive until adapter eligibility and sandbox flows are verified.
+          </SettingsEmptyState>
+        </>
+      ) : (
+        <form onSubmit={save} noValidate>
+          <div className="settings-toolbar">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setSelected(null)}
+            >
+              <ArrowLeft size={15} /> All{" "}
+              {kind === "payment" ? "providers" : "integrations"}
+            </button>
+            <SettingsStatus>Inactive · {p.connection}</SettingsStatus>
+          </div>
+          <SettingsSection
+            title={`${p.name} · Merchant identity`}
+            description="Save a configuration plan for this provider."
+          >
+            <div className="settings-fields">
+              <SettingsField
+                label="Provider display name"
+                value={p.value.name}
+                maxLength={80}
+                disabled={busy}
+                error={errors.name}
+                onChange={(e) => edit("name", e.target.value)}
+              />
+              <SettingsField
+                label="Merchant / account ID"
+                value={p.value.accountId}
+                maxLength={120}
+                disabled={busy}
+                error={errors.accountId}
+                onChange={(e) => edit("accountId", e.target.value)}
+              />
+            </div>
+          </SettingsSection>
+          <SettingsSection
+            title="Credentials status"
+            description="Secret values are never returned to the browser."
+          >
+            <div className="settings-status-list">
+              <div>
+                <span>
+                  API credential<small>{p.credential}</small>
+                </span>
+                <SettingsStatus>
+                  {p.credentialConfigured
+                    ? "Configured · masked"
                     : "Not configured"}
-                </p>
+                </SettingsStatus>
+              </div>
+              {p.webhookSecret && (
+                <div>
+                  <span>
+                    Webhook signature secret<small>{p.webhookSecret}</small>
+                  </span>
+                  <SettingsStatus>
+                    {p.webhookSecretConfigured
+                      ? "Configured · masked"
+                      : "Not configured"}
+                  </SettingsStatus>
+                </div>
               )}
-              <p className="small muted mt-3">{p.reason}</p>
-              {p.docs && (
-                <p>
-                  <a href={p.docs} target="_blank" rel="noreferrer">
-                    Official provider documentation
-                  </a>
-                </p>
-              )}
-              <button className="btn btn-primary mt-3" disabled={busy}>
-                {busy ? "Saving…" : "Save configuration"}
-              </button>
-            </form>
-          ))}
-      </div>
+            </div>
+          </SettingsSection>
+          {kind === "payment" && (
+            <SettingsSection
+              title="Payment methods"
+              description="Planned methods only. Availability requires provider verification."
+            >
+              <SettingsCheckboxGroup
+                label="Supported methods"
+                options={["card", "wallet", "cash_reference"]}
+                value={p.value.methods}
+                onChange={(v) => edit("methods", v)}
+                disabled={busy}
+              />
+            </SettingsSection>
+          )}
+          <SettingsSection
+            title="Webhook configuration"
+            description="Saving this URL does not register a webhook."
+          >
+            <SettingsField
+              label="Planned webhook URL (not registered)"
+              type="url"
+              value={p.value.webhookUrl}
+              maxLength={500}
+              error={errors.webhookUrl}
+              disabled={busy}
+              hint="Use an HTTPS endpoint, or leave empty."
+              onChange={(e) => edit("webhookUrl", e.target.value)}
+            />
+          </SettingsSection>
+          <SettingsSection title="Sandbox / live configuration">
+            <SettingsSelect
+              label="Configuration mode"
+              value={p.value.mode}
+              disabled={busy}
+              onChange={(e) => edit("mode", e.target.value)}
+              options={[
+                { value: "sandbox", label: "Sandbox" },
+                { value: "live", label: "Live (activation locked)" },
+              ]}
+            />
+            {kind === "payment" && (
+              <p className="settings-hint">Supported currency: EGP</p>
+            )}
+          </SettingsSection>
+          <SettingsSection title="Connection readiness">
+            <SettingsEmptyState title="Verification required">
+              {p.reason}
+            </SettingsEmptyState>
+            {p.docs && (
+              <a href={p.docs} target="_blank" rel="noreferrer">
+                Official provider documentation ↗
+              </a>
+            )}
+          </SettingsSection>
+          <SettingsSaveBar
+            dirty={changed(p)}
+            busy={busy}
+            onDiscard={() => {
+              setProviders((ps) =>
+                ps.map((x) =>
+                  x.id === p.id ? saved.find((s) => s.id === p.id) : x,
+                ),
+              );
+              setErrors({});
+              setMessage("Changes discarded.");
+            }}
+          />
+        </form>
+      )}
     </div>
   );
 }

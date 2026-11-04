@@ -1,3 +1,4 @@
+import { validSettingsOrigin } from "@/lib/settings-origin";
 import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
@@ -37,7 +38,7 @@ export async function GET() {
 export async function PUT(request) {
   const { session, error } = await requireAuth(['admin']);
   if (error) return error;
-  if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid origin' }, { status: 403 });
+  if (!validSettingsOrigin(request)) return Response.json({ error: 'Invalid origin' }, { status: 403 });
 
   try {
     const body = await request.json();

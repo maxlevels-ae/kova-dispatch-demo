@@ -1,68 +1,230 @@
-'use client';
+"use client";
 /* eslint-disable @next/next/no-img-element -- Validated inline logo previews cannot use image optimization. */
-import { useEffect, useState } from 'react';
-import { useBranding } from '@/context/BrandingProvider';
-import { DEFAULT_BRANDING, MAX_LOGO_BYTES } from '@/lib/branding';
-import { KovaIcon } from '@/components/brand/KovaLogo';
-import { useToast } from '@/components/ui/Toast';
-export default function BrandingSettings() {
-  const { branding, setBranding } = useBranding();
-  const [draft, setDraft] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const toast = useToast();
+import { useEffect, useRef, useState } from "react";
+import { useBranding } from "@/context/BrandingProvider";
+import { DEFAULT_BRANDING, MAX_LOGO_BYTES } from "@/lib/branding";
+import { KovaIcon } from "@/components/brand/KovaLogo";
+import {
+  SettingsSection,
+  SettingsField,
+  SettingsSaveBar,
+  SettingsStatus,
+  useSettingsDirty,
+} from "./settings/SettingsUI";
+export default function BrandingSettings({ onDirty, localization }) {
+  const { setBranding } = useBranding();
+  const [draft, setDraft] = useState(null),
+    [saved, setSaved] = useState(null),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(""),
+    [errors, setErrors] = useState({});
+  const lock = useRef(false);
   useEffect(() => {
-    fetch('/api/branding', { cache: 'no-store' }).then(async r => {
-      if (!r.ok) throw new Error('Unable to load saved branding. Reload to try again.');
-      setDraft(await r.json());
-    }).catch(e => setLoadError(e.message));
+    fetch("/api/branding", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw Error("Unable to load branding. Reload to retry.");
+        const d = await r.json();
+        setDraft(d);
+        setSaved(d);
+      })
+      .catch((e) => setMessage(e.message));
   }, []);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
+  useSettingsDirty("branding", dirty, onDirty);
   async function choose(key, file) {
     if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > MAX_LOGO_BYTES) {
-      toast('Choose a PNG, JPEG or WebP logo up to 256 KB.', 'error'); return;
+    if (
+      !["image/png", "image/jpeg", "image/webp"].includes(file.type) ||
+      file.size > MAX_LOGO_BYTES
+    ) {
+      setErrors((e) => ({
+        ...e,
+        [key]: "Choose a PNG, JPEG or WebP image up to 256 KB.",
+      }));
+      return;
     }
     try {
       const value = await new Promise((resolve, reject) => {
-        const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
       });
-      setDraft(d => ({ ...d, [key]: value }));
-    } catch { toast('Could not read this image.', 'error'); }
+      setDraft((d) => ({ ...d, [key]: value }));
+      setErrors({});
+    } catch {
+      setErrors((e) => ({ ...e, [key]: "Could not read image." }));
+    }
   }
   async function save(e) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault();
+    if (lock.current || !dirty) return;
+    if (
+      !draft.name.trim() ||
+      draft.name.trim().length > 60 ||
+      /[\u0000-\u001f]/.test(draft.name)
+    ) {
+      setErrors({ name: "Enter 1–60 printable characters." });
+      return;
+    }
+    lock.current = true;
+    setBusy(true);
     try {
-      const r = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Unable to save branding');
-      setBranding(data); setDraft(data); toast('Branding saved', 'success');
-    } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
+      const r = await fetch("/api/admin/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const d = await r.json();
+      if (!r.ok) throw Error(d.error);
+      setBranding(d);
+      setDraft(d);
+      setSaved(d);
+      setMessage("Branding saved.");
+      setErrors({});
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
   }
-  if (!draft) return <div className="content-pad" role="status">{loadError || 'Loading settings…'}</div>;
-  return <div className="content-pad" style={{ maxWidth: 900 }}>
-    <h2 className="page-title">General &amp; Branding</h2>
-    <p className="page-sub mb-6">Manage the branding customers and drivers see across Maxride.</p>
-    <form onSubmit={save} className="flex-col gap-4">
-      <section className="card card-pad">
-        <h2 className="mb-4">Brand identity</h2>
-        <div className="field"><label htmlFor="brand-name">Company / brand display name</label><input id="brand-name" className="input" maxLength={60} required value={draft.name} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} /></div>
-      </section>
-      <div className="grid-2">
-        {[['logo', 'Main company logo'], ['loginLogo', 'Login-page logo (optional)']].map(([key, title]) => <section key={key} className="card card-pad" style={{ minWidth: 0 }}>
-          <h3>{title}</h3><p className="small muted mt-2">{draft[key] ? 'Custom logo' : key === 'loginLogo' ? 'Uses the main company logo' : 'Original default logo'}</p>
-          <div className="flex items-center justify-center mt-4 mb-4" style={{ minHeight: 130, background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 12 }}>
-            {draft[key] || (key === 'loginLogo' && draft.logo) ? <img src={draft[key] || draft.logo} alt={`${title} preview`} style={{ maxWidth: '100%', maxHeight: 110, objectFit: 'contain' }} /> : <KovaIcon size={64} />}
+  if (!draft) return <p role="status">{message || "Loading branding…"}</p>;
+  return (
+    <form onSubmit={save} noValidate>
+      <p role="status" className="settings-feedback">
+        {message}
+      </p>
+      <SettingsSection
+        title="Company identity"
+        description="The name customers and drivers see across Maxride."
+      >
+        <SettingsField
+          id="brand-name"
+          label="Company / brand display name"
+          value={draft.name}
+          maxLength={60}
+          disabled={busy}
+          error={errors.name}
+          onChange={(e) => {
+            setDraft({ ...draft, name: e.target.value });
+            setErrors({});
+          }}
+        />
+      </SettingsSection>
+      <SettingsSection
+        title="Country and localization"
+        description="Operating location is managed in Maps & Service Zones. Financial records retain their original currency."
+      >
+        <div className="settings-status-list">
+          <div>
+            <span>Operating location</span>
+            <strong>
+              {localization
+                ? `${localization.city}, ${localization.country}`
+                : "Loading location…"}
+            </strong>
           </div>
-          <label className="field">{draft[key] ? 'Replace logo' : 'Upload logo'}<input style={{ maxWidth: '100%' }} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { choose(key, e.target.files?.[0]); e.target.value = ''; }} /></label>
-          <p className="tiny muted mt-2">PNG, JPEG or WebP · 256 KB maximum · static images only</p>
-          {draft[key] && <button className="btn btn-secondary btn-sm mt-3" type="button" disabled={busy} onClick={() => setDraft({ ...draft, [key]: null })}>Remove uploaded logo</button>}
-        </section>)}
-      </div>
-      <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setDraft(branding)}>Cancel</button>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setDraft({ ...DEFAULT_BRANDING })}>Restore default branding</button>
-      </div>
+          <div>
+            <span>Timezone</span>
+            <strong>Africa/Cairo</strong>
+          </div>
+          <div>
+            <span>Platform currency</span>
+            <SettingsStatus>EGP · Egyptian pound</SettingsStatus>
+          </div>
+        </div>
+      </SettingsSection>
+      <SettingsSection
+        title="Main logo and login logo"
+        description="Static PNG, JPEG or WebP images, up to 256 KB each."
+      >
+        <div className="settings-logo-grid">
+          {[
+            ["logo", "Main company logo"],
+            ["loginLogo", "Login-page logo (optional)"],
+          ].map(([key, title]) => (
+            <div key={key}>
+              <h4>{title}</h4>
+              <div className="settings-logo-preview">
+                {draft[key] || (key === "loginLogo" && draft.logo) ? (
+                  <img
+                    src={draft[key] || draft.logo}
+                    alt={`${title} preview`}
+                  />
+                ) : (
+                  <KovaIcon size={48} />
+                )}
+              </div>
+              <SettingsField
+                label={`Upload ${title.toLowerCase()}`}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={busy}
+                error={errors[key]}
+                onChange={(e) => {
+                  choose(key, e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+              <p className="settings-hint">
+                {draft[key]
+                  ? "Custom image"
+                  : key === "loginLogo"
+                    ? "Uses the main company logo"
+                    : "Original Maxride logo"}
+              </p>
+              {draft[key] && (
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={busy}
+                  onClick={() => setDraft({ ...draft, [key]: null })}
+                >
+                  Remove uploaded logo
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </SettingsSection>
+      <SettingsSection
+        title="Brand preview"
+        description="Preview your company identity before saving."
+      >
+        <div className="settings-brand-preview">
+          {draft.logo ? (
+            <img src={draft.logo} alt="Brand preview" />
+          ) : (
+            <KovaIcon size={36} />
+          )}
+          <strong>{draft.name || "Your company"}</strong>
+          <span>Workspace</span>
+        </div>
+      </SettingsSection>
+      <SettingsSection
+        title="Restore default branding"
+        description="Replace the name and both logos with the original Maxride identity. Save to apply."
+        danger
+      >
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy}
+          onClick={() => setDraft({ ...DEFAULT_BRANDING })}
+        >
+          Restore default branding
+        </button>
+      </SettingsSection>
+      <SettingsSaveBar
+        dirty={dirty}
+        busy={busy}
+        onDiscard={() => {
+          setDraft(saved);
+          setErrors({});
+          setMessage("Changes discarded.");
+        }}
+      />
     </form>
-  </div>;
+  );
 }
