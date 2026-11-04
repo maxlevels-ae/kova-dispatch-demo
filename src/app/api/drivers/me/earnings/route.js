@@ -1,3 +1,4 @@
+import { walletAccount, walletAccounts } from '@/lib/currency';
 import { CURRENCY } from '@/lib/currency';
 import mongoose from 'mongoose';
 import connectDB from '@/lib/db/mongodb';
@@ -34,7 +35,7 @@ export async function GET(request) {
 
     const [driver, user, todayAgg, weekAgg, recentRides, transactions] = await Promise.all([
       Driver.findOne({ userId: driverUserId }).select('stats').lean(),
-      User.findById(driverUserId).select('wallet').lean(),
+      User.findById(driverUserId).select('wallet egpWallet').lean(),
       Ride.aggregate([
         {
           $match: {
@@ -88,7 +89,8 @@ export async function GET(request) {
     return Response.json({
       currency: CURRENCY,
       financialScope: 'EGP only; historical currencies remain in trip history',
-      wallet: user?.wallet || { balance: 0, currency: null },
+      wallet: walletAccount(user) || { balance: 0, currency: null },
+      accounts: walletAccounts(user),
       stats: { ...driver?.stats, totalEarnings: lifetime[0]?.total || 0, currency: CURRENCY },
       today: todayAgg[0] || { earnings: 0, trips: 0 },
       week: {

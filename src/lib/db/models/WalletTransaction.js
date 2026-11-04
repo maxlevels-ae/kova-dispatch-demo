@@ -3,6 +3,11 @@ import { CURRENCY } from '@/lib/currency';
 
 const walletTransactionSchema = new mongoose.Schema(
   {
+    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    actorName: String,
+    reason: { type: String, maxlength: 200 },
+    reference: { type: String, maxlength: 100 },
+    balanceBefore: Number,
     currency: { type: String, default: function () { return this.isNew ? CURRENCY : undefined; } },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -12,7 +17,7 @@ const walletTransactionSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
-        'topup',
+        'topup', 'manual_credit', 'manual_debit',
         'ride_payment',
         'ride_earning',
         'refund',
@@ -53,6 +58,12 @@ const walletTransactionSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+// Ledger entries are append-only. Corrections require a separate compensating entry.
+walletTransactionSchema.pre('save', function () { if (!this.isNew) throw new Error('Wallet ledger entries are immutable'); });
+for (const operation of ['updateOne','updateMany','findOneAndUpdate','replaceOne','findOneAndReplace','deleteOne','deleteMany','findOneAndDelete']) {
+  walletTransactionSchema.pre(operation, function () { throw new Error('Wallet ledger entries are immutable'); });
+}
 
 walletTransactionSchema.index({ userId: 1, createdAt: -1 });
 walletTransactionSchema.index({ ref: 1 }, { unique: true, sparse: true });

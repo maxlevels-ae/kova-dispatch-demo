@@ -158,12 +158,12 @@ async function socketDB() {
   }
   return socketDbPromise;
 }
-async function currentSocketUser(id, role) {
+async function currentSocketUser(id, role, authVersion = 0) {
   const { ObjectId } = require("mongodb");
   return (await socketDB())
     .collection("users")
     .findOne(
-      { _id: new ObjectId(id), role, isActive: true },
+      { _id: new ObjectId(id), role, isActive: true, $expr: { $eq: [{ $ifNull: ["$authVersion", 0] }, authVersion] } },
       { projection: { name: 1 } },
     );
 }
@@ -213,8 +213,9 @@ app.prepare().then(() => {
       if (requiredRole && payload.role !== requiredRole) {
         return nextFn(new Error("Wrong namespace for role"));
       }
-      if (!(await currentSocketUser(payload.sub, payload.role)))
+      if (!(await currentSocketUser(payload.sub, payload.role, payload.authVersion || 0)))
         return nextFn(new Error("Authorization revoked"));
+      socket.authVersion = payload.authVersion || 0;
       socket.userId = payload.sub;
       socket.userRole = payload.role;
       socket.userName = payload.name || "";
@@ -255,7 +256,7 @@ app.prepare().then(() => {
         return;
       try {
         const { ObjectId } = require("mongodb");
-        const user = await currentSocketUser(socket.userId, "driver");
+        const user = await currentSocketUser(socket.userId, "driver", socket.authVersion);
         const driver = await (
           await socketDB()
         )
@@ -332,7 +333,7 @@ app.prepare().then(() => {
     socket.join(`user:${socket.userId}`);
     const timer = setInterval(async () => {
       try {
-        if (!(await currentSocketUser(socket.userId, "admin")))
+        if (!(await currentSocketUser(socket.userId, "admin", socket.authVersion)))
           socket.disconnect(true);
       } catch {
         socket.disconnect(true);

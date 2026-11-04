@@ -196,7 +196,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only")) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only")) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -1225,7 +1225,7 @@ try {
     },
   );
   }
-  await check(
+  if (!process.argv.includes("--accounts-only")) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1242,6 +1242,10 @@ try {
       });
     },
   );
+  if (!process.argv.includes('--maps-only')) {
+    const {accountsChecks}=await import('./accounts-integration.mjs');
+    await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});
+  }
   console.log(
     `${passed} database/API integration checks passed; only disposable database ${dbName} was written.`,
   );

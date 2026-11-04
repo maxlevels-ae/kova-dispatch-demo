@@ -1,3 +1,4 @@
+import { validSettingsOrigin } from '@/lib/settings-origin';
 import sharp from 'sharp';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
@@ -12,6 +13,7 @@ const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'i
 export async function POST(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (!validSettingsOrigin(request)) return Response.json({error:"Invalid request origin"},{status:403});
 
   try {
     const form = await request.formData();
@@ -53,9 +55,10 @@ export async function POST(request) {
 }
 
 // DELETE /api/users/me/avatar — remove the profile picture
-export async function DELETE() {
+export async function DELETE(request) {
   const { session, error } = await requireAuth();
   if (error) return error;
+  if (!validSettingsOrigin(request)) return Response.json({error:"Invalid request origin"},{status:403});
 
   try {
     await connectDB();

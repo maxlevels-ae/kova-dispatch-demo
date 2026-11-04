@@ -1,7 +1,7 @@
 import { getSettings } from '@/lib/settings';
 import { bookingPolicy } from '@/lib/settings-schema';
 import mongoose from 'mongoose';
-import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta } from '@/lib/currency';
+import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta, walletAccount } from '@/lib/currency';
 import crypto from 'crypto';
 import connectDB from '@/lib/db/mongodb';
 import redis from '@/lib/db/redis';
@@ -153,9 +153,9 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType, schedu
     pickup,
   });
 
-  const rider = await User.findById(riderId).select('wallet').lean();
-  if (!sameCurrency(rider?.wallet?.currency, CURRENCY)) throw new RideError('Your wallet requires currency review before booking EGP rides. Existing funds are unchanged.', 409);
-  const balance = rider?.wallet?.balance ?? 0;
+  const rider = await User.findById(riderId).select('wallet egpWallet').lean();
+  if (!sameCurrency(walletAccount(rider)?.currency, CURRENCY)) throw new RideError('Your wallet requires currency review before booking EGP rides. Existing funds are unchanged.', 409);
+  const balance = walletAccount(rider)?.balance ?? 0;
 
   // An outstanding balance (unpaid cancellation fee, or a fare that couldn't
   // be covered) must be cleared before booking again.
@@ -226,8 +226,8 @@ export async function acceptRide({ rideId, driverUserId }) {
   if (offeredRide?.scheduledAt && new Date(offeredRide.scheduledAt) > new Date()) throw new RideError('This scheduled ride is not ready for dispatch', 409);
   if (offeredRide?.dispatch?.manualHold) throw new RideError('Ride is awaiting manual dispatch', 409);
   if (!driver.isOnline || driver.vehicle.type !== offeredRide?.vehicleType) throw new RideError('Driver is unavailable or vehicle category does not match', 409);
-  const driverWallet = await User.findById(driverUserId).select('wallet').lean();
-  if (!sameCurrency(offeredRide?.fare?.currency, driverWallet?.wallet?.currency)) throw new RideError('Wallet currency does not match this ride; contact support for currency review.', 409);
+  const driverWallet = await User.findById(driverUserId).select('wallet egpWallet').lean();
+  if (!sameCurrency(offeredRide?.fare?.currency, walletAccount(driverWallet, offeredRide?.fare?.currency)?.currency)) throw new RideError('Wallet currency does not match this ride; contact support for currency review.', 409);
 
   const holdsOffer = await verifyOfferHolder(rideId, driver._id);
   if (!holdsOffer) {
@@ -383,8 +383,8 @@ export async function completeRide({ rideId, driverUserId }) {
   const { ride, shortfall } = await mongoose.connection.transaction(async dbSession => {
     const current = await Ride.findOne({ _id: rideId, driverId: driverUserId }).session(dbSession).lean();
     if (!current) throw new RideError('Ride not found', 404);
-    const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId] } }).select('wallet').session(dbSession).lean();
-    if (wallets.length !== 2 || wallets.some(u => !sameCurrency(u.wallet?.currency, current.fare?.currency))) throw new RideError('Settlement requires currency review. Balances are unchanged.', 409);
+    const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId] } }).select('wallet egpWallet').session(dbSession).lean();
+    if (wallets.length !== 2 || wallets.some(u => !sameCurrency(walletAccount(u, current.fare?.currency)?.currency, current.fare?.currency))) throw new RideError('Settlement requires currency review. Balances are unchanged.', 409);
     const ride = await transition({
       rideId,
       driverUserId,
@@ -408,10 +408,10 @@ export async function completeRide({ rideId, driverUserId }) {
     // must settle before booking again (enforced in createRide).
     const rider = await User.findByIdAndUpdate(
       ride.riderId,
-      walletDelta(-total),
+      walletDelta(-total, ride.fare.currency),
       { returnDocument: 'after', session: dbSession, updatePipeline: true }
     );
-    const shortfall = rider ? rider.wallet.balance < 0 : false;
+    const shortfall = rider ? walletAccount(rider, ride.fare.currency).balance < 0 : false;
 
     if (rider) {
       await WalletTransaction.create([{
@@ -419,7 +419,7 @@ export async function completeRide({ rideId, driverUserId }) {
         userId: ride.riderId,
         type: 'ride_payment',
         amount: -total,
-        balanceAfter: rider.wallet.balance,
+        balanceAfter: walletAccount(rider, ride.fare.currency).balance,
         rideId: ride._id,
         note: `Ride to ${ride.dropoff.address}`.slice(0, 200),
       }], { session: dbSession });
@@ -429,7 +429,7 @@ export async function completeRide({ rideId, driverUserId }) {
     // rider shortfall is a platform receivable, not the driver's problem.
     const driverUser = await User.findByIdAndUpdate(
       ride.driverId,
-      walletDelta(driverEarnings),
+      walletDelta(driverEarnings, ride.fare.currency),
       { returnDocument: 'after', session: dbSession, updatePipeline: true }
     );
     if (driverUser) {
@@ -438,7 +438,7 @@ export async function completeRide({ rideId, driverUserId }) {
         userId: ride.driverId,
         type: 'ride_earning',
         amount: driverEarnings,
-        balanceAfter: driverUser.wallet.balance,
+        balanceAfter: walletAccount(driverUser, ride.fare.currency).balance,
         rideId: ride._id,
         note: `Trip earnings`,
       }], { session: dbSession });
@@ -506,8 +506,8 @@ export async function cancelRide({ rideId, userId, role, reason }) {
   }
 
   if (role === 'rider' && ride.status === 'arrived') {
-    const wallets = await User.find({ _id: { $in: [ride.riderId, ride.driverId].filter(Boolean) } }).select('wallet').lean();
-    if (!['EGP', 'USD'].includes(ride.fare?.currency) || wallets.some(u => !sameCurrency(u.wallet?.currency, ride.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
+    const wallets = await User.find({ _id: { $in: [ride.riderId, ride.driverId].filter(Boolean) } }).select('wallet egpWallet').lean();
+    if (!['EGP', 'USD'].includes(ride.fare?.currency) || wallets.some(u => !sameCurrency(walletAccount(u, ride.fare?.currency)?.currency, ride.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
   }
   const hadDriver = Boolean(ride.driverProfileId);
 
@@ -553,12 +553,12 @@ export async function cancelRide({ rideId, userId, role, reason }) {
     const cancellationFee = current.status === 'arrived' ? (current.fare.currency === CURRENCY ? (current.fare.quotedCancellationFee ?? EGP_CANCEL_FEE) : LATE_CANCEL_FEE) : 0;
     if (cancellationFee) {
       const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId].filter(Boolean) } }).session(dbSession).lean();
-      if (wallets.length !== (current.driverId ? 2 : 1) || wallets.some(u => !sameCurrency(u.wallet?.currency, current.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
+      if (wallets.length !== (current.driverId ? 2 : 1) || wallets.some(u => !sameCurrency(walletAccount(u, current.fare?.currency)?.currency, current.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
       const deltas = [{ id: current.riderId, amount: -cancellationFee, type: 'cancellation_fee', note: 'Late cancellation fee' }];
       if (current.driverId) deltas.push({ id: current.driverId, amount: round2(cancellationFee * 0.8), type: 'ride_earning', note: 'Cancellation compensation' });
       for (const delta of deltas) {
-        const user = await User.findByIdAndUpdate(delta.id, walletDelta(delta.amount), { returnDocument: 'after', session: dbSession, updatePipeline: true });
-        await WalletTransaction.create([{ userId: delta.id, currency: current.fare.currency, amount: delta.amount, type: delta.type, note: delta.note, balanceAfter: user.wallet.balance, rideId: current._id }], { session: dbSession });
+        const user = await User.findByIdAndUpdate(delta.id, walletDelta(delta.amount, current.fare.currency), { returnDocument: 'after', session: dbSession, updatePipeline: true });
+        await WalletTransaction.create([{ userId: delta.id, currency: current.fare.currency, amount: delta.amount, type: delta.type, note: delta.note, balanceAfter: walletAccount(user, current.fare.currency).balance, rideId: current._id }], { session: dbSession });
       }
     }
     if (cancellationFee) {

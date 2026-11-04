@@ -11,6 +11,8 @@ import { formatRelativeTime } from '@/lib/utils/geo';
 const QUICK_AMOUNTS = [10, 25, 50, 100];
 
 const TXN_LABEL = {
+  manual_credit: 'Administrator credit',
+  manual_debit: 'Administrator deduction',
   topup: 'Wallet top-up',
   ride_payment: 'Ride payment',
   ride_earning: 'Trip earnings',
@@ -24,6 +26,7 @@ export default function WalletPanel() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [wallet, setWallet] = useState(null);
+  const [accounts,setAccounts]=useState([]);
   const [transactions, setTransactions] = useState(null);
   const [stripeEnabled, setStripeEnabled] = useState(false);
   const [topupEnabled, setTopupEnabled] = useState(false);
@@ -39,6 +42,7 @@ export default function WalletPanel() {
       if (res.ok) {
         const data = await res.json();
         setWallet(data.wallet);
+        setAccounts(data.accounts || []);
         setTransactions(data.transactions);
         setStripeEnabled(Boolean(data.stripeEnabled));
         setTopupEnabled(Boolean(data.topupEnabled));
@@ -168,7 +172,8 @@ export default function WalletPanel() {
           <Wallet size={36} style={{ opacity: 0.35 }} />
         </div>
 
-        {owes && (
+        {accounts.filter(a=>a.currency!==wallet?.currency).map((a,i)=><p key={i} className="card" style={{padding:16}}>Historical balance: {money(a.balance,a.currency??null)}. Kept separately from EGP ride funds.</p>)}
+      {owes && (
           <p className="small mt-3" style={{ color: '#fca5a5' }}>
             You owe {money(Math.abs(wallet.balance), wallet.currency ?? null)} — top up to book rides again.
           </p>

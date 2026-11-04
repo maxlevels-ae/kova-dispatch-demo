@@ -1,3 +1,4 @@
+import { walletAccount, walletAccounts } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
@@ -47,7 +48,8 @@ export async function GET() {
         email: user.email || '',
         avatar: user.avatar || '',
         role: user.role,
-        wallet: user.wallet || { balance: 0, currency: null },
+        wallet: walletAccount(user) || { balance: 0, currency: null },
+        accounts: walletAccounts(user),
         rating: user.rating,
         savedPlaces: user.savedPlaces || [],
         createdAt: user.createdAt,

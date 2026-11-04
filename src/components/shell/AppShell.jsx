@@ -39,13 +39,14 @@ export default function AppShell({ nav, children }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
+            <Link href={user?.role === 'admin' ? '/admin/profile' : '/profile'} className="flex items-center gap-2 flex-1" aria-label="My profile"><Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
             <div className="flex-1 truncate">
               <div className="small truncate" style={{ fontWeight: 600 }}>
                 {user?.name || '—'}
               </div>
               <div className="tiny muted truncate">@{user?.username || ''}</div>
             </div>
+            </Link>
             <button
               className="btn btn-ghost btn-icon"
               style={{ minHeight: 36, width: 36 }}
@@ -59,7 +60,7 @@ export default function AppShell({ nav, children }) {
         </div>
       </aside>
 
-      <main className="content">{children}</main>
+      <main className="content">{user?.role === 'admin' && <div className="admin-mobile-profile"><Link href="/admin/profile" className="btn btn-ghost"><Avatar name={user.name} src={user.avatar} size="sm"/>My profile</Link></div>}{children}</main>
     </div>
   );
 }

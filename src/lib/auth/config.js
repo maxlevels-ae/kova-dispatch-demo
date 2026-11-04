@@ -48,6 +48,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
           role: user.role,
           avatar: user.avatar,
+          authVersion: user.authVersion || 0,
         };
       },
     }),
@@ -65,6 +66,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.policyExpiresAt = Date.now() + (await getSettings()).security.sessionHours * 3600000;
+        token.authVersion = user.authVersion;
         token.id = user.id;
         token.role = user.role;
         token.username = user.username;
@@ -82,6 +84,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (token?.policyExpiresAt && Date.now() > token.policyExpiresAt) { session.user = undefined; return session; }
       if (token) {
+        session.user.authVersion = token.authVersion || 0;
         session.user.id = token.id;
         session.user.role = token.role;
         session.user.username = token.username;

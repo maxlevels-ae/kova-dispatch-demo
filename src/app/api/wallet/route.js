@@ -1,3 +1,4 @@
+import { walletAccount, walletAccounts } from '@/lib/currency';
 import mongoose from 'mongoose';
 import { CURRENCY, PAYMENT_LIMITATION, walletDelta } from '@/lib/currency';
 import { z } from 'zod';
@@ -26,7 +27,7 @@ export async function GET(request) {
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '30', 10));
 
     const [user, transactions] = await Promise.all([
-      User.findById(session.user.id).select('wallet').lean(),
+      User.findById(session.user.id).select('wallet egpWallet').lean(),
       WalletTransaction.find({ userId: session.user.id })
         .sort({ createdAt: -1 })
         .limit(limit)
@@ -34,10 +35,11 @@ export async function GET(request) {
     ]);
 
     return Response.json({
-      wallet: user?.wallet || { balance: 0, currency: null },
+      wallet: walletAccount(user) || { balance: 0, currency: null },
+      accounts: walletAccounts(user),
       transactions,
       stripeEnabled: isStripeEnabled(),
-      topupEnabled: process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && user?.wallet?.currency === CURRENCY,
+      topupEnabled: process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && walletAccount(user)?.currency === CURRENCY,
       limitation: PAYMENT_LIMITATION,
     });
   } catch (err) {
@@ -74,17 +76,17 @@ export async function POST(request) {
     await connectDB();
     const result = await mongoose.connection.transaction(async dbSession => {
       const user = await User.findOneAndUpdate(
-        { _id: session.user.id, 'wallet.currency': CURRENCY },
-        walletDelta(amount), { returnDocument: 'after', session: dbSession, updatePipeline: true }
+        { _id: session.user.id },
+        walletDelta(amount, CURRENCY), { returnDocument: 'after', session: dbSession, updatePipeline: true }
       );
       if (!user) return null;
-      const [txn] = await WalletTransaction.create([{ userId: session.user.id, type: 'topup', amount, currency: CURRENCY, balanceAfter: user.wallet.balance, note: 'Demo wallet top-up' }], { session: dbSession });
+      const [txn] = await WalletTransaction.create([{ userId: session.user.id, type: 'topup', amount, currency: CURRENCY, balanceAfter: walletAccount(user).balance, note: 'Demo wallet top-up' }], { session: dbSession });
       return { user, txn };
     });
     if (!result) return Response.json({ error: 'Wallet currency requires review. Balance unchanged.' }, { status: 409 });
     const { user, txn } = result;
 
-    return Response.json({ wallet: user.wallet, transaction: txn }, { status: 201 });
+    return Response.json({ wallet: walletAccount(user), transaction: txn }, { status: 201 });
   } catch (err) {
     console.error('Top-up error:', err);
     return Response.json({ error: 'Failed to top up wallet' }, { status: 500 });

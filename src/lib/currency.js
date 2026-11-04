@@ -28,6 +28,18 @@ export const DEFAULT_PRICING = {
   xl: { baseFare: 40, perKmRate: 15, perMinRate: 2, minimumFare: 80, bookingFee: 7.5, platformCommission: 8, surgeMultiplierCap: 3 },
 };
 
-export function walletDelta(amount) {
+export function walletAccount(user, currency = CURRENCY) {
+  if (sameCurrency(user?.wallet?.currency, currency)) return user.wallet;
+  if (currency === CURRENCY && user) return { balance: user.egpWallet?.balance ?? 0, currency: CURRENCY };
+  return null;
+}
+export function walletAccounts(user) {
+  return user?.wallet?.currency === CURRENCY ? [user.wallet] : [walletAccount(user), user?.wallet].filter(Boolean);
+}
+export function walletDelta(amount, currency) {
+  if (currency === CURRENCY) return [{ $set: {
+    'wallet.balance': { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, { $round: [{ $add: ['$wallet.balance', minorUnits(amount) / 100] }, 2] }, '$wallet.balance'] },
+    egpWallet: { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, '$egpWallet', { currency: CURRENCY, balance: { $round: [{ $add: [{ $ifNull: ['$egpWallet.balance', 0] }, minorUnits(amount) / 100] }, 2] } }] },
+  } }];
   return [{ $set: { 'wallet.balance': { $round: [{ $add: ['$wallet.balance', minorUnits(amount) / 100] }, 2] } } }];
 }

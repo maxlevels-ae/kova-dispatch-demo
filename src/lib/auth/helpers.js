@@ -20,14 +20,11 @@ export async function requireAuth(roles) {
     return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
-  // Recheck active status and role for privileged requests; stale JWTs cannot retain admin access.
-  if (roles?.includes('admin')) {
-    try {
-      await connectDB();
-      const current = await User.findById(session.user.id).select('role isActive').lean();
-      if (!current?.isActive || current.role !== 'admin') return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
-    } catch { return { error: Response.json({ error: 'Authorization unavailable' }, { status: 503 }) }; }
-  }
+  try {
+    await connectDB();
+    const current = await User.findById(session.user.id).select('role isActive authVersion').lean();
+    if (!current?.isActive || current.role !== session.user.role || (current.authVersion || 0) !== (session.user.authVersion || 0)) return { error: Response.json({error:'Session expired or account unavailable'}, {status:403}) };
+  } catch { return { error: Response.json({error:'Authorization unavailable'}, {status:503}) }; }
   return { session };
 }
 
@@ -45,6 +42,7 @@ export function signSocketToken(user, extraClaims = {}) {
       sub: user.id,
       role: user.role,
       name: user.name || '',
+      authVersion: user.authVersion || 0,
       ...extraClaims,
     },
     secret,
