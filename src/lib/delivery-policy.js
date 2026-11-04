@@ -30,7 +30,7 @@ export const deliveryDefaults={
 export const deliveryPoint=z.object({lat:z.number().min(22).max(32),lng:z.number().min(24).max(37),address:z.string().trim().min(3).max(300)});
 const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().regex(/^\+?[\d ()-]{7,20}$/),instructions:z.string().max(500).default('')});
 export const deliveryBookingSchema=z.object({
- pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30)}),region:z.string().max(60),
+ pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
  package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive(),length:z.number().positive(),width:z.number().positive(),height:z.number().positive(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),
  acknowledged:z.literal(true),idempotencyKey:z.uuid(),
 }).strict();

@@ -34,6 +34,7 @@ const SQUARE_SVG =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 
 export default function MapView({
+  publicMap = false,
   center: requestedCenter,
   zoom: requestedZoom,
   autoFitDrivers = false,
@@ -49,7 +50,7 @@ export default function MapView({
   className = "",
   style,
 }) {
-  const config = useMapSettings();
+  const config = useMapSettings(!publicMap);
   const center = requestedCenter || config.center;
   const zoom = requestedZoom ?? config.settings.initialZoom;
   const [mapState, setMapState] = useState("loading");

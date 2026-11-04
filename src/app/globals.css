@@ -1056,3 +1056,10 @@ textarea.input { padding: 12px 16px; resize: vertical; min-height: 80px; }
 .map-frame{direction:ltr}.delivery-detail bdi,.delivery-booking bdi{unicode-bidi:isolate}
 .delivery-detail .trip-timeline{padding:0;padding-inline-start:22px}.delivery-detail-grid>*{min-width:0}.delivery-detail p,.delivery-detail header{overflow-wrap:anywhere}.delivery-detail h1{font-size:clamp(1.4rem,4vw,2rem)}
 @media(max-width:900px){.delivery-booking-grid,.delivery-detail-grid{grid-template-columns:1fr}.delivery-booking-map{height:300px;position:relative;top:auto;grid-row:1}.delivery-steps{gap:4px}.delivery-steps li{font-size:.7rem;flex-direction:column}.delivery-filters{flex-wrap:wrap}.delivery-filters input{flex:1 1 100%}.delivery-filters select{flex:1}.delivery-list-row{flex-direction:column;gap:10px}.delivery-detail .card{padding:18px}.delivery-grid{gap:10px}.ride-page:has(.service-choices) .ride-panel{top:auto;max-height:62%}[dir=rtl] .ride-panel{right:12px;left:12px}.service-choices{inset-inline-start:12px;inset-block-start:12px;max-width:calc(100% - 24px);width:auto;inset-inline-end:12px}.delivery-detail-grid>aside{min-width:0}}
+
+/* Keep the early route summary inside the existing responsive map panel. */
+.delivery-booking-map{display:flex;flex-direction:column}
+.delivery-booking-map>.map-frame{flex:1;min-height:180px}
+.delivery-booking-map>.delivery-route-preview:empty{display:none}
+
+@media(max-width:900px){.delivery-booking-map:has(.delivery-route-preview [role="alert"]){height:460px}}

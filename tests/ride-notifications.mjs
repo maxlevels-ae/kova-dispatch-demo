@@ -53,7 +53,8 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    expect.poll(()=>pages.driver.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return(await reg.getNotifications()).some(n=>n.body==='New ride request');}),{timeout:10000}).toBe(true).catch(async e=>{console.log('NOTIFICATION DIAGNOSTICS',JSON.stringify(await d.json('/api/notifications')));console.log('BROWSER ERRORS',jsErrors,await pages.driver.evaluate(async()=>({permission:Notification.permission,worker:Boolean((await navigator.serviceWorker.getRegistration())?.active)}))); throw e;})
    ]);
    await pages.driver.getByRole('dialog').screenshot({path:'docs/qa/ride-notification-offer.png'});
-   const acceptedResponse=pages.driver.waitForResponse(response=>response.url().endsWith(`/api/rides/${rideId}/accept`)&&response.request().method()==='POST');
+   const acceptRequests=[];pages.driver.on('request',request=>{if(request.url().includes('/accept'))acceptRequests.push(request.url());});
+   const acceptedResponse=pages.driver.waitForResponse(response=>response.url().endsWith(`/api/rides/${rideId}/accept`)&&response.request().method()==='POST').catch(async error=>{console.log('ACCEPT REQUEST DIAGNOSTIC',{rideId,acceptRequests,jsErrors,body:await pages.driver.locator('body').innerText(),offer:await d.json('/api/drivers/me/offer')});throw error;});
    await pages.driver.getByRole('button',{name:'Accept',exact:true}).click();
    const accepted=await acceptedResponse;assert.equal(accepted.status(),200,JSON.stringify(await accepted.json()));
    await expect.poll(()=>pages.driver.evaluate(()=>qaAudio.every(a=>!a.loop||a.paused))).toBe(true);

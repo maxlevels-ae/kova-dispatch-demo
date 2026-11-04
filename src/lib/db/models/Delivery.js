@@ -2,7 +2,9 @@ import mongoose from 'mongoose';
 import {deliveryTransitions} from '@/lib/delivery-policy';
 const id=mongoose.Schema.Types.ObjectId,Mixed=mongoose.Schema.Types.Mixed;
 const schema=new mongoose.Schema({
- customerId:{type:id,required:true,index:true},recipientId:{type:id,required:true,index:true},courierId:{type:id,index:true},driverProfileId:id,
+ customerId:{type:id,required:true,index:true},recipientId:{type:id,index:true},courierId:{type:id,index:true},driverProfileId:id,
+ recipientType:{type:String,enum:['registered','guest']},verificationMethod:{type:String,enum:['account_otp','private_link']},
+ guestAccess:{hash:{type:String,select:false},expiresAt:Date,revokedAt:Date},
  idempotencyKey:{type:String,required:true,unique:true},status:{type:String,enum:Object.keys(deliveryTransitions),default:'CREATED',index:true},
  pickup:Mixed,dropoff:Mixed,sender:Mixed,recipient:Mixed,package:Mixed,region:String,route:Mixed,quote:Mixed,fare:Mixed,policy:Mixed,vehicle:Mixed,
  timeline:[{status:String,event:String,at:{type:Date,default:Date.now},actorId:id,role:String,note:String}],

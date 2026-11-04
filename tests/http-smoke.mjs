@@ -63,6 +63,13 @@ try {
   await check('public branding failure returns safe default only', async () => {
     const r = await request('/api/branding'); assert.equal(r.status, 503); assert.deepEqual(await r.json(), { name: 'Maxride', logo: null, loginLogo: null }); assert.match(r.headers.get('cache-control'), /no-store/);
   });
+  await check('guest recipient page is public, private-cache and referrer protected',async()=>{
+    const r=await request('/recipient/000000000000000000000001');assert.equal(r.status,200);assert.equal(r.headers.get('referrer-policy'),'no-referrer');assert.match(r.headers.get('x-robots-tag'),/noindex/);assert.match(r.headers.get('cache-control'),/no-store/);
+  });
+  await check('guest access rejects hostile origins and previews require authentication',async()=>{
+    assert.equal((await request('/api/guest/deliveries/000000000000000000000001',null,{method:'POST',headers:{origin:'https://evil.test'}})).status,403);
+    assert.equal((await request('/api/deliveries/route-preview',null,{method:'POST'})).status,401);
+  });
   await check('public homepage uses Maxride text', async () => assert.match(await (await request('/')).text(), /Maxride/));
   console.log(`${passed} HTTP checks passed. Sessions are signed test fixtures; database login and persistence require integration infrastructure.`);
 } catch (error) {

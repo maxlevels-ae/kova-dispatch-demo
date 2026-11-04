@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deliveryDefaults,deliverySettingsSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '../src/lib/delivery-policy.js';
+import {deliveryBookingSchema,deliveryDefaults,deliverySettingsSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '../src/lib/delivery-policy.js';
 import {translate} from '../src/lib/i18n.js';
 import {safeNotificationLink} from '../src/lib/notification-policy.js';
 test('delivery policies require recipient verification, valid regions and a single shared assignment',()=>{
@@ -23,4 +23,12 @@ test('Arabic customer labels and interpolations preserve mixed text isolation',(
  assert.equal(translate('Estimated arrival: 5 min','ar'),'الوصول المتوقع: \u20685\u2069 دقيقة');
  assert.equal(safeNotificationLink('/deliveries/0123456789abcdef01234567'),'/deliveries/0123456789abcdef01234567');
  assert.equal(safeNotificationLink('/deliveries/../../admin'),'/dashboard');
+});
+
+test('guest booking requires contact and Egyptian locations but no recipient account',()=>{
+ const input={pickup:{lat:30.0444,lng:31.2357,address:'Cairo pickup'},dropoff:{lat:30.05,lng:31.24,address:'Cairo destination'},sender:{name:'Sender',phone:'+201000000001'},recipient:{name:'Guest',phone:'+201000000002'},region:'Cairo',package:{category:'Documents',size:'small',weight:1,length:10,width:10,height:10,description:'Sealed documents'},acknowledged:true,idempotencyKey:'c68639a8-8ad7-4b3a-a6e9-d616b1ba3504'};
+ assert.equal(deliveryBookingSchema.safeParse(input).success,true);
+ assert.equal(deliveryBookingSchema.safeParse({...input,recipient:{...input.recipient,username:'registered'}}).success,true);
+ assert.equal(deliveryBookingSchema.safeParse({...input,recipient:{name:'Guest'}}).success,false);
+ assert.equal(deliveryBookingSchema.safeParse({...input,dropoff:{...input.dropoff,lat:35}}).success,false);
 });

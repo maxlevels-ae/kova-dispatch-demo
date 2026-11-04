@@ -21,12 +21,12 @@ export class DeliveryError extends Error{constructor(message,status=409){super(m
 const fail=(message,status=409)=>{throw new DeliveryError(message,status);};
 const equal=(a,b)=>String(a)===String(b);
 const key=()=>crypto.createHash('sha256').update(process.env.AUTH_SECRET||process.env.NEXTAUTH_SECRET||fail('Verification configuration unavailable',503)).digest();
-function generateCode(minutes){
+export function generateCode(minutes){
  const code=String(crypto.randomInt(100000,1000000)),iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',key(),iv);
  const encrypted=Buffer.concat([cipher.update(code,'utf8'),cipher.final()]);
  return {hash:crypto.createHmac('sha256',key()).update(code).digest('hex'),cipher:Buffer.concat([iv,cipher.getAuthTag(),encrypted]).toString('base64'),expiresAt:new Date(Date.now()+minutes*60000),attempts:0};
 }
-function decryptCode(value){const b=Buffer.from(value,'base64'),dec=crypto.createDecipheriv('aes-256-gcm',key(),b.subarray(0,12));dec.setAuthTag(b.subarray(12,28));return Buffer.concat([dec.update(b.subarray(28)),dec.final()]).toString();}
+export function decryptCode(value){const b=Buffer.from(value,'base64'),dec=crypto.createDecipheriv('aes-256-gcm',key(),b.subarray(0,12));dec.setAuthTag(b.subarray(12,28));return Buffer.concat([dec.update(b.subarray(28)),dec.final()]).toString();}
 export function canAccessDelivery(order,user){return user.role==='admin'||equal(order.customerId,user.id)||equal(order.recipientId,user.id)||equal(order.courierId,user.id);}
 export async function loadDelivery(id,user){
  await connectDB();if(!mongoose.isValidObjectId(id))fail('Invalid order reference',400);
@@ -34,6 +34,9 @@ export async function loadDelivery(id,user){
 }
 export async function deliveryView(order,user){
  const data=order.toObject?order.toObject():structuredClone(order);
+ delete data.guestAccess;
+ data.recipientType=order.recipientType||(order.recipientId?'registered':'guest');data.verificationMethod=order.verificationMethod||(order.recipientId?'account_otp':'private_link');
+ if(user.role==='admin')data.verificationAttempts={pickup:order.pickupCode?.attempts||0,delivery:order.deliveryCode?.attempts||0};
  delete data.pickupCode;delete data.deliveryCode;delete data.policy;delete data.idempotencyKey;delete data.__v;
  const [courier,driver]=order.courierId?await Promise.all([User.findById(order.courierId).select('name avatar').lean(),Driver.findById(order.driverProfileId).select('location lastLocationUpdate stats.averageRating').lean()]):[null,null];
  data.courier=courier?{name:courier.name,avatar:courier.avatar,rating:driver?.stats?.averageRating,location:!terminalDeliveryStates.includes(order.status)&&driver?.lastLocationUpdate&&Date.now()-new Date(driver.lastLocationUpdate)<90000?{lng:driver.location.coordinates[0],lat:driver.location.coordinates[1]}:null}:null;
@@ -71,11 +74,11 @@ export async function quoteDelivery(input){
  if(!s.general.regions.includes(b.region))fail('Unsupported delivery region',400);
  const center=deliveryCities[b.region];if([b.pickup,b.dropoff].some(p=>haversineDistance(center[0],center[1],p.lat,p.lng)>50))fail('Destination is outside the delivery range',400);
  if(!s.packages.categories.includes(b.package.category)||b.package.weight>s.packages.maxWeight||b.package.length>s.packages.maxLength||b.package.width>s.packages.maxWidth||b.package.height>s.packages.maxHeight)fail('Package exceeds configured category, weight or dimensions',400);
- const recipient=await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone').lean();
- if(!recipient||recipient.phone?.replace(/\D/g,'')!==b.recipient.phone.replace(/\D/g,''))fail('Recipient verification requires an existing Maxride customer account with a matching phone. SMS delivery is not configured.',400);
+ const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone').lean():null;
+ if(b.recipient.username&&(!recipient||recipient.phone?.replace(/\D/g,'')!==b.recipient.phone.replace(/\D/g,'')))fail('Registered recipient account and phone do not match.',400);
  const route=await getRoute(b.pickup,b.dropoff);if(route.distanceMeters>s.dispatch.radiusKm*1000*5)fail('Destination is outside the delivery range',400);
  const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}},{$limit:1}]):[];
- return {input:b,settings:s,recipientId:recipient._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
+ return {input:b,settings:s,recipientId:recipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
 }
 export async function createDelivery(input,user){
  await Promise.all([Delivery.init(),WalletTransaction.init()]);
@@ -84,7 +87,7 @@ export async function createDelivery(input,user){
  const orderId=new mongoose.Types.ObjectId();
  const result=await mongoose.connection.transaction(async session=>{
   if(b.package.photoId){const photo=await DeliveryEvidence.findOne({_id:b.package.photoId,ownerId:user.id,kind:'package',deliveryId:null,expiresAt:{$gt:new Date()}}).session(session);if(!photo)fail('Invalid package photo',400);photo.deliveryId=orderId;photo.expiresAt=new Date(Date.now()+s.proof.retentionDays*86400000);await photo.save({session});}
-  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
+  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
   await postLedger(user.id,-quote.total,'delivery_payment',order,`delivery:${orderId}:payment`,session);return order;
  });
  await notifySafely(result,result.status,'created');return result;
@@ -94,11 +97,12 @@ export async function verifyDeliveryCode(id,user,kind,code){
  if(!equal(order.courierId,user.id)||user.role!=='driver')fail('Only the assigned courier can verify a code',403);
  if(!/^[0-9]{6}$/.test(code||''))fail('Enter the six-digit confirmation code',400);
  const expected=kind==='pickup'?['AT_PICKUP','RETURN_REQUESTED']:['AT_DROPOFF'];if(!expected.includes(order.status))fail('Verification is not available at this stage');
- const claimed=await Delivery.findOneAndUpdate({_id:id,status:order.status,[field+'.attempts']:{$lt:order.policy.proof.maxAttempts},[field+'.expiresAt']:{$gt:new Date()},[field+'.verifiedAt']:null},{$inc:{[field+'.attempts']:1}},{returnDocument:'after'}).select('+'+field+'.hash');
+ const guestGuard=kind==='delivery'&&!order.recipientId?{'guestAccess.expiresAt':{$gt:new Date()},'guestAccess.revokedAt':null}:{};
+ const claimed=await Delivery.findOneAndUpdate({_id:id,status:order.status,...guestGuard,[field+'.attempts']:{$lt:order.policy.proof.maxAttempts},[field+'.expiresAt']:{$gt:new Date()},[field+'.verifiedAt']:null},{$inc:{[field+'.attempts']:1}},{returnDocument:'after'}).select('+'+field+'.hash');
  if(!claimed)fail('Code expired, already verified, or attempt limit reached');
  const actual=crypto.createHmac('sha256',key()).update(code).digest('hex');
- if(!crypto.timingSafeEqual(Buffer.from(claimed[field].hash),Buffer.from(actual)))fail('Incorrect confirmation code',400);
- const verified=await Delivery.updateOne({_id:id,status:order.status,[field+'.hash']:claimed[field].hash,[field+'.verifiedAt']:null},{$set:{[field+'.verifiedAt']:new Date()},$push:{timeline:{status:order.status,event:kind+'_code_verified',actorId:user.id,role:user.role,at:new Date()}}});
+ if(!crypto.timingSafeEqual(Buffer.from(claimed[field].hash),Buffer.from(actual))){await Delivery.updateOne({_id:id,status:order.status},{$push:{timeline:{status:order.status,event:kind+'_code_rejected',actorId:user.id,role:user.role,at:new Date()}}});fail('Incorrect confirmation code',400);}
+ const verified=await Delivery.updateOne({_id:id,status:order.status,...guestGuard,[field+'.expiresAt']:{$gt:new Date()},[field+'.hash']:claimed[field].hash,[field+'.verifiedAt']:null},{$set:{[field+'.verifiedAt']:new Date()},$push:{timeline:{status:order.status,event:kind+'_code_verified',actorId:user.id,role:user.role,at:new Date()}}});
  if(!verified.modifiedCount)fail('Code changed; refresh and try again');
  return {verified:true};
 }
@@ -126,6 +130,7 @@ export async function transitionDelivery(id,user,to,note=''){
  const result=await mongoose.connection.transaction(async session=>{
   const order=await Delivery.findOne({_id:id,status:initial.status}).session(session);if(!order)fail('Delivery changed; refresh and try again');
   if(to==='PICKED_UP'&&order.policy.proof.pickupOTP&&!order.pickupCode.verifiedAt)fail('Verify the pickup code first');
+  if(to==='DELIVERED'&&!order.recipientId&&(!order.guestAccess?.expiresAt||order.guestAccess.revokedAt||order.guestAccess.expiresAt<=new Date()))fail('Recipient link expired or revoked');
   if(to==='DELIVERED'&&!order.deliveryCode.verifiedAt)fail('Recipient verification is required');
   if(to==='RETURNED'&&!order.pickupCode.verifiedAt)fail('Verify the sender return code first');
   if(to==='DELIVERED'&&order.policy.proof.photoRequired&&!order.proof.photoId)fail('Proof photo is required');

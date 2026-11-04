@@ -43,10 +43,10 @@ converted nor relabelled. No external payment, COD or payout is activated.
 
 ## Verified handover and privacy
 
-Recipient verification currently requires an existing, active Maxride customer
-account whose username and phone match the booking. The recipient reads their
-code while authenticated. **SMS delivery is not integrated.** Sender and recipient
-codes are never exposed to the courier or administrator. Codes use cryptographic
+Guest recipients use a private, expiring link manually shared by the sender.
+Registered recipients continue to read their code through their authenticated
+account. Neither flow sends SMS; link access does not verify phone ownership.
+Codes are never returned through courier or administrator APIs. Codes use cryptographic
 randomness, authenticated encryption at rest, expiration, attempt limits and
 rate-limited renewal. `AUTH_SECRET` (or `NEXTAUTH_SECRET`) supplies the server key;
 rotating it requires active participants to renew outstanding codes.
@@ -107,3 +107,21 @@ Verification executed on 2026-11-04:
 SMS recipient codes and closed-browser/mobile Web Push remain unverified and
 disabled without their required integrations. No production ride or delivery
 was created by these local suites.
+
+
+## MX-026 / MX-029 guest recipients and early routing
+
+New customer bookings require recipient name, phone and destination, with optional instructions. They do not require a username or create a user account. The API still accepts the existing recipient username field for registered-recipient clients and historical orders retain their recipientId. Each new order records recipientType and verificationMethod, with a creation audit note.
+
+Senders can issue, renew or revoke a private recipient link from the order detail. A 256-bit random bearer token is returned once, placed in a URL fragment and stored only as SHA-256 in MongoDB. Links expire after the shorter of 60 minutes and the order's OTP expiry policy. Issuance is limited to five operations per 15 minutes per order. Revocation or renewal atomically invalidates the previous link and handover code, including previously verified codes. Completed orders cannot be changed through these actions.
+
+The public recipient page uses a scoped Authorization header, no-referrer policy, no indexing and no caching. It exposes only order reference/status, destination, courier/vehicle summary, fresh courier location during the final delivery leg, confirmation time and the recipient code. It does not expose sender details, chats, evidence, wallet information or unrelated orders. Token and IP rate limits fail closed if Redis is unavailable. Guest access does not verify phone ownership; SMS remains disabled. Anyone holding the private link can read its code, so the sender must share it only with the intended recipient. The recipient page supports English and Arabic without an account.
+
+Couriers still enter the recipient-provided code server-side at AT_DROPOFF. Existing attempt limits, pickup code and proof-photo requirements remain enforced. Guest completion additionally requires a live, unrevoked link. Rejected code attempts and link issuance/revocation are audited; admin investigation shows verification method and attempt counts. No phone or SMS delivery is claimed.
+
+POST /api/deliveries/route-preview accepts only pickup and dropoff coordinates. The booking map requests it immediately after both endpoints are selected, aborts obsolete requests and recalculates on either endpoint change. It uses the existing OSRM routing service and configured routing mode. When only an estimate is available it shows an explicit warning and does not draw a straight line as a road route. Egypt coordinates, Cairo service-region validation, operating hours and dispatch radius are unchanged.
+
+Production physical collection/delivery and courier GPS must not be simulated. Local integration fixtures may use synthetic locations and proof images only in the hardcoded disposable localhost database.
+
+
+MX-026/MX-029 release checks (2026-11-05): lint exited 0 with 38 warnings; 33 unit tests, 21 HTTP checks and all 66 full database/API/browser integration checks passed. Production build succeeded and npm audit --omit=dev found zero vulnerabilities. An initial full run timed out at the existing Taxi Accept browser step; request diagnostics were added, and the complete rerun passed including native alerts, acceptance and expiry. Guest screenshots cover English/Arabic at 360, 390, 768 and 1440 pixels. The immediate-route screenshot uses a deterministic routing fixture to test endpoint changes; production road routing is checked separately, without substituting courier GPS or claiming a physical handover.

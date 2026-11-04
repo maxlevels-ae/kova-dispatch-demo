@@ -285,7 +285,7 @@ app.prepare().then(() => {
             .emit("driver:location", { ...payload, rideId });
         if(driver.currentDeliveryId){
           const delivery=await (await socketDB()).collection('deliveries').findOne({_id:driver.currentDeliveryId,courierId:new ObjectId(socket.userId),status:{$nin:['DELIVERED','CANCELLED','NO_COURIER','RETURNED']}},{projection:{customerId:1,recipientId:1}});
-          if(delivery){const update={...payload,driverId:socket.userId,id:String(delivery._id)};riderNs.to(`user:${delivery.customerId}`).emit('delivery:location',update);riderNs.to(`user:${delivery.recipientId}`).emit('delivery:location',update);adminNs.emit('delivery:location',update);}
+          if(delivery){const update={...payload,driverId:socket.userId,id:String(delivery._id)};riderNs.to(`user:${delivery.customerId}`).emit('delivery:location',update);if(delivery.recipientId)riderNs.to(`user:${delivery.recipientId}`).emit('delivery:location',update);adminNs.emit('delivery:location',update);}
         }
         adminNs.emit("driver:location", {
           ...payload,

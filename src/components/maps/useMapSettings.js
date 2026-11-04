@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { mapDefaults, cityCenter } from "@/lib/map-config";
-export function useMapSettings() {
+export function useMapSettings(enabled=true) {
   const [config, setConfig] = useState({
     settings: mapDefaults,
     center: cityCenter(),
@@ -9,6 +9,7 @@ export function useMapSettings() {
     error: "",
   });
   useEffect(() => {
+    if(!enabled)return;
     let active = true;
     async function load() {
       try {
@@ -31,6 +32,6 @@ export function useMapSettings() {
       window.removeEventListener("maxride:maps-saved", load);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, []);
+  }, [enabled]);
   return config;
 }

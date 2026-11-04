@@ -14,10 +14,22 @@ export async function uploadDeliveryImage(file,kind,deliveryId){
  const response=await fetch('/api/deliveries/evidence',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image,kind,deliveryId})}),data=await response.json();if(!response.ok)throw Error(data.error);return data;
 }
 export default function DeliveryBooking(){
- useI18n();const router=useRouter();const [config,setConfig]=useState(null),[step,setStep]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[estimate,setEstimate]=useState(null);
- const [form,setForm]=useState({pickup:null,dropoff:null,sender:{name:'',phone:'',instructions:''},recipient:{name:'',phone:'',username:'',instructions:''},package:{category:'Documents',size:'small',weight:1,length:20,width:15,height:10,description:'',handling:''},region:'Cairo',acknowledged:false,idempotencyKey:''});
+ useI18n();const router=useRouter();const [config,setConfig]=useState(null),[step,setStep]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState(''),[estimate,setEstimate]=useState(null),[preview,setPreview]=useState(null),[routing,setRouting]=useState(false),[routeError,setRouteError]=useState(''),[routeRetry,setRouteRetry]=useState(0);
+ const [form,setForm]=useState({pickup:null,dropoff:null,sender:{name:'',phone:'',instructions:''},recipient:{name:'',phone:'',instructions:''},package:{category:'Documents',size:'small',weight:1,length:20,width:15,height:10,description:'',handling:''},region:'Cairo',acknowledged:false,idempotencyKey:''});
  const [texts,setTexts]=useState({pickup:'',dropoff:''});
  useEffect(()=>{let live=true;fetch('/api/deliveries/config').then(async r=>{const d=await r.json();if(!r.ok)throw Error(d.error);if(live){setConfig(d.settings);setForm(f=>({...f,idempotencyKey:crypto.randomUUID(),region:d.settings.general.regions[0],package:{...f.package,category:d.settings.packages.categories[0]}}));}}).catch(e=>setError(e.message));return()=>{live=false;};},[]);
+ useEffect(()=>{
+  setPreview(null);setRouteError('');setEstimate(null);
+  if(!form.pickup||!form.dropoff){setRouting(false);return;}
+  const controller=new AbortController();setRouting(true);
+  const timer=setTimeout(async()=>{try{
+   const coordinates=p=>({lat:p.lat,lng:p.lng});
+   const response=await fetch('/api/deliveries/route-preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pickup:coordinates(form.pickup),dropoff:coordinates(form.dropoff)}),signal:controller.signal});
+   const data=await response.json();if(!response.ok)throw Error(data.error);
+   if(!controller.signal.aborted){setPreview(data.route);if(!data.roadRouteAvailable)setRouteError('Road routing is unavailable. Distance and duration are approximate.');}
+  }catch(e){if(!controller.signal.aborted)setRouteError(e.message);}finally{if(!controller.signal.aborted)setRouting(false);}},250);
+  return()=>{controller.abort();clearTimeout(timer);};
+ },[form.pickup,form.dropoff,routeRetry]);
  const change=(section,key,value)=>{setEstimate(null);setForm(f=>({...f,[section]:{...f[section],[key]:value}}));};
  const run=async callback=>{if(busy)return;setBusy(true);setError('');try{await callback();}catch(e){setError(e.message);}finally{setBusy(false);}};
  const next=e=>{e.preventDefault();run(async()=>{
@@ -36,7 +48,7 @@ export default function DeliveryBooking(){
     {step<2&&<><label className="delivery-field"><span>{t(steps[step])}</span><PlaceSearch value={texts[step===0?'pickup':'dropoff']} onChangeText={value=>{const key=step===0?'pickup':'dropoff';setTexts(v=>({...v,[key]:value}));setForm(f=>({...f,[key]:null}));}} committedValue={form[step===0?'pickup':'dropoff']?.address} onSelect={place=>{const key=step===0?'pickup':'dropoff';setForm(f=>({...f,[key]:{lat:place.lat,lng:place.lng,address:place.address}}));setTexts(v=>({...v,[key]:place.address}));}} placeholder={t('Search a place…')} bias={{lat:30.0444,lng:31.2357}}/></label>
      <DeliveryField label={step===0?'Sender name':'Recipient name'} value={form[step===0?'sender':'recipient'].name} onChange={v=>change(step===0?'sender':'recipient','name',v)} maxLength={100}/>
      <DeliveryField label={step===0?'Sender phone':'Recipient phone'} type="tel" value={form[step===0?'sender':'recipient'].phone} onChange={v=>change(step===0?'sender':'recipient','phone',v)} maxLength={20}/>
-     {step===1&&<><DeliveryField label="Recipient username" value={form.recipient.username} onChange={v=>change('recipient','username',v)} dir="ltr"/><p className="small muted">{t('Recipient verification uses their signed-in Maxride account. SMS is not available.')}</p></>}
+     {step===1&&<p className="small muted">{t('No recipient account is needed. Share a private confirmation link after booking. This does not verify phone ownership.')}</p>}
      <DeliveryField label={step===0?'Pickup instructions':'Delivery instructions'} value={form[step===0?'sender':'recipient'].instructions} onChange={v=>change(step===0?'sender':'recipient','instructions',v)} maxLength={500} required={false}/>
      {step===0&&<DeliveryField label="Region" value={form.region} onChange={v=>setForm(f=>({...f,region:v}))} options={config.general.regions}/>}
     </>}
@@ -49,7 +61,7 @@ export default function DeliveryBooking(){
     {step>=3&&estimate&&<><dl className="delivery-price">{[['base','Base fee'],['distance','Distance fee'],['vehicle','Vehicle surcharge'],['size','Package surcharge'],['total','Total']].map(([key,label])=><div key={key}><dt>{t(label)}</dt><dd><bdi>{deliveryMoney(estimate.quote[key])}</bdi></dd></div>)}</dl><p>{new Intl.NumberFormat(customerLocale(),{maximumFractionDigits:1}).format(estimate.route.distanceMeters/1000)} {t('km')} · {Math.ceil(estimate.route.durationSeconds/60)} {t('min')}</p><p>{t('Vehicle')}: {estimate.vehicleTypes.map(v=>t(v)).join(' · ')}</p><p className="muted">{estimate.pickupETA?t(`Estimated pickup: ${estimate.pickupETA} min`):t('Pickup time is confirmed after a courier accepts.')}</p><p>{t('Waiting fee')}: <bdi>{deliveryMoney(config.pricing.waitingPerMinute)}</bdi> / {t('min')} ({config.pricing.waitingFreeMinutes} {t('free minutes')})</p><p>{t('Cancellation fee')}: <bdi>{deliveryMoney(config.pricing.cancellation)}</bdi></p><p>{t('EGP wallet payment')}</p></>}
     {step===4&&<div className="delivery-summary"><p><strong>{t('Pickup')}:</strong> <bdi>{form.pickup.address}</bdi></p><p><strong>{t('Dropoff')}:</strong> <bdi>{form.dropoff.address}</bdi></p><p><bdi>{form.sender.name}</bdi> → <bdi>{form.recipient.name}</bdi></p><p>{t(form.package.size)} · <bdi>{form.package.description}</bdi></p></div>}
     <div className="flex gap-2 mt-4">{step>0&&<button type="button" className="btn btn-secondary" disabled={busy} onClick={()=>setStep(s=>s-1)}><ArrowLeft className="directional" size={16}/>{t('Back')}</button>}<button className="btn btn-primary" disabled={busy}>{step===4?<CheckCircle2 size={17}/>:<ArrowRight className="directional" size={17}/>} {t(busy?'Submitting…':step===4?'Confirm delivery request':'Next')}</button></div>
-   </form><div className="delivery-booking-map"><MapView pickup={form.pickup} dropoff={form.dropoff} routeGeometry={estimate?.route.geometry} fit onClick={point=>{if(step<2){const key=step===0?'pickup':'dropoff',address=`${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;setForm(f=>({...f,[key]:{...point,address}}));setTexts(v=>({...v,[key]:address}));}}}/></div></div>
+   </form><div className="delivery-booking-map"><div className="card card-pad mb-3 delivery-route-preview" aria-live="polite" data-testid="delivery-route-preview">{routing?<p>{t('Calculating road route…')}</p>:preview&&<p>{new Intl.NumberFormat(customerLocale(),{maximumFractionDigits:1}).format(preview.distanceMeters/1000)} {t('km')} · {Math.ceil(preview.durationSeconds/60)} {t('min')}</p>}{routeError&&<><p role="alert">{t(routeError)}</p><button type="button" className="btn btn-secondary" onClick={()=>setRouteRetry(n=>n+1)}>{t('Retry route')}</button></>}</div><MapView pickup={form.pickup} dropoff={form.dropoff} routeGeometry={preview?.geometry} fit onClick={point=>{if(step<2){const key=step===0?'pickup':'dropoff',address=`${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;setForm(f=>({...f,[key]:{...point,address}}));setTexts(v=>({...v,[key]:address}));}}}/></div></div>
   </>}
  </div>;
 }
