@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { Bell, X } from "lucide-react";
 import { useSession } from "next-auth/react";
 export default function NotificationInbox() {
   const { data: session } = useSession();
+  const detailsRef=useRef(null);
   const [preference, setPreference] = useState(true);
   const [items, setItems] = useState(null),
     [error, setError] = useState(""),
@@ -52,31 +54,16 @@ export default function NotificationInbox() {
   }
   if (!session?.user) return null;
   return (
-    <details
-      style={{
-        position: "fixed",
-        bottom: 80,
-        right: 16,
-        zIndex: 80,
-        maxWidth: "calc(100vw - 32px)",
-      }}
-      className="card card-pad"
-    >
-      <summary
+    <details ref={detailsRef} className="notification-inbox" onKeyDown={e=>{if(e.key==='Escape'){detailsRef.current.open=false;detailsRef.current.querySelector('summary').focus();}}}>
+      <summary className="btn btn-ghost notification-trigger" aria-label="Notifications"
         onClick={() => {
           if (!items) load();
         }}
       >
-        Notifications
+        <Bell size={18} aria-hidden="true"/><span>Notifications</span>
       </summary>
-      <div
-        style={{
-          width: 300,
-          maxWidth: "100%",
-          maxHeight: "50vh",
-          overflowY: "auto",
-        }}
-      >
+      <div className="notification-panel card" role="region" aria-label="Notification inbox">
+        <div className="flex justify-between items-center mb-3"><strong>Notifications</strong><button className="btn btn-ghost btn-icon" aria-label="Close notifications" onClick={()=>{detailsRef.current.open=false;detailsRef.current.querySelector('summary').focus();}}><X size={16}/></button></div>
         <label className="flex gap-2">
           <input
             type="checkbox"

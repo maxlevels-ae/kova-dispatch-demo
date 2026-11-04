@@ -1,6 +1,5 @@
 'use client';
 
-import NotificationInbox from '@/components/NotificationInbox';
 import { SessionProvider } from 'next-auth/react';
 import { SocketProvider } from '@/context/SocketProvider';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -10,7 +9,7 @@ export default function Providers({ children }) {
   return (
     <SessionProvider>
       <SocketProvider>
-        <ToastProvider>{children}<NotificationInbox /></ToastProvider>
+        <ToastProvider>{children}</ToastProvider>
       </SocketProvider>
     </SessionProvider>
   );

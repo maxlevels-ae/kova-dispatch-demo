@@ -98,12 +98,15 @@ export async function mapBrowserChecks({
     page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(45000);
     const errors = [];
     page.on("pageerror", (e) => { errors.push(e.message);console.log("MAP JS ERROR",e.message); });
+    page.on('response', r=>{if(r.status()>=400 && /openfreemap|maplibre/.test(r.url()))console.log('MAP ASSET ERROR',r.status(),r.url());});
+    page.on('requestfailed', r=>{if(/openfreemap|maplibre/.test(r.url()))console.log('MAP REQUEST FAILED',r.url(),r.failure()?.errorText);});
     const requests = [];
 
 
     page.on("request", (r) => {if(!requests.some(u=>new URL(u).hostname===new URL(r.url()).hostname))console.log("MAP HOST",new URL(r.url()).hostname);requests.push(r.url());});
     console.log("MAP QA: loading real basemap");
     await page.goto(base + "/admin/dashboard",{waitUntil:"domcontentloaded"});
+    await headerInbox(page, 'admin');
     await expect(page.locator(".map-frame")).toHaveAttribute(
       "data-map-state",
       "ready",
@@ -334,6 +337,7 @@ export async function mapBrowserChecks({
       );
       const p = await c.newPage();
       await p.goto(base + path);
+      await headerInbox(p, role);
       await expect(p.locator(".map-frame")).toHaveAttribute(
         "data-map-state",
         "ready",
@@ -357,4 +361,19 @@ export async function mapBrowserChecks({
     socket.disconnect();
     await browser.close();
   }
+}
+
+async function headerInbox(page, role) {
+  const trigger=page.locator('.app-header').getByLabel('Notifications',{exact:true});
+  await expect(trigger).toBeVisible({timeout:30000});
+  await expect(page.locator('.notification-inbox')).toHaveCount(1);
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('region',{name:'Notification inbox'})).toBeVisible();
+  const bounds=await page.locator('.notification-panel').boundingBox();
+  assert.ok(bounds.x>=0 && bounds.x+bounds.width<=page.viewportSize().width, 'Inbox fits viewport');
+  await page.screenshot({path:`docs/qa/notifications-header-${role}.png`,fullPage:true});
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('region',{name:'Notification inbox'})).not.toBeVisible();
+  await expect(trigger).toBeFocused();
 }

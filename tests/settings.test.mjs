@@ -1,5 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { arabicMapStyle } from "../src/lib/map-labels.js";
+import { createExpression } from "@maplibre/maplibre-gl-style-spec";
+test("map labels prefer Arabic, retain original names, and preserve route shields", () => {
+  const field = ["coalesce", ["get", "name_en"], ["get", "name"]];
+  const style = {version:8, sources:{}, layers:[
+    {id:"street",type:"symbol",layout:{"text-field":field,"text-font":["Noto Sans Regular"]}},
+    {id:"shield",type:"symbol",layout:{"text-field":["get","ref"]}},
+  ]};
+  const result=arabicMapStyle(null,style);
+  const compiled=createExpression(result.layers[0].layout["text-field"], 'layers[0].layout.text-field');
+  assert.equal(compiled.result,"success");
+  const evaluate=properties=>compiled.value.evaluate({}, {properties});
+  assert.equal(evaluate({"name:ar":"شارع التحرير",name:"Tahrir"}),"شارع التحرير");
+  assert.equal(evaluate({"name:ar":"",name:"شارع الهرم"}),"شارع الهرم");
+  assert.equal(evaluate({name_en:"Original English"}),"Original English");
+  assert.equal(evaluate({name:"شارع التحرير / Tahrir 12"}),"شارع التحرير / Tahrir 12");
+  assert.deepEqual(result.layers[1],style.layers[1]);
+  assert.deepEqual(style.layers[0].layout["text-field"],field);
+  assert.deepEqual(result.layers[0].layout["text-font"],["Noto Sans Regular"]);
+});
 import {
   defaults,
   schemas,

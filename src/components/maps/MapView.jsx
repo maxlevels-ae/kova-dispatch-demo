@@ -13,6 +13,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { useMapSettings } from "./useMapSettings";
 import { basemapStyle, mapRequest, cartoConfigured } from "@/lib/map-config";
+import { arabicMapStyle } from "@/lib/map-labels";
 
 function el(className, html) {
   const div = document.createElement("div");
@@ -88,6 +89,7 @@ export default function MapView({
       container: containerRef.current,
       style: basemapStyle("openfreemap", "standard"),
       transformRequest: mapRequest,
+      transformStyle: arabicMapStyle,
       center: [center.lng, center.lat],
       zoom,
       attributionControl: { compact: true },

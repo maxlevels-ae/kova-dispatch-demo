@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import NotificationInbox from '@/components/NotificationInbox';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { LogOut } from 'lucide-react';
@@ -60,7 +61,7 @@ export default function AppShell({ nav, children }) {
         </div>
       </aside>
 
-      <main className="content">{user?.role === 'admin' && <div className="admin-mobile-profile"><Link href="/admin/profile" className="btn btn-ghost"><Avatar name={user.name} src={user.avatar} size="sm"/>My profile</Link></div>}{children}</main>
+      <main className="content"><header className="app-header" aria-label="Account controls">{user?.role === 'admin' && <div className="admin-mobile-profile"><Link href="/admin/profile" className="btn btn-ghost"><Avatar name={user.name} src={user.avatar} size="sm"/>My profile</Link></div>}<NotificationInbox /></header>{children}</main>
     </div>
   );
 }
