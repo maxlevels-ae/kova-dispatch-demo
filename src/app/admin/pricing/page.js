@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/Toast';
 const DEFAULTS = DEFAULT_PRICING;
 
 const FIELDS = [
+  ['cancellationFee', 'Late cancellation fee (EGP)'],
   ['baseFare', 'Base fare (EGP)'],
   ['perKmRate', 'Per km (EGP)'],
   ['perMinRate', 'Per minute (EGP)'],
@@ -37,8 +38,8 @@ export default function AdminPricingPage() {
         for (const type of Object.keys(DEFAULTS)) {
           const dbRule = data.rules.find((r) => r.vehicleType === type && r.city === 'default' && r.currency === 'EGP');
           merged[type] = dbRule
-            ? { ...DEFAULTS[type], ...dbRule }
-            : { ...DEFAULTS[type], _unsaved: true };
+            ? { cancellationFee: 30, ...DEFAULTS[type], ...dbRule }
+            : { cancellationFee: 30, ...DEFAULTS[type], _unsaved: true };
         }
         setRules(merged);
       } catch {

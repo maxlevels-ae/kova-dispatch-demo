@@ -1,3 +1,5 @@
+import connectDB from '@/lib/db/mongodb';
+import User from '@/lib/db/models/User';
 import jwt from 'jsonwebtoken';
 import { auth } from './config';
 
@@ -18,6 +20,14 @@ export async function requireAuth(roles) {
     return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 
+  // Recheck active status and role for privileged requests; stale JWTs cannot retain admin access.
+  if (roles?.includes('admin')) {
+    try {
+      await connectDB();
+      const current = await User.findById(session.user.id).select('role isActive').lean();
+      if (!current?.isActive || current.role !== 'admin') return { error: Response.json({ error: 'Forbidden' }, { status: 403 }) };
+    } catch { return { error: Response.json({ error: 'Authorization unavailable' }, { status: 503 }) }; }
+  }
   return { session };
 }
 

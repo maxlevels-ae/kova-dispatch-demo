@@ -11,6 +11,7 @@ const latLng = z.object({
 });
 
 const createSchema = z.object({
+  scheduledAt: z.iso.datetime().optional(),
   pickup: latLng,
   dropoff: latLng,
   vehicleType: z.enum(['economy', 'comfort', 'premium', 'xl']).default('economy'),

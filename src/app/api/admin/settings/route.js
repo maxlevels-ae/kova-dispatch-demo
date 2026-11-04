@@ -4,7 +4,7 @@ import Branding from '@/lib/db/models/Branding';
 import { MAX_BRANDING_BODY } from '@/lib/branding';
 import { validateLogo } from '@/lib/validate-branding';
 export async function PUT(request) {
-  const { error } = await requireAuth(['admin']);
+  const { session, error } = await requireAuth(['admin']);
   if (error) return error;
   if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid request origin' }, { status: 403 });
   if (!request.headers.get('content-type')?.startsWith('application/json')) return Response.json({ error: 'Expected JSON' }, { status: 415 });
@@ -27,7 +27,7 @@ export async function PUT(request) {
   }
   try {
     await connectDB();
-    await Branding.findOneAndUpdate({ _id: 'public' }, { $set: data }, { upsert: true, runValidators: true });
+    await Branding.findOneAndUpdate({ _id: 'public' }, { $set: data, $push: { history: { $each: [{ actor: session.user.id, at: new Date(), name: data.name, hasLogo: Boolean(data.logo), hasLoginLogo: Boolean(data.loginLogo) }], $slice: -100 } } }, { upsert: true, runValidators: true });
     return Response.json(data, { headers: { 'Cache-Control': 'no-store' } });
   } catch {
     return Response.json({ error: 'Unable to save branding. Please retry.' }, { status: 503 });

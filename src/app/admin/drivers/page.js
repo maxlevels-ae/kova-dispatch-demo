@@ -10,6 +10,7 @@ function DriversAdmin() {
   const toast = useToast();
   const searchParams = useSearchParams();
   const [pendingOnly, setPendingOnly] = useState(searchParams.get('pending') === '1');
+  const [reasons, setReasons] = useState({});
   const [drivers, setDrivers] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
@@ -33,7 +34,7 @@ function DriversAdmin() {
       const res = await fetch('/api/admin/drivers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId, isApproved }),
+        body: JSON.stringify({ driverId, isApproved, reason: reasons[driverId] || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -112,7 +113,7 @@ function DriversAdmin() {
                       <span className="badge badge-warning badge-dot">Pending</span>
                     )}
                   </td>
-                  <td className="text-right">
+                  <td className="text-right">{d.isApproved && <input aria-label={`Suspension reason for ${d.userId?.name || 'driver'}`} className="input mb-2" placeholder="Suspension reason" maxLength={300} value={reasons[d._id] || ''} onChange={e => setReasons({...reasons, [d._id]: e.target.value})} />}
                     {d.isApproved ? (
                       <button
                         className="btn btn-danger btn-sm"

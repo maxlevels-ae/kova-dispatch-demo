@@ -8,6 +8,8 @@ export async function register() {
   const { startDispatchSweeper } = await import('@/lib/realtime/dispatch');
   const { startLocationFlusher } = await import('@/lib/realtime/location-flusher');
 
+  const { startNotificationWorker } = await import('@/lib/notifications');
+  startNotificationWorker();
   startDispatchSweeper();
   startLocationFlusher();
 

@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import { requireAuth } from '@/lib/auth/helpers';
 
 const PHOTON_BASE = process.env.PHOTON_URL || 'https://photon.komoot.io';
@@ -39,7 +40,9 @@ export async function GET(request) {
       if (q.trim().length < 2) {
         return Response.json({ results: [] });
       }
-      url = `${PHOTON_BASE}/api/?q=${encodeURIComponent(q.trim())}&limit=6`;
+      const { maps } = await getSettings();
+      const query = Number.isFinite(lat) && Number.isFinite(lng) ? q.trim() : `${q.trim()}, ${maps.city}, ${maps.country}`;
+      url = `${PHOTON_BASE}/api/?q=${encodeURIComponent(query)}&limit=6`;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         // Bias hard toward the user's area — nearby streets should beat
         // same-named streets in other cities

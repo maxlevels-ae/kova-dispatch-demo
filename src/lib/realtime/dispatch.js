@@ -1,16 +1,11 @@
+import { recordOperationalError } from '@/lib/operational-errors';
+import { getSettings } from '@/lib/settings';
 import connectDB from '@/lib/db/mongodb';
 import redis from '@/lib/db/redis';
 import Ride from '@/lib/db/models/Ride';
 import Driver from '@/lib/db/models/Driver';
 import { findBestDriver, estimateDriverETA } from '@/lib/services/ride-matcher';
 import { emitToRider, emitToDriver, emitToAdmin, rideBus } from './emit';
-
-/** Seconds a driver has to respond to an offer (client shows 15s). */
-const OFFER_TIMEOUT_MS = 16000;
-/** Redis TTL for the active offer claim. */
-const OFFER_TTL_SECONDS = 25;
-/** Give up after this many drivers have been offered the ride. */
-const MAX_OFFERS = 8;
 
 const offerKey = (rideId) => `ride:offer:${rideId}`;
 const dispatchLockKey = (rideId) => `ride:dispatch:${rideId}`;
@@ -60,7 +55,7 @@ async function recordOfferOutcome(driverProfileId, accepted) {
  * candidate is tried. A Redis lock prevents two dispatch loops for the
  * same ride (e.g. duplicate POST or sweeper overlap).
  */
-export async function startDispatch(rideId) {
+export async function startDispatch(rideId, { manual = false } = {}) {
   await connectDB();
 
   // Prevent concurrent dispatch loops for the same ride
@@ -72,8 +67,9 @@ export async function startDispatch(rideId) {
   }
 
   try {
-    await runCascade(rideId);
+    await runCascade(rideId, manual);
   } catch (err) {
+    await recordOperationalError('dispatch', 'CASCADE_FAILED');
     console.error(`[Dispatch] Cascade failed for ride ${rideId}:`, err);
   } finally {
     try {
@@ -84,13 +80,19 @@ export async function startDispatch(rideId) {
   }
 }
 
-async function runCascade(rideId) {
+async function runCascade(rideId, manual) {
+  const { dispatch } = await getSettings();
+  const OFFER_TIMEOUT_MS = dispatch.acceptanceSeconds * 1000;
+  const OFFER_TTL_SECONDS = dispatch.acceptanceSeconds + 9;
+  const MAX_OFFERS = dispatch.maxAttempts;
   const User = (await import('@/lib/db/models/User')).default;
   let riderInfo = null;
 
   for (let attempt = 0; attempt < MAX_OFFERS; attempt++) {
     const ride = await Ride.findById(rideId);
-    if (!ride || ride.status !== 'searching') return; // accepted or cancelled
+    if (!ride || ride.status !== 'searching') return;
+    if (ride.scheduledAt && ride.scheduledAt > new Date()) return;
+    if (!manual && (ride.dispatch.manualHold || dispatch.assignmentMode === 'manual')) return;
 
     if (!riderInfo) {
       const rider = await User.findById(ride.riderId).select('name rating').lean();
@@ -105,16 +107,17 @@ async function runCascade(rideId) {
       lng: ride.pickup.location.coordinates[0],
     };
 
+    if ((ride.dispatch?.offersSent || 0) >= MAX_OFFERS) { await failDispatch(ride, ride.dispatch.offersSent, dispatch.fallback); return; }
     const excludeIds = (ride.dispatch?.offeredTo || []).map(String);
     const candidate = await findBestDriver({
       pickup,
       vehicleType: ride.vehicleType,
-      maxRadiusKm: 15,
+      maxRadiusKm: dispatch.searchRadiusKm,
       excludeDriverIds: excludeIds,
     });
 
     if (!candidate) {
-      await failDispatch(ride, attempt);
+      await failDispatch(ride, attempt, dispatch.fallback);
       return;
     }
 
@@ -196,18 +199,24 @@ async function runCascade(rideId) {
 
   const ride = await Ride.findById(rideId);
   if (ride && ride.status === 'searching') {
-    await failDispatch(ride, MAX_OFFERS);
+    await failDispatch(ride, MAX_OFFERS, dispatch.fallback);
   }
 }
 
-async function failDispatch(ride, offersSent) {
-  ride.status = 'no_drivers';
-  ride.timeline.push({
-    status: 'no_drivers',
-    timestamp: new Date(),
-    note: offersSent > 0 ? `No driver accepted (${offersSent} offered)` : 'No drivers nearby',
-  });
-  await ride.save();
+async function failDispatch(ride, offersSent, fallback) {
+  if (fallback === 'manual') {
+    await Ride.updateOne({ _id: ride._id, status: 'searching' }, { $set: { 'dispatch.manualHold': true } });
+    emitToAdmin('ride:updated', { rideId: String(ride._id), status: 'searching', manualHold: true });
+    return;
+  }
+  const updated = await Ride.findOneAndUpdate(
+    { _id: ride._id, status: 'searching' },
+    { $set: { status: 'no_drivers' }, $push: { timeline: {
+      status: 'no_drivers', timestamp: new Date(),
+      note: offersSent > 0 ? `No driver accepted (${offersSent} offered)` : 'No drivers nearby',
+    } } }, { returnDocument: 'after' }
+  );
+  if (!updated) return;
 
   emitToRider(String(ride.riderId), 'ride:no-drivers', {
     rideId: String(ride._id),
@@ -261,6 +270,8 @@ export function startDispatchSweeper() {
       const cutoff = new Date(Date.now() - 90 * 1000);
       const stuck = await Ride.find({
         status: 'searching',
+        'dispatch.manualHold': { $ne: true },
+        $or: [{ scheduledAt: null }, { scheduledAt: { $lte: new Date() } }],
         updatedAt: { $lt: cutoff },
       })
         .select('_id')

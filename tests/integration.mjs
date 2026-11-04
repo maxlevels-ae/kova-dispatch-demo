@@ -28,7 +28,7 @@ const password = randomBytes(24).toString('hex');
 let server;
 let passed = 0;
 async function check(label, fn) { await fn(); passed++; console.log(`PASS ${label}`); }
-function request(path, cookie = '', options = {}) { return fetch(base + path, { redirect: 'manual', ...options, headers: { cookie, ...options.headers } }); }
+function request(path, cookie = '', options = {}) { return fetch(base + path, { redirect: 'manual', ...options, headers: { cookie, origin: base, ...options.headers } }); }
 async function start() {
   server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: '3188', HOSTNAME: 'localhost', BIND_HOST: '127.0.0.1', NEXT_PUBLIC_APP_URL: base, AUTH_SECRET: secret, NEXTAUTH_SECRET: secret, AUTH_URL: base, NEXTAUTH_URL: base }, stdio: 'ignore', windowsHide: true });
   for (let i = 0; i < 60; i++) { try { if ((await request('/login')).status === 200) return; } catch {} await new Promise(r => setTimeout(r, 1000)); }
@@ -137,6 +137,12 @@ try {
     const updated = await request('/api/auth/session', c, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ csrfToken, data: { role: 'admin' } }) });
     const session = await updated.json(); assert.equal(session.user.role, 'rider');
   });
+  await check('authenticated admin mutations reject cross-origin, invalid images and oversized payloads',async()=>{
+    const write=(body,origin=base)=>request('/api/admin/settings',cookies.admin,{method:'PUT',headers:{origin,'content-type':'application/json'},body});
+    assert.equal((await write('{}','https://evil.test')).status,403);
+    assert.equal((await write(JSON.stringify({name:'QA',logo:'data:image/svg+xml;base64,PHN2Zz4=',loginLogo:null}))).status,400);
+    assert.equal((await write(' '.repeat(740000))).status,413);
+  });
   await check('default branding is returned from empty database', async () => assert.deepEqual(await (await request('/api/branding')).json(), { name: 'Maxride', logo: null, loginLogo: null }));
   let saved;
   await check('admin upload is persisted and publicly readable', async () => {
@@ -243,6 +249,36 @@ try {
     }
     assert.deepEqual(await PricingRule.collection.find({}).sort({ vehicleType: 1 }).toArray(), legacyPricing);
   });
+  await check('settings authorization, persistence, revisions, provider lock and notification isolation', async () => {
+    const { defaults: safeDefaults, events } = await import('../src/lib/settings-schema.js');
+    const defaults = { ...safeDefaults, notifications: { ...safeDefaults.notifications, enabledEvents: events } };
+    for (const role of ['rider','driver']) {
+      assert.equal((await request('/api/admin/settings/platform', cookies[role])).status, 403);
+      assert.equal((await request('/api/admin/settings/providers', cookies[role])).status, 403);
+    }
+    const write = (section, value, revision=0) => request('/api/admin/settings/platform', cookies.admin, { method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({section,value,revision}) });
+    for (const [section,value] of Object.entries(defaults)) assert.equal((await write(section,value)).status,200,section);
+    assert.equal((await write('dispatch',defaults.dispatch)).status,409);
+    assert.equal((await write('dispatch',{...defaults.dispatch,maxAttempts:99},1)).status,400);
+    const persisted=await (await request('/api/admin/settings/platform',cookies.admin)).json();
+    assert.deepEqual(persisted.settings,defaults);
+    assert.equal(persisted.records.find(r=>r._id==='dispatch').history.length,1);
+    const providers=await (await request('/api/admin/settings/providers',cookies.admin)).json();
+    const provider=providers.providers.find(p=>p.id==='paymob');
+    assert.equal(provider.active,false);
+    const providerPut = value => request('/api/admin/settings/providers',cookies.admin,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({id:'paymob',value,revision:0})});
+    assert.equal((await providerPut({...provider.value,active:true})).status,400);
+    assert.equal((await providerPut({...provider.value,accountId:'qa-test'})).status,200);
+    assert.equal((await request('/api/admin/settings/monitoring',cookies.admin)).status,200);
+    const notificationResponse=await request('/api/notifications',cookies.rider); assert.equal(notificationResponse.status,200);
+    const inbox=await notificationResponse.json(); assert.ok(inbox.notifications.length>0); assert.ok(inbox.notifications.every(n=>n.userId===String(users.rider._id)));
+    const count=inbox.notifications.length;
+    assert.equal((await (await request('/api/notifications',cookies.rider)).json()).notifications.length,count);
+    assert.equal((await request('/api/notifications',cookies.rider,{method:'PATCH'})).status,200);
+    assert.ok((await (await request('/api/notifications',cookies.rider)).json()).notifications.every(n=>n.readAt));
+    assert.equal((await request('/api/notifications',cookies.rider,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({inApp:false})})).status,200);
+    assert.equal((await (await request('/api/notifications',cookies.rider)).json()).preference,false);
+  });
   await check('production top-ups cannot mint funds when Stripe is disabled', async () => {
     const before = (await User.findById(users.rider._id)).wallet.balance;
     const response = await request('/api/wallet', cookies.rider, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount: 100 }) });
@@ -253,6 +289,53 @@ try {
     const response = await request('/api/auth/signup', '', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: 'QA New Rider', username: 'qa_new_rider', password, confirmPassword: password, role: 'rider' }) });
     assert.equal(response.status, 201);
     const user = await User.findOne({ username: 'qa_new_rider' }).lean(); assert.equal(user.wallet.currency, 'EGP'); assert.equal(user.wallet.balance, 0);
+  });
+  await check('booking policies and manual/scheduled dispatch preserve ride claims',async()=>{
+    const {defaults}=await import('../src/lib/settings-schema.js');
+    const {createRide,acceptRide}=await import('../src/lib/services/ride-service.js');
+    const {startDispatch}=await import('../src/lib/realtime/dispatch.js');
+    const {default:Settings}=await import('../src/lib/db/models/PlatformSettings.js');
+    const policyUser=await User.create({username:'qa_policy_rider',name:'Policy Rider',role:'rider',passwordHash:await bcrypt.hash(password,10),wallet:{currency:'EGP',balance:1000}});
+    const pickup={address:'QA pickup',lat:30,lng:31},dropoff={address:'QA dropoff',lat:30.02,lng:31.02};
+    await Settings.updateOne({_id:'fleet'},{$set:{value:{...defaults.fleet,enabledCategories:['xl']}}});
+    await assert.rejects(createRide({riderId:policyUser._id,pickup,dropoff,vehicleType:'economy'}),/category/);
+    await Settings.updateOne({_id:'fleet'},{$set:{value:defaults.fleet}});
+    await assert.rejects(createRide({riderId:policyUser._id,pickup,dropoff,vehicleType:'economy',scheduledAt:new Date(Date.now()+3600000).toISOString()}),/Scheduled/);
+    await Settings.updateOne({_id:'dispatch'},{$set:{value:{...defaults.dispatch,assignmentMode:'manual',scheduledEnabled:true}}});
+    const scheduled=await createRide({riderId:policyUser._id,pickup,dropoff,vehicleType:'economy',scheduledAt:new Date(Date.now()+3600000).toISOString()});
+    await startDispatch(String(scheduled._id));
+    const stored=await Ride.findById(scheduled._id).lean();assert.equal(stored.status,'searching');assert.equal(stored.dispatch.offersSent,0);
+    await assert.rejects(acceptRide({rideId:scheduled._id,driverUserId:users.driver._id}),/scheduled ride/);
+    await cancelRide({rideId:scheduled._id,userId:policyUser._id,role:'rider'});
+    await Settings.updateOne({_id:'dispatch'},{$set:{value:defaults.dispatch}});
+  });
+  await check('desktop/mobile settings tabs, save feedback and reload persistence in Chromium', async () => {
+    process.env.PLAYWRIGHT_BROWSERS_PATH = new URL('../.cache/playwright', import.meta.url).pathname.replace(/^\/(.:\/)/, '$1');
+    const { chromium, expect } = await import('@playwright/test');
+    const browser = await chromium.launch({ headless:true });
+    try {
+      const context=await browser.newContext({viewport:{width:1440,height:1000}});
+      await context.addCookies(cookies.admin.split('; ').filter(Boolean).map(pair=>({name:pair.split('=')[0],value:pair.slice(pair.indexOf('=')+1),url:base})));
+      const page=await context.newPage();
+      const errors=[];page.on('pageerror',e=>errors.push(e.message));
+      await page.goto(base+'/admin/settings');
+      await expect(page.getByRole('tab')).toHaveCount(10);
+      await page.getByRole('tab',{name:'Bookings & Dispatch',exact:true}).click();
+      await page.getByLabel('Driver search radius (km)',{exact:true}).fill('12');
+      await page.getByRole('button',{name:'Save settings',exact:true}).click();
+      await expect(page.getByRole('status').filter({hasText:'Settings saved.'})).toBeVisible();
+      await page.reload();await page.getByRole('tab',{name:'Bookings & Dispatch',exact:true}).click();
+      await expect(page.getByLabel('Driver search radius (km)',{exact:true})).toHaveValue('12');
+      for(const tab of ['Drivers & Fleet','Payment Gateways','Notifications','Pricing & Commission','Maps & Service Zones','Users & Security','Integrations','System & Monitoring'])await page.getByRole('tab',{name:tab,exact:true}).click();
+      await page.getByRole('button',{name:'Refresh health',exact:true}).click();
+      await expect(page.locator('pre')).toContainText('"mongo": "up"');
+      await page.setViewportSize({width:390,height:844});
+      await page.getByRole('tab',{name:'Bookings & Dispatch',exact:true}).click();
+      await expect(page.getByRole('button',{name:'Save settings',exact:true})).toBeVisible();
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'mobile horizontal overflow');
+      await page.screenshot({path:'.cache/settings-mobile.png',fullPage:true});
+      assert.deepEqual(errors,[]);
+    } finally {await browser.close();}
   });
   console.log(`${passed} database/API integration checks passed; only disposable database ${dbName} was written.`);
 } catch (error) { console.error('Integration failed:', error.stack); process.exitCode = 1; }

@@ -1,3 +1,5 @@
+import { getSettings } from '@/lib/settings';
+import { bookingPolicy } from '@/lib/settings-schema';
 import mongoose from 'mongoose';
 import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta } from '@/lib/currency';
 import crypto from 'crypto';
@@ -72,6 +74,7 @@ export function serializeRide(ride, { driver, driverUser } = {}) {
   const r = ride.toObject ? ride.toObject({ virtuals: false }) : ride;
   return {
     id: String(r._id),
+    scheduledAt: r.scheduledAt,
     status: r.status,
     pickup: { address: r.pickup.address, ...coordsToLatLng(r.pickup.location) },
     dropoff: { address: r.dropoff.address, ...coordsToLatLng(r.dropoff.location) },
@@ -120,8 +123,14 @@ async function loadDriverBundle(ride) {
 
 // ─── Create & dispatch ────────────────────────────────────────────────────────
 
-export async function createRide({ riderId, pickup, dropoff, vehicleType }) {
+export async function createRide({ riderId, pickup, dropoff, vehicleType, scheduledAt }) {
   await connectDB();
+
+  const settings = await getSettings();
+  const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+  if (scheduledDate && (!settings.dispatch.scheduledEnabled || !Number.isFinite(+scheduledDate) || +scheduledDate < Date.now() + 60000 || +scheduledDate > Date.now() + settings.dispatch.maxScheduleDays * 86400000)) throw new RideError('Scheduled booking is disabled or outside the allowed advance window');
+  const policyError = bookingPolicy(settings, pickup, dropoff, vehicleType, scheduledDate || new Date());
+  if (policyError) throw new RideError(policyError);
 
   // One live ride per rider
   const existing = await Ride.findOne({ riderId, status: { $in: ACTIVE_STATUSES } });
@@ -133,8 +142,8 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType }) {
   if (route.distanceMeters < 100) {
     throw new RideError('Pickup and destination are too close together');
   }
-  if (route.distanceMeters > 200000) {
-    throw new RideError('This trip is too long to book (200 km max)');
+  if (route.distanceMeters > settings.dispatch.maxTripKm * 1000) {
+    throw new RideError(`This trip exceeds the ${settings.dispatch.maxTripKm} km limit`);
   }
 
   const fare = await calculateFare({
@@ -169,6 +178,8 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType }) {
   const ride = await Ride.create({
     riderId,
     status: 'searching',
+    scheduledAt: scheduledDate || undefined,
+    dispatch: { manualHold: settings.dispatch.assignmentMode === 'manual' },
     pickup: { address: pickup.address, location: point(pickup.lat, pickup.lng) },
     dropoff: { address: dropoff.address, location: point(dropoff.lat, dropoff.lng) },
     route: {
@@ -203,8 +214,18 @@ export async function acceptRide({ rideId, driverUserId }) {
   const driver = await Driver.findOne({ userId: driverUserId });
   if (!driver) throw new RideError('Driver profile not found', 404);
   if (!driver.isApproved) throw new RideError('Your driver account is not approved yet', 403);
+  const { fleet } = await getSettings();
+  if (!fleet.enabledCategories.includes(driver.vehicle.type) || fleet.requiredDocuments.some(type => !driver.documents.some(d => d.type === type && d.verified))) throw new RideError('Driver does not meet current fleet policy', 403);
+  if (fleet.maxDailyTrips > 0) {
+    const since = new Date(Date.now() - 86400000);
+    const count = await Ride.countDocuments({ driverId: driverUserId, status: 'completed', completedAt: { $gte: since } });
+    if (count >= fleet.maxDailyTrips) throw new RideError('Driver trip limit reached for the past 24 hours', 409);
+  }
 
   const offeredRide = await Ride.findById(rideId).lean();
+  if (offeredRide?.scheduledAt && new Date(offeredRide.scheduledAt) > new Date()) throw new RideError('This scheduled ride is not ready for dispatch', 409);
+  if (offeredRide?.dispatch?.manualHold) throw new RideError('Ride is awaiting manual dispatch', 409);
+  if (!driver.isOnline || driver.vehicle.type !== offeredRide?.vehicleType) throw new RideError('Driver is unavailable or vehicle category does not match', 409);
   const driverWallet = await User.findById(driverUserId).select('wallet').lean();
   if (!sameCurrency(offeredRide?.fare?.currency, driverWallet?.wallet?.currency)) throw new RideError('Wallet currency does not match this ride; contact support for currency review.', 409);
 
@@ -529,7 +550,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
   const settled = await mongoose.connection.transaction(async dbSession => {
     const current = await Ride.findOne(match).session(dbSession);
     if (!current) throw new RideError('This ride can no longer be cancelled', 409);
-    const cancellationFee = current.status === 'arrived' ? (current.fare.currency === CURRENCY ? EGP_CANCEL_FEE : LATE_CANCEL_FEE) : 0;
+    const cancellationFee = current.status === 'arrived' ? (current.fare.currency === CURRENCY ? (current.fare.quotedCancellationFee ?? EGP_CANCEL_FEE) : LATE_CANCEL_FEE) : 0;
     if (cancellationFee) {
       const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId].filter(Boolean) } }).session(dbSession).lean();
       if (wallets.length !== (current.driverId ? 2 : 1) || wallets.some(u => !sameCurrency(u.wallet?.currency, current.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);

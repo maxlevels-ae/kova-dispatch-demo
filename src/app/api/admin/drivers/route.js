@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import mongoose from 'mongoose';
@@ -48,6 +49,7 @@ export async function GET(request) {
 }
 
 const patchSchema = z.object({
+  reason: z.string().trim().max(300).optional(),
   driverId: z.string(),
   isApproved: z.boolean(),
 });
@@ -65,7 +67,14 @@ export async function PATCH(request) {
     }
 
     await connectDB();
-    const update = { isApproved: parsed.data.isApproved };
+    const { fleet } = await getSettings();
+    if (!parsed.data.isApproved && fleet.suspensionReasonRequired && !parsed.data.reason) return Response.json({ error: 'A suspension reason is required' }, { status: 400 });
+    if (parsed.data.isApproved) {
+      const existing = await Driver.findById(parsed.data.driverId).lean();
+      if (!existing) return Response.json({ error: 'Driver not found' }, { status: 404 });
+      if (fleet.requiredDocuments.some(type => !existing.documents?.some(d => d.type === type && d.verified))) return Response.json({ error: 'Required documents must be verified before approval' }, { status: 409 });
+    }
+    const update = { suspensionReason: parsed.data.isApproved ? '' : parsed.data.reason || '', isApproved: parsed.data.isApproved };
     if (!parsed.data.isApproved) update.isOnline = false; // suspend also knocks them offline
 
     const driver = await Driver.findByIdAndUpdate(parsed.data.driverId, update, {

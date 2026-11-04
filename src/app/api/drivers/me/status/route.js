@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
@@ -8,7 +9,7 @@ import { updateDriverCell, removeDriverFromIndex } from '@/lib/services/h3-redis
 import { emitToAdmin } from '@/lib/realtime/emit';
 
 /** How far a driver's wallet may go negative before they must settle up. */
-const MAX_DRIVER_DEBT = -25;
+
 
 const statusSchema = z.object({
   online: z.boolean(),
@@ -41,6 +42,9 @@ export async function POST(request) {
     }
 
     if (online) {
+      const { fleet } = await getSettings();
+      const MAX_DRIVER_DEBT = -fleet.maxDebtEGP;
+      if (!fleet.enabledCategories.includes(driver.vehicle.type) || fleet.requiredDocuments.some(type => !driver.documents.some(d => d.type === type && d.verified))) return Response.json({ error: 'Vehicle category or verified documents do not meet fleet policy' }, { status: 403 });
       if (!driver.isApproved) {
         return Response.json(
           { error: 'Your driver account is pending approval' },

@@ -53,6 +53,8 @@ export async function GET() {
   return Response.json(
     {
       status: healthy ? 'ok' : 'degraded',
+      version: '0.1.0',
+      commit: process.env.RENDER_GIT_COMMIT || null,
       checks,
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),

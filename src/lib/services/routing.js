@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import { haversineDistance } from '@/lib/utils/geo';
 
 const OSRM_BASE = process.env.OSRM_URL || 'https://router.project-osrm.org';
@@ -14,6 +15,8 @@ const OSRM_BASE = process.env.OSRM_URL || 'https://router.project-osrm.org';
  * @returns {{distanceMeters:number, durationSeconds:number, geometry:Array<[number,number]>|null, source:string}}
  */
 export async function getRoute(from, to) {
+  const { maps } = await getSettings();
+  if (maps.routingMode === 'estimate') return estimateRoute(from, to);
   try {
     const url =
       `${OSRM_BASE}/route/v1/driving/` +

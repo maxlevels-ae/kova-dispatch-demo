@@ -95,6 +95,7 @@ export async function calculateFare({
   const driverEarnings = round(total) - platformFee;
 
   const result = {
+    quotedCancellationFee: pricing.cancellationFee ?? 30,
     baseFare: round(pricing.baseFare),
     distanceFare: round(distanceFare),
     timeFare: round(timeFare),

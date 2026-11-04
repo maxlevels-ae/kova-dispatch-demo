@@ -45,6 +45,7 @@ export default function RiderDashboard() {
   const [vehicleType, setVehicleType] = useState('economy');
   const [walletCurrency, setWalletCurrency] = useState(null);
   const [walletBalance, setWalletBalance] = useState(null);
+  const [scheduledAt, setScheduledAt] = useState('');
   const [booking, setBooking] = useState(false);
   const [nearby, setNearby] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
@@ -151,7 +152,7 @@ export default function RiderDashboard() {
           }),
         });
         const data = await res.json();
-        if (!ignore && res.ok) setEstimate(data);
+        if (!ignore && res.ok) { setEstimate(data); setVehicleType(current => data.estimates[current] ? current : Object.keys(data.estimates)[0]); }
       } catch {
         if (!ignore) toast('Could not estimate fare — check your connection', 'error');
       } finally {
@@ -166,7 +167,7 @@ export default function RiderDashboard() {
     if (!pickup || !dropoff || booking) return;
     setBooking(true);
     try {
-      await book({ pickup, dropoff, vehicleType });
+      await book({ pickup, dropoff, vehicleType, scheduledAt: estimate?.bookingPolicy?.scheduledEnabled && scheduledAt ? new Date(scheduledAt).toISOString() : undefined });
       setUnread(0);
     } catch (err) {
       toast(err.message, 'error', 5000);
@@ -353,6 +354,7 @@ export default function RiderDashboard() {
                   </p>
                 )}
 
+                {estimate.bookingPolicy?.scheduledEnabled && <label className="field mt-4">Schedule pickup (your local time; optional)<input className="input" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /><span className="tiny muted">Up to {estimate.bookingPolicy.maxScheduleDays} days ahead. Leave empty to ride now.</span></label>}
                 <button
                   className="btn btn-primary btn-lg btn-full mt-4"
                   onClick={handleBook}
@@ -373,7 +375,7 @@ export default function RiderDashboard() {
             <div className="pulse-ring" style={{ width: 64, height: 64, margin: '12px auto 20px', borderRadius: '50%', background: 'var(--ink-950)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Car size={26} color="#fff" />
             </div>
-            <h3 style={{ fontSize: '1.15rem' }}>Finding your driver…</h3>
+            <h3 style={{ fontSize: '1.15rem' }}>{ride?.scheduledAt ? `Pickup scheduled for ${new Date(ride.scheduledAt).toLocaleString()}` : 'Finding your driver…'}</h3>
             <p className="small muted mt-1">
               {offersSent > 0
                 ? `Contacting nearby drivers (${offersSent} reached)`

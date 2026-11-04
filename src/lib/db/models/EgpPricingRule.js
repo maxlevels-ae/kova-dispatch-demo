@@ -3,6 +3,7 @@ import { CURRENCY } from '@/lib/currency';
 
 const egpPricingRuleSchema = new mongoose.Schema(
   {
+    history: [{ actor: String, at: Date, value: mongoose.Schema.Types.Mixed }],
     currency: { type: String, enum: [CURRENCY], default: CURRENCY, required: true },
     vehicleType: {
       type: String,
@@ -14,6 +15,7 @@ const egpPricingRuleSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    cancellationFee: { type: Number, min: 0, max: 1000, default: 30 },
     baseFare: {
       type: Number,
       required: true,

@@ -3,6 +3,7 @@ import { CURRENCY } from '@/lib/currency';
 
 const rideSchema = new mongoose.Schema(
   {
+    scheduledAt: Date,
     riderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -70,6 +71,7 @@ const rideSchema = new mongoose.Schema(
       discount: { type: Number, default: 0 },
       platformFee: { type: Number, default: 0 },
       driverEarnings: { type: Number, default: 0 },
+      quotedCancellationFee: { type: Number },
       cancellationFee: { type: Number, default: 0 },
       total: { type: Number, default: 0 },
       estimatedTotal: { type: Number, default: 0 },
@@ -107,6 +109,7 @@ const rideSchema = new mongoose.Schema(
       },
     ],
     dispatch: {
+      manualHold: { type: Boolean, default: false },
       offeredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Driver' }],
       declinedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Driver' }],
       offersSent: { type: Number, default: 0 },

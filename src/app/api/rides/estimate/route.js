@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/helpers';
 import { getRoute } from '@/lib/services/routing';
@@ -34,7 +35,10 @@ export async function POST(request) {
       pickup,
     });
 
+    const settings = await getSettings();
+    for (const type of Object.keys(estimates)) if (!settings.fleet.enabledCategories.includes(type)) delete estimates[type];
     return Response.json({
+      bookingPolicy: { scheduledEnabled: settings.dispatch.scheduledEnabled, maxScheduleDays: settings.dispatch.maxScheduleDays },
       route: {
         distanceMeters: route.distanceMeters,
         durationSeconds: route.durationSeconds,

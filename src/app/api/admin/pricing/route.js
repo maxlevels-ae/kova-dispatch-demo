@@ -7,11 +7,12 @@ import { requireAuth } from '@/lib/auth/helpers';
 const ruleSchema = z.object({
   vehicleType: z.enum(['economy', 'comfort', 'premium', 'xl']),
   city: z.string().trim().min(1).max(60).default('default'),
-  baseFare: z.number().min(0).max(100),
-  perKmRate: z.number().min(0).max(50),
-  perMinRate: z.number().min(0).max(20),
-  minimumFare: z.number().min(0).max(200),
-  bookingFee: z.number().min(0).max(50),
+  cancellationFee: z.number().min(0).max(1000).default(30),
+  baseFare: z.number().min(0).max(10000),
+  perKmRate: z.number().min(0).max(1000),
+  perMinRate: z.number().min(0).max(1000),
+  minimumFare: z.number().min(0).max(10000),
+  bookingFee: z.number().min(0).max(1000),
   platformCommission: z.number().min(0).max(50),
   surgeMultiplierCap: z.number().min(1).max(10),
   isActive: z.boolean().default(true),
@@ -34,8 +35,9 @@ export async function GET() {
 
 // PUT /api/admin/pricing — upsert a rule for (vehicleType, city)
 export async function PUT(request) {
-  const { error } = await requireAuth(['admin']);
+  const { session, error } = await requireAuth(['admin']);
   if (error) return error;
+  if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid origin' }, { status: 403 });
 
   try {
     const body = await request.json();
@@ -53,7 +55,7 @@ export async function PUT(request) {
     await EgpPricingRule.init();
     const rule = await EgpPricingRule.findOneAndUpdate(
       { vehicleType, city },
-      { vehicleType, city, ...rest, currency: CURRENCY },
+      { $set: { vehicleType, city, ...rest, currency: CURRENCY }, $push: { history: { $each: [{ actor: session.user.id, at: new Date(), value: rest }], $slice: -100 } } },
       { new: true, upsert: true, runValidators: true }
     ).lean();
 

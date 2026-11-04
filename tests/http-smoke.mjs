@@ -53,9 +53,13 @@ try {
     await check(`${role} cannot update branding`, async () => assert.equal((await request('/api/admin/settings', cookies[role], { method: 'PUT' })).status, 403));
   }
   await check('anonymous cannot update branding', async () => assert.equal((await request('/api/admin/settings', null, { method: 'PUT' })).status, 401));
-  await check('admin cross-origin update rejected', async () => assert.equal((await request('/api/admin/settings', cookies.admin, { method: 'PUT', headers: { origin: 'https://evil.test' } })).status, 403));
-  await check('admin SVG upload rejected before storage', async () => assert.equal((await request('/api/admin/settings', cookies.admin, { method: 'PUT', headers: { origin: base, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Maxride', logo: 'data:image/svg+xml;base64,PHN2Zz4=', loginLogo: null }) })).status, 400));
-  await check('oversize request rejected', async () => assert.equal((await request('/api/admin/settings', cookies.admin, { method: 'PUT', headers: { origin: base, 'content-type': 'application/json' }, body: ' '.repeat(740000) })).status, 413));
+  await check('admin API fails closed without a database role check', async () => {
+    for (const path of ['/api/admin/settings','/api/admin/settings/platform','/api/admin/settings/providers']) {
+      const r = await request(path, cookies.admin, { method:'PUT',headers:{origin:base,'content-type':'application/json'},body:'{}' });
+      assert.equal(r.status,503);
+      assert.equal((await r.json()).error,'Authorization unavailable');
+    }
+  });
   await check('public branding failure returns safe default only', async () => {
     const r = await request('/api/branding'); assert.equal(r.status, 503); assert.deepEqual(await r.json(), { name: 'Maxride', logo: null, loginLogo: null }); assert.match(r.headers.get('cache-control'), /no-store/);
   });

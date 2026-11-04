@@ -51,6 +51,7 @@ const driverSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    suspensionReason: { type: String, maxlength: 300 },
     isApproved: {
       type: Boolean,
       default: false,

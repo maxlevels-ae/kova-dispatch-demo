@@ -102,6 +102,7 @@ export async function findBestDriver({
             },
           },
         },
+        { $match: { distance: { $lte: maxRadiusKm * 1000 } } },
         { $sort: { matchScore: -1 } },
         { $limit: 5 },
       ]);
@@ -130,7 +131,7 @@ async function findBestDriverGeoNear({
   excludeDriverIds = [],
 }) {
   // Try expanding radius: 2km → 5km → maxRadiusKm
-  const radiusTiers = [2000, 5000, maxRadiusKm * 1000];
+  const radiusTiers = [...new Set([2000, 5000, maxRadiusKm * 1000].map(r => Math.min(r, maxRadiusKm * 1000)))];
   const excludeObjectIds = excludeDriverIds.map((id) =>
     typeof id === 'string' ? new mongoose.Types.ObjectId(id) : id
   );
@@ -181,7 +182,8 @@ async function findBestDriverGeoNear({
           },
         },
       },
-      { $sort: { matchScore: -1 } },
+      { $match: { distance: { $lte: maxRadiusKm * 1000 } } },
+        { $sort: { matchScore: -1 } },
       { $limit: 5 },
     ]);
 

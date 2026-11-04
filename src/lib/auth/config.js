@@ -1,3 +1,4 @@
+import { getSettings } from '@/lib/settings';
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
@@ -63,6 +64,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
+        token.policyExpiresAt = Date.now() + (await getSettings()).security.sessionHours * 3600000;
         token.id = user.id;
         token.role = user.role;
         token.username = user.username;
@@ -78,6 +80,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
+      if (token?.policyExpiresAt && Date.now() > token.policyExpiresAt) { session.user = undefined; return session; }
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;

@@ -8,6 +8,9 @@ import { formatDate } from '@/lib/utils/geo';
 const STATUSES = ['', 'searching', 'accepted', 'arrived', 'in_progress', 'completed', 'cancelled', 'no_drivers'];
 
 export default function AdminRidesPage() {
+  const [dispatchMessage, setDispatchMessage] = useState('');
+  const [dispatchBusy, setDispatchBusy] = useState(false);
+  async function dispatchRide(rideId) { setDispatchBusy(true); try { const r = await fetch('/api/admin/rides', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rideId }) }); const d = await r.json(); if (!r.ok) throw Error(d.error); setDispatchMessage('Dispatch requested. Refresh the ride list to see progress.'); } catch (e) { setDispatchMessage(e.message); } finally { setDispatchBusy(false); } }
   const [rides, setRides] = useState(null);
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
@@ -35,7 +38,7 @@ export default function AdminRidesPage() {
 
   return (
     <div className="content-pad">
-      <h1 className="page-title">Rides</h1>
+      <h1 className="page-title">Rides</h1><p role="status">{dispatchMessage}</p>
       <p className="page-sub mb-6">Every trip on the platform</p>
 
       <div className="flex gap-2 wrap mb-4">
@@ -81,7 +84,7 @@ export default function AdminRidesPage() {
                   <td className="small mono-nums" style={{ fontWeight: 600 }}>
                     {r.status === 'completed' ? money(r.fare?.total, r.fare?.currency ?? null) : '—'}
                   </td>
-                  <td><RideStatusBadge status={r.status} /></td>
+                  <td><RideStatusBadge status={r.status} />{r.status === 'searching' && <button className="btn btn-secondary btn-sm" disabled={dispatchBusy} onClick={() => dispatchRide(r._id)}>Dispatch now</button>}</td>
                 </tr>
               ))}
             </tbody>

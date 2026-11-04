@@ -1,68 +1,358 @@
-'use client';
-/* eslint-disable @next/next/no-img-element -- Validated inline logo previews cannot use image optimization. */
-import { useEffect, useState } from 'react';
-import { useBranding } from '@/context/BrandingProvider';
-import { DEFAULT_BRANDING, MAX_LOGO_BYTES } from '@/lib/branding';
-import { KovaIcon } from '@/components/brand/KovaLogo';
-import { useToast } from '@/components/ui/Toast';
+"use client";
+import { useEffect, useState } from "react";
+import { categories, events } from "@/lib/settings-schema";
+import ProviderSettings from "@/components/ProviderSettings";
+import BrandingSettings from "@/components/BrandingSettings";
+import PricingSettings from "@/app/admin/pricing/page";
+const tabs = [
+  "General & Branding",
+  "Bookings & Dispatch",
+  "Drivers & Fleet",
+  "Payment Gateways",
+  "Notifications",
+  "Pricing & Commission",
+  "Maps & Service Zones",
+  "Users & Security",
+  "Integrations",
+  "System & Monitoring",
+];
+const sections = {
+  1: "dispatch",
+  2: "fleet",
+  4: "notifications",
+  6: "maps",
+  7: "security",
+};
+const labels = {
+  maxDailyTrips: "Maximum trips in 24 hours (0 = unlimited)",
+  suspensionReasonRequired: "Require a suspension reason",
+  assignmentMode: "Assignment mode",
+  fallback: "Dispatch fallback",
+  scheduledEnabled: "Allow scheduled bookings",
+  maxScheduleDays: "Maximum days in advance",
+  searchRadiusKm: "Driver search radius (km)",
+  acceptanceSeconds: "Acceptance timeout (seconds)",
+  maxAttempts: "Maximum assignment attempts",
+  maxTripKm: "Maximum trip distance (km)",
+  serviceStartHour: "Service start hour (Africa/Cairo)",
+  serviceEndHour: "Service end hour (Africa/Cairo)",
+  enabledCategories: "Enabled vehicle categories",
+  requiredDocuments: "Required verified documents",
+  maxDebtEGP: "Maximum driver debt (EGP)",
+  sessionHours: "Session duration for new logins (hours)",
+  enabledEvents: "Enabled notification events",
+  restrictPickup: "Restrict pickups to boundary",
+  restrictDropoff: "Restrict dropoffs to boundary",
+  south: "Southern latitude",
+  north: "Northern latitude",
+  west: "Western longitude",
+  east: "Eastern longitude",
+};
 export default function SettingsPage() {
-  const { branding, setBranding } = useBranding();
-  const [draft, setDraft] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const toast = useToast();
+  const [tab, setTab] = useState(0),
+    [data, setData] = useState(null),
+    [records, setRecords] = useState([]),
+    [message, setMessage] = useState(""),
+    [busy, setBusy] = useState(false),
+    [health, setHealth] = useState(null);
   useEffect(() => {
-    fetch('/api/branding', { cache: 'no-store' }).then(async r => {
-      if (!r.ok) throw new Error('Unable to load saved branding. Reload to try again.');
-      setDraft(await r.json());
-    }).catch(e => setLoadError(e.message));
+    fetch("/api/admin/settings/platform")
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw Error(d.error);
+        setData(d.settings);
+        setRecords(d.records);
+      })
+      .catch((e) => setMessage(e.message));
   }, []);
-  async function choose(key, file) {
-    if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > MAX_LOGO_BYTES) {
-      toast('Choose a PNG, JPEG or WebP logo up to 256 KB.', 'error'); return;
-    }
-    try {
-      const value = await new Promise((resolve, reject) => {
-        const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject; reader.readAsDataURL(file);
-      });
-      setDraft(d => ({ ...d, [key]: value }));
-    } catch { toast('Could not read this image.', 'error'); }
-  }
+  const section = sections[tab];
   async function save(e) {
-    e.preventDefault(); setBusy(true);
+    e.preventDefault();
+    setBusy(true);
+    setMessage("");
     try {
-      const r = await fetch('/api/admin/settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Unable to save branding');
-      setBranding(data); setDraft(data); toast('Branding saved', 'success');
-    } catch (e) { toast(e.message, 'error'); } finally { setBusy(false); }
+      const revision = records.find((r) => r._id === section)?.revision || 0;
+      const r = await fetch("/api/admin/settings/platform", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, value: data[section], revision }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw Error(d.error);
+      setRecords((rs) => [
+        ...rs.filter((x) => x._id !== section),
+        { _id: section, revision: d.revision },
+      ]);
+      setMessage("Settings saved.");
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
-  if (!draft) return <div className="content-pad" role="status">{loadError || 'Loading settings…'}</div>;
-  return <div className="content-pad" style={{ maxWidth: 900 }}>
-    <h1 className="page-title">Settings</h1>
-    <p className="page-sub mb-6">Manage the branding customers and drivers see across Maxride.</p>
-    <form onSubmit={save} className="flex-col gap-4">
-      <section className="card card-pad">
-        <h2 className="mb-4">Brand identity</h2>
-        <div className="field"><label htmlFor="brand-name">Company / brand display name</label><input id="brand-name" className="input" maxLength={60} required value={draft.name} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} /></div>
-      </section>
-      <div className="grid-2">
-        {[['logo', 'Main company logo'], ['loginLogo', 'Login-page logo (optional)']].map(([key, title]) => <section key={key} className="card card-pad" style={{ minWidth: 0 }}>
-          <h3>{title}</h3><p className="small muted mt-2">{draft[key] ? 'Custom logo' : key === 'loginLogo' ? 'Uses the main company logo' : 'Original default logo'}</p>
-          <div className="flex items-center justify-center mt-4 mb-4" style={{ minHeight: 130, background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 12 }}>
-            {draft[key] || (key === 'loginLogo' && draft.logo) ? <img src={draft[key] || draft.logo} alt={`${title} preview`} style={{ maxWidth: '100%', maxHeight: 110, objectFit: 'contain' }} /> : <KovaIcon size={64} />}
-          </div>
-          <label className="field">{draft[key] ? 'Replace logo' : 'Upload logo'}<input style={{ maxWidth: '100%' }} type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={e => { choose(key, e.target.files?.[0]); e.target.value = ''; }} /></label>
-          <p className="tiny muted mt-2">PNG, JPEG or WebP · 256 KB maximum · static images only</p>
-          {draft[key] && <button className="btn btn-secondary btn-sm mt-3" type="button" disabled={busy} onClick={() => setDraft({ ...draft, [key]: null })}>Remove uploaded logo</button>}
-        </section>)}
+  function change(key, value) {
+    setData((d) => ({ ...d, [section]: { ...d[section], [key]: value } }));
+  }
+  async function refreshHealth() {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/admin/settings/monitoring");
+      const d = await r.json();
+      if (!r.ok) throw Error(d.error);
+      setHealth(d);
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="content-pad" style={{ maxWidth: 1200 }}>
+      <h1 className="page-title">Platform settings</h1>
+      <p className="page-sub">
+        Manage Maxride operations. Financial history remains in its original
+        currency.
+      </p>
+      <div
+        role="tablist"
+        aria-label="Settings sections"
+        className="flex gap-2 mb-4"
+        style={{ flexWrap: "wrap" }}
+      >
+        {tabs.map((name, i) => (
+          <button
+            key={name}
+            role="tab"
+            aria-selected={tab === i}
+            className={`btn btn-sm ${tab === i ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => {
+              setTab(i);
+              setMessage("");
+            }}
+          >
+            {name}
+          </button>
+        ))}
       </div>
-      <div className="flex gap-3" style={{ flexWrap: 'wrap' }}>
-        <button className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setDraft(branding)}>Cancel</button>
-        <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => setDraft({ ...DEFAULT_BRANDING })}>Restore default branding</button>
+      <p role="status">{message}</p>
+      <div role="tabpanel" aria-label={tabs[tab]}>
+        {tab === 0 && <BrandingSettings />}
+        {tab === 5 && <PricingSettings />}
+        {section && data && (
+          <form onSubmit={save} className="card card-pad">
+            <h2 className="mb-4">{tabs[tab]}</h2>
+            {tab === 1 && (
+              <p className="muted mb-4">
+                Manual mode holds bookings for admin dispatch. Drivers still
+                accept offers. Scheduled bookings dispatch after their requested
+                time; one active booking per rider remains enforced.
+              </p>
+            )}
+            {tab === 2 && (
+              <p className="muted mb-4">
+                Admin approval is mandatory. Suspension prevents new
+                availability; active trips retain their settlement path.
+              </p>
+            )}
+            {tab === 4 && (
+              <p className="muted mb-4">
+                In-app ride notifications are reconciled by the background
+                worker and on inbox refresh. Email, SMS, WhatsApp and push: Not
+                configured.
+              </p>
+            )}
+            {tab === 6 && (
+              <p className="muted mb-4">
+                Rectangular service boundary. Existing map and routing
+                implementation remains active.
+              </p>
+            )}
+            {Object.entries(data[section]).map(([key, value]) => (
+              <div className="field" key={key}>
+                <label htmlFor={key}>{labels[key] || key}</label>
+                {["assignmentMode", "fallback", "routingMode"].includes(key) ? (
+                  <select
+                    id={key}
+                    className="input"
+                    value={value}
+                    disabled={busy}
+                    onChange={(e) => change(key, e.target.value)}
+                  >
+                    {(key === "assignmentMode"
+                      ? ["automatic", "manual"]
+                      : key === "routingMode"
+                        ? ["osrm", "estimate"]
+                        : ["no_drivers", "manual"]
+                    ).map((v) => (
+                      <option key={v} value={v}>
+                        {v.replaceAll("_", " ")}
+                      </option>
+                    ))}
+                  </select>
+                ) : Array.isArray(value) ? (
+                  <div>
+                    {(key === "enabledCategories"
+                      ? categories
+                      : key === "enabledEvents"
+                        ? events
+                        : [
+                            "license",
+                            "insurance",
+                            "registration",
+                            "background_check",
+                            "profile_photo",
+                          ]
+                    ).map((option) => (
+                      <label key={option} className="flex gap-2">
+                        <input
+                          type="checkbox"
+                        style={{ width: 'auto', alignSelf: 'flex-start' }}
+                          disabled={busy}
+                          checked={value.includes(option)}
+                          onChange={(e) =>
+                            change(
+                              key,
+                              e.target.checked
+                                ? [...value, option]
+                                : value.filter((x) => x !== option),
+                            )
+                          }
+                        />
+                        {option.replaceAll("_", " ")}
+                      </label>
+                    ))}
+                  </div>
+                ) : key === "templates" ? (
+                  Object.entries(value).map(([event, text]) => (
+                    <label key={event} className="field">
+                      {event}
+                      <input
+                        className="input"
+                        maxLength={300}
+                        value={text}
+                        disabled={busy}
+                        onChange={(e) =>
+                          change(key, { ...value, [event]: e.target.value })
+                        }
+                      />
+                    </label>
+                  ))
+                ) : typeof value === "boolean" ? (
+                  <input
+                    id={key}
+                    type="checkbox"
+                        style={{ width: 'auto', alignSelf: 'flex-start' }}
+                    checked={value}
+                    disabled={busy}
+                    onChange={(e) => change(key, e.target.checked)}
+                  />
+                ) : (
+                  <input
+                    id={key}
+                    className="input"
+                    type={typeof value === "number" ? "number" : "text"}
+                    step="any"
+                    required={!Array.isArray(value)}
+                    disabled={busy}
+                    value={
+                      ["assignmentMode", "fallback", "routingMode"].includes(
+                        key,
+                      ) ? (
+                        <select
+                          id={key}
+                          className="input"
+                          value={value}
+                          disabled={busy}
+                          onChange={(e) => change(key, e.target.value)}
+                        >
+                          {(key === "assignmentMode"
+                            ? ["automatic", "manual"]
+                            : key === "routingMode"
+                              ? ["osrm", "estimate"]
+                              : ["no_drivers", "manual"]
+                          ).map((v) => (
+                            <option key={v} value={v}>
+                              {v.replaceAll("_", " ")}
+                            </option>
+                          ))}
+                        </select>
+                      ) : Array.isArray(value) ? (
+                        value.join(", ")
+                      ) : (
+                        value
+                      )
+                    }
+                    onChange={(e) =>
+                      change(
+                        key,
+                        Array.isArray(value)
+                          ? e.target.value
+                              .split(",")
+                              .map((x) => x.trim())
+                              .filter(Boolean)
+                          : typeof value === "number"
+                            ? Number(e.target.value)
+                            : e.target.value,
+                      )
+                    }
+                  />
+                )}
+              </div>
+            ))}
+            <button className="btn btn-primary" disabled={busy}>
+              {busy ? "Saving…" : "Save settings"}
+            </button>
+          </form>
+        )}
+        {section && !data && (
+          <p>Settings unavailable or loading. Reload to retry.</p>
+        )}
+        {tab === 3 && <ProviderSettings kind="payment" />}
+        {tab === 7 && (
+          <section className="card card-pad mt-4">
+            <h3>Access and audit</h3>
+            <p>
+              Only admins may edit settings. Riders and drivers cannot access
+              settings APIs.
+            </p>
+            {records.map((r) => (
+              <div key={r._id}>
+                <strong>
+                  {r._id} · revision {r.revision}
+                </strong>
+                {r.history
+                  ?.slice(-5)
+                  .reverse()
+                  .map((h, i) => (
+                    <p key={i} className="tiny">
+                      {new Date(h.at).toLocaleString()} · {h.actor} ·{" "}
+                      {h.fields.join(", ")}
+                    </p>
+                  ))}
+              </div>
+            ))}
+          </section>
+        )}
+        {tab === 8 && <ProviderSettings kind="notification" />}
+        {tab === 9 && (
+          <section className="card card-pad">
+            <h2>System & Monitoring</h2>
+            <button
+              className="btn btn-secondary mt-4"
+              disabled={busy}
+              onClick={refreshHealth}
+            >
+              {busy ? "Checking…" : "Refresh health"}
+            </button>
+            {health && <div className="grid-2 mt-4">{Object.entries(health.checks).map(([name,status])=><article className="card card-pad" key={name}><h3>{name === 'mongo' ? 'MongoDB' : name === 'redis' ? 'Redis' : 'Socket.IO'}</h3><p className={status === 'up' ? 'badge badge-success' : 'badge badge-warning'}>{status}</p></article>)}<article className="card card-pad"><h3>Notification queue</h3><p>Worker: {health.notifications.worker}</p>{health.notifications.queue.map(q=><p key={q._id}>{q._id}: {q.count}</p>)}<p className="small muted">Version {health.version}</p></article></div>}
+            {health && (
+              <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
+                {JSON.stringify(health, null, 2)}
+              </pre>
+            )}
+          </section>
+        )}
       </div>
-    </form>
-  </div>;
+    </div>
+  );
 }

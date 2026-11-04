@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+import { startDispatch } from '@/lib/realtime/dispatch';
 import connectDB from '@/lib/db/mongodb';
 import Ride from '@/lib/db/models/Ride';
 import { requireAuth } from '@/lib/auth/helpers';
@@ -38,4 +40,19 @@ export async function GET(request) {
     console.error('Admin rides error:', err);
     return Response.json({ error: 'Failed to fetch rides' }, { status: 500 });
   }
+}
+
+// Manual dispatch initiates the existing safe offer cascade; drivers must still accept.
+export async function POST(request) {
+ const { error } = await requireAuth(['admin']); if (error) return error;
+ if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid origin' }, { status: 403 });
+ try {
+ const { rideId } = await request.json();
+ if (!mongoose.isValidObjectId(rideId)) return Response.json({ error: 'Invalid ride' }, { status: 400 });
+ await connectDB();
+ const ride = await Ride.findOneAndUpdate({ _id: rideId, status: 'searching', $or: [{ scheduledAt: null }, { scheduledAt: { $lte: new Date() } }] }, { $set: { 'dispatch.manualHold': false } }, { returnDocument: 'after' });
+ if (!ride) return Response.json({ error: 'Ride is not ready for dispatch' }, { status: 409 });
+ startDispatch(rideId, { manual: true }).catch(() => console.error('[Dispatch] Manual cascade failed'));
+ return Response.json({ ok: true }, { status: 202 });
+ } catch { return Response.json({ error: 'Dispatch failed' }, { status: 503 }); }
 }
