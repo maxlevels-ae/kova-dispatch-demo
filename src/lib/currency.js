@@ -1,3 +1,4 @@
+import {customerLocale} from './i18n';
 export const CURRENCY = 'EGP';
 export const COUNTRY = 'EG';
 export const COUNTRY_NAME = 'Egypt';
@@ -9,7 +10,7 @@ export const PAYMENT_LIMITATION = 'Card payments and bank payouts are unavailabl
 export function money(amount, currency = CURRENCY) {
   const value = Number(amount ?? 0);
   if (!currency) return `${value.toFixed(2)} (currency unverified)`;
-  return new Intl.NumberFormat(CURRENCY_LOCALE, { style: 'currency', currency: currency.toUpperCase(), currencyDisplay: 'code', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).replace('EGP', CURRENCY_SYMBOL);
+  return new Intl.NumberFormat(customerLocale(), { style: 'currency', currency: currency.toUpperCase(), currencyDisplay: 'code', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).replace('EGP', customerLocale()==='ar-EG'?'ج.م.':CURRENCY_SYMBOL);
 }
 export function minorUnits(amount) {
   if (!Number.isFinite(amount)) throw new Error('Invalid monetary amount');

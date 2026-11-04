@@ -766,6 +766,7 @@ export function AccountDetail({ id }) {
               </span>
             </div>
           ))}
+          <Link href={'/admin/deliveries?userId='+id} className="btn btn-secondary">View delivery history</Link>
           <h3>Audit history</h3>
           {data.audit.map((a) => (
             <div className="account-history" key={a._id}>

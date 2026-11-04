@@ -1,0 +1,4 @@
+import {z} from 'zod';
+import Driver from '@/lib/db/models/Driver';
+import {deliveryGuard,deliveryBody,deliveryFailure} from '@/lib/delivery-http';
+export async function PUT(request){const {session,error}=await deliveryGuard(request,['driver']);if(error)return error;try{const result=z.object({rides:z.boolean(),deliveries:z.boolean()}).strict().refine(v=>v.rides||v.deliveries,'Select at least one service').safeParse(await deliveryBody(request));if(!result.success)return Response.json({error:result.error.issues[0].message},{status:400});const driver=await Driver.findOneAndUpdate({userId:session.user.id,currentRideId:null,currentDeliveryId:null},{$set:{services:result.data}},{returnDocument:'after'});if(!driver)return Response.json({error:'Finish your current assignment first'},{status:409});return Response.json({services:driver.services});}catch(e){return deliveryFailure(e);}}

@@ -1,3 +1,4 @@
+import {customerLocale,t} from '../i18n';
 /**
  * Geo utility functions for distance calculation and coordinate helpers
  */
@@ -56,9 +57,9 @@ export function etaMinutes(meters, speedKmh = 25) {
  */
 export function formatDistance(meters) {
   if (meters < 1000) {
-    return `${Math.round(meters)} m`;
+    return t(`${Math.round(meters)} m`);
   }
-  return `${(meters / 1000).toFixed(1)} km`;
+  return t(`${(meters / 1000).toFixed(1)} km`);
 }
 
 /**
@@ -68,15 +69,15 @@ export function formatDistance(meters) {
  */
 export function formatDuration(seconds) {
   if (seconds < 60) {
-    return `${Math.round(seconds)} sec`;
+    return t(`${Math.round(seconds)} sec`);
   }
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
-    return `${minutes} min`;
+    return t(`${minutes} min`);
   }
   const hours = Math.floor(minutes / 60);
   const remainingMins = minutes % 60;
-  return `${hours}h ${remainingMins}m`;
+  return t(`${hours}h ${remainingMins}m`);
 }
 
 /**
@@ -100,12 +101,12 @@ export function formatRelativeTime(date) {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
 
-  if (seconds < 60) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
+  if (seconds < 60) return t('Just now');
+  if (minutes < 60) return t(`${minutes}m ago`);
+  if (hours < 24) return t(`${hours}h ago`);
+  if (days < 7) return t(`${days}d ago`);
 
-  return new Date(date).toLocaleDateString('en-US', {
+  return new Date(date).toLocaleDateString(customerLocale(), {
     month: 'short',
     day: 'numeric',
     year: days > 365 ? 'numeric' : undefined,
@@ -118,7 +119,7 @@ export function formatRelativeTime(date) {
  * @returns {string}
  */
 export function formatDate(date) {
-  return new Date(date).toLocaleDateString('en-US', {
+  return new Date(date).toLocaleDateString(customerLocale(), {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

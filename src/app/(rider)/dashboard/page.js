@@ -1,5 +1,9 @@
 'use client';
+import {t as tr,customerLocale} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 import AssignedVehicleCard from '@/components/ride/AssignedVehicleCard';
+import ServiceChoices from '@/components/delivery/ServiceChoices';
+import useServiceAvailability from '@/hooks/useServiceAvailability';
 import { LATE_CANCEL_FEE, LEGACY_USD_CANCEL_FEE } from '@/lib/currency';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -33,6 +37,8 @@ const CANCEL_REASONS = [
 ];
 
 export default function RiderDashboard() {
+  useI18n();
+  const services=useServiceAvailability();
   const toast = useToast();
   const { position: geo, error: geoError } = useGeolocation({ watch: false });
 
@@ -249,20 +255,21 @@ export default function RiderDashboard() {
 
   return (
     <div className="ride-page">
+      {phase==='idle'&&<ServiceChoices services={services}/>}
       <div className="map-fill">
         <MapView center={center} zoom={13} {...mapProps} />
       </div>
 
       <div className="ride-panel">
+        {phase==='idle'&&!loadingActive&&!services&&<div className="card card-pad" role="status">{tr('Loading available services…')}</div>}
+        {phase==='idle'&&!loadingActive&&services&&!services.taxiEnabled&&<div className="card card-pad" role="status"><h2>{tr(services.deliveryEnabled?'Send a Package':'Services are temporarily unavailable.')}</h2><p>{tr('Taxi bookings are currently paused.')}</p>{services.deliveryEnabled&&<Link className="btn btn-primary mt-3" href="/deliveries/new">{tr('Send a Package')}</Link>}</div>}
         {/* ── IDLE: booking form ── */}
-        {phase === 'idle' && !loadingActive && (
+        {phase === 'idle' && !loadingActive && services?.taxiEnabled && (
           <div className="card card-pad animate-in">
-            <h2 style={{ fontSize: '1.25rem', marginBottom: 14 }}>Where to?</h2>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: 14 }}>{tr("Where to?")}</h2>
 
             {geoError && !pickup && (
-              <p className="tiny muted mb-3">
-                Location access is off — search for your pickup point instead.
-              </p>
+              <p className="tiny muted mb-3">{tr("Location access is off — search for your pickup point instead.")}</p>
             )}
 
             <div className="flex-col gap-3">
@@ -271,7 +278,7 @@ export default function RiderDashboard() {
                 onChangeText={(t) => { setPickupText(t); if (pickup) setPickup(null); }}
                 onSelect={(r) => { setPickup(r); setPickupText(r.address); }}
                 committedValue={pickup?.address}
-                placeholder="Pickup location"
+                placeholder={tr("Pickup location")}
                 icon={Circle}
                 bias={geo || undefined}
               />
@@ -280,7 +287,7 @@ export default function RiderDashboard() {
                 onChangeText={(t) => { setDropoffText(t); if (dropoff) setDropoff(null); }}
                 onSelect={(r) => { setDropoff(r); setDropoffText(r.address); }}
                 committedValue={dropoff?.address}
-                placeholder="Where are you going?"
+                placeholder={tr("Where are you going?")}
                 icon={MapPin}
                 bias={geo || undefined}
                 autoFocus={Boolean(pickup)}
@@ -289,20 +296,18 @@ export default function RiderDashboard() {
 
             {estimating && (
               <div className="flex items-center gap-2 mt-4 muted small">
-                <span className="spinner" /> Calculating fares…
-              </div>
+                <span className="spinner" />{tr("Calculating fares…")}</div>
             )}
 
             {estimate && !estimating && (
               <>
                 <div className="flex items-center justify-between mt-4 mb-2">
                   <span className="tiny muted">
-                    {formatDistance(estimate.route.distanceMeters)} · {formatDuration(estimate.route.durationSeconds)}
+                    {tr(formatDistance(estimate.route.distanceMeters))} · {tr(formatDuration(estimate.route.durationSeconds))}
                   </span>
                   {surge && (
                     <span className="badge badge-warning">
-                      <TrendingUp size={12} /> {selectedFare.surgeMultiplier}× demand
-                    </span>
+                      <TrendingUp size={12} /> {tr(selectedFare.surgeMultiplier)}{' '}{tr("× demand")}</span>
                   )}
                 </div>
 
@@ -319,11 +324,11 @@ export default function RiderDashboard() {
                         <Meta.icon size={22} style={{ color: vehicleType === type ? 'var(--gold-600)' : 'var(--ink-400)', flexShrink: 0 }} />
                         <span className="flex-1" style={{ minWidth: 0 }}>
                           <span className="small" style={{ display: 'block', fontWeight: 700 }}>
-                            {VEHICLE_LABELS[type]}
+                            {tr(VEHICLE_LABELS[type])}
                           </span>
-                          <span className="tiny muted truncate" style={{ display: 'block' }}>{Meta.blurb}</span>
+                          <span className="tiny muted truncate" style={{ display: 'block' }}>{tr(Meta.blurb)}</span>
                         </span>
-                        <span className="small mono-nums" style={{ fontWeight: 700 }}>{money(fare.total, fare.currency ?? null)}</span>
+                        <span className="small mono-nums" style={{ fontWeight: 700 }}>{tr(money(fare.total, fare.currency ?? null))}</span>
                       </button>
                     );
                   })}
@@ -335,31 +340,25 @@ export default function RiderDashboard() {
                   style={{ padding: '10px 14px', background: 'var(--ink-50)', borderRadius: 12 }}
                 >
                   <span className="flex items-center gap-2 tiny" style={{ fontWeight: 600 }}>
-                    <Wallet size={16} /> Paying with wallet
-                  </span>
+                    <Wallet size={16} />{tr("Paying with wallet")}</span>
                   <span className="tiny mono-nums muted">
-                    {walletBalance != null ? money(walletBalance, walletCurrency) : '—'}
+                    {tr(walletBalance != null ? money(walletBalance, walletCurrency) : '—')}
                   </span>
                 </div>
 
                 {insufficientWallet && (
-                  <p className="tiny mt-2" style={{ color: 'var(--danger)' }}>
-                    Wallet balance too low —{' '}
-                    <Link href="/wallet" style={{ fontWeight: 700, textDecoration: 'underline' }}>
-                      add funds
-                    </Link>{' '}
-                    to book this ride.
-                  </p>
+                  <p className="tiny mt-2" style={{ color: 'var(--danger)' }}>{tr("Wallet balance too low —")}{' '}{tr(' ')}
+                    <Link href="/wallet" style={{ fontWeight: 700, textDecoration: 'underline' }}>{tr("add funds")}</Link>{tr(' ')}{' '}{tr("to book this ride.")}</p>
                 )}
 
-                {estimate.bookingPolicy?.scheduledEnabled && <label className="field mt-4">Schedule pickup (your local time; optional)<input className="input" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /><span className="tiny muted">Up to {estimate.bookingPolicy.maxScheduleDays} days ahead. Leave empty to ride now.</span></label>}
+                {estimate.bookingPolicy?.scheduledEnabled && <label className="field mt-4">{tr("Schedule pickup (your local time; optional)")}<input className="input" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /><span className="tiny muted">{tr("Up to")}{' '}{tr(estimate.bookingPolicy.maxScheduleDays)}{' '}{tr("days ahead. Leave empty to ride now.")}</span></label>}
                 <button
                   className="btn btn-primary btn-lg btn-full mt-4"
                   onClick={handleBook}
                   disabled={booking || insufficientWallet}
                 >
                   {booking ? <span className="spinner" /> : (
-                    <>Book {VEHICLE_LABELS[vehicleType]} · {money(selectedFare?.total || 0)}</>
+                    <>{tr("Book")}{' '}{tr(VEHICLE_LABELS[vehicleType])} · {tr(money(selectedFare?.total || 0))}</>
                   )}
                 </button>
               </>
@@ -373,7 +372,7 @@ export default function RiderDashboard() {
             <div className="pulse-ring" style={{ width: 64, height: 64, margin: '12px auto 20px', borderRadius: '50%', background: 'var(--ink-950)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Car size={26} color="#fff" />
             </div>
-            <h3 style={{ fontSize: '1.15rem' }}>{ride?.scheduledAt ? `Pickup scheduled for ${new Date(ride.scheduledAt).toLocaleString()}` : 'Finding your driver…'}</h3>
+            <h3 style={{ fontSize: '1.15rem' }}>{tr(ride?.scheduledAt ? `Pickup scheduled for ${new Date(ride.scheduledAt).toLocaleString(customerLocale())}` : 'Finding your driver…')}</h3>
             <p className="small muted mt-1">
               {offersSent > 0
                 ? `Contacting nearby drivers (${offersSent} reached)`
@@ -382,9 +381,7 @@ export default function RiderDashboard() {
             <button
               className="btn btn-secondary btn-full mt-6"
               onClick={() => setCancelOpen(true)}
-            >
-              Cancel request
-            </button>
+            >{tr("Cancel request")}</button>
           </div>
         )}
 
@@ -393,19 +390,19 @@ export default function RiderDashboard() {
           <div className="card card-pad animate-in">
             <div className="flex items-center justify-between mb-3 wrap gap-2">
               <span className={`badge badge-dot ${ride.status === 'in_progress' ? 'badge-info' : 'badge-gold'}`}>
-                {ride.status === 'accepted' &&
+                {tr(ride.status === 'accepted' &&
                   (liveTrip
                     ? `Driver ${liveTrip.minutes} min away`
                     : etaMinutes
                       ? `Driver arriving in ~${etaMinutes} min`
-                      : 'Driver on the way')}
-                {ride.status === 'arrived' && 'Your driver is here'}
-                {ride.status === 'in_progress' &&
-                  (liveTrip ? `${liveTrip.minutes} min to destination` : 'Heading to destination')}
+                      : 'Driver on the way'))}
+                {tr(ride.status === 'arrived' && 'Your driver is here')}
+                {tr(ride.status === 'in_progress' &&
+                  (liveTrip ? `${liveTrip.minutes} min to destination` : 'Heading to destination'))}
               </span>
               {liveTrip && (
                 <span className="tiny muted mono-nums">
-                  {formatDistance(liveTrip.meters)} {liveTrip.toDestination ? 'remaining' : 'away'}
+                  {tr(formatDistance(liveTrip.meters))} {tr(liveTrip.toDestination ? 'remaining' : 'away')}
                 </span>
               )}
             </div>
@@ -451,15 +448,15 @@ export default function RiderDashboard() {
               >
                 <div className="flex items-center gap-2">
                   <ShieldCheck size={18} style={{ color: 'var(--gold-700)' }} />
-                  <span className="small" style={{ fontWeight: 600 }}>Your PIN</span>
+                  <span className="small" style={{ fontWeight: 600 }}>{tr("Your PIN")}</span>
                 </div>
                 <button
                   className="flex items-center gap-2"
                   onClick={() => { navigator.clipboard?.writeText(ride.pin); toast('PIN copied', 'info', 1500); }}
-                  aria-label="Copy PIN"
+                  aria-label={tr("Copy PIN")}
                   style={{ fontWeight: 800, fontSize: '1.3rem', letterSpacing: '0.25em', color: 'var(--gold-700)' }}
                 >
-                  {ride.pin} <Copy size={14} />
+                  {tr(ride.pin)} <Copy size={14} />
                 </button>
               </div>
             )}
@@ -474,15 +471,15 @@ export default function RiderDashboard() {
                 <span className="truncate muted">{ride.dropoff.address}</span>
               </div>
               <div className="flex items-center justify-between mt-2">
-                <span className="muted">Trip</span>
+                <span className="muted">{tr("Trip")}</span>
                 <span className="mono-nums">
-                  {formatDistance(ride.route?.distanceMeters || 0)} ·{' '}
-                  {formatDuration(ride.route?.durationSeconds || 0)}
+                  {tr(formatDistance(ride.route?.distanceMeters || 0))} ·{tr(' ')}
+                  {tr(formatDuration(ride.route?.durationSeconds || 0))}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="muted">Fare (wallet)</span>
-                <span className="mono-nums" style={{ fontWeight: 700 }}>{money(ride.fare?.total, ride.fare?.currency ?? null)}</span>
+                <span className="muted">{tr("Fare (wallet)")}</span>
+                <span className="mono-nums" style={{ fontWeight: 700 }}>{tr(money(ride.fare?.total, ride.fare?.currency ?? null))}</span>
               </div>
             </div>
 
@@ -492,27 +489,23 @@ export default function RiderDashboard() {
                 onClick={() => { setChatOpen(true); setUnread(0); }}
                 style={{ position: 'relative' }}
               >
-                <MessageCircle size={17} /> Chat
-                {unread > 0 && (
+                <MessageCircle size={17} />{tr("Chat")}{' '}{unread > 0 && (
                   <span
                     className="badge badge-danger"
                     style={{ position: 'absolute', top: -6, right: -4, minWidth: 20, justifyContent: 'center', padding: '1px 6px' }}
                   >
-                    {unread}
+                    {tr(unread)}
                   </span>
                 )}
               </button>
               {ride.status !== 'in_progress' && (
                 <button className="btn btn-danger flex-1" onClick={() => setCancelOpen(true)}>
-                  <X size={17} /> Cancel
-                </button>
+                  <X size={17} />{tr("Cancel")}</button>
               )}
             </div>
 
             {ride.status === 'arrived' && (
-              <p className="tiny muted mt-3 text-center">
-                Cancelling now includes a {money(ride.fare?.currency === 'EGP' ? LATE_CANCEL_FEE : LEGACY_USD_CANCEL_FEE, ride.fare?.currency ?? null)} late-cancel fee
-              </p>
+              <p className="tiny muted mt-3 text-center">{tr("Cancelling now includes a")}{' '}{tr(money(ride.fare?.currency === 'EGP' ? LATE_CANCEL_FEE : LEGACY_USD_CANCEL_FEE, ride.fare?.currency ?? null))}{' '}{tr("late-cancel fee")}</p>
             )}
           </div>
         )}
@@ -539,7 +532,7 @@ export default function RiderDashboard() {
       )}
 
       {/* Cancel confirm */}
-      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title="Cancel this ride?">
+      <Modal open={cancelOpen} onClose={() => setCancelOpen(false)} title={tr("Cancel this ride?")}>
         <div className="flex-col gap-2">
           {CANCEL_REASONS.map((r) => (
             <button
@@ -548,15 +541,13 @@ export default function RiderDashboard() {
               onClick={() => handleCancel(r)}
               disabled={cancelling}
             >
-              <span className="small">{r}</span>
+              <span className="small">{tr(r)}</span>
             </button>
           ))}
           <button className="btn btn-danger btn-full mt-2" onClick={() => handleCancel('')} disabled={cancelling}>
             {cancelling ? <span className="spinner" /> : 'Cancel without a reason'}
           </button>
-          <button className="btn btn-ghost btn-full" onClick={() => setCancelOpen(false)}>
-            Keep my ride
-          </button>
+          <button className="btn btn-ghost btn-full" onClick={() => setCancelOpen(false)}>{tr("Keep my ride")}</button>
         </div>
       </Modal>
 
@@ -564,50 +555,47 @@ export default function RiderDashboard() {
       <Modal
         open={Boolean(completedRide)}
         onClose={() => { clearCompleted(); refreshWallet(); }}
-        title="Trip complete"
+        title={tr("Trip complete")}
       >
         {completedRide && (
           <div className="flex-col gap-4">
             <div className="card card-pad" style={{ background: 'var(--ink-50)', border: 'none' }}>
               <div className="flex items-center justify-between small">
-                <span className="muted">Base + distance + time</span>
+                <span className="muted">{tr("Base + distance + time")}</span>
                 <span className="mono-nums">
-                  {money((completedRide.fare?.baseFare || 0) + (completedRide.fare?.distanceFare || 0) + (completedRide.fare?.timeFare || 0), completedRide.fare?.currency ?? null)}
+                  {tr(money((completedRide.fare?.baseFare || 0) + (completedRide.fare?.distanceFare || 0) + (completedRide.fare?.timeFare || 0), completedRide.fare?.currency ?? null))}
                 </span>
               </div>
               {completedRide.fare?.surgeFare > 0 && (
                 <div className="flex items-center justify-between small mt-1">
-                  <span className="muted">Surge ({completedRide.fare.surgeMultiplier}×)</span>
-                  <span className="mono-nums">{money(completedRide.fare.surgeFare, completedRide.fare?.currency ?? null)}</span>
+                  <span className="muted">{tr("Surge (")}{' '}{tr(completedRide.fare.surgeMultiplier)}×)</span>
+                  <span className="mono-nums">{tr(money(completedRide.fare.surgeFare, completedRide.fare?.currency ?? null))}</span>
                 </div>
               )}
               <div className="flex items-center justify-between small mt-1">
-                <span className="muted">Booking fee</span>
-                <span className="mono-nums">{money(completedRide.fare?.bookingFee, completedRide.fare?.currency ?? null)}</span>
+                <span className="muted">{tr("Booking fee")}</span>
+                <span className="mono-nums">{tr(money(completedRide.fare?.bookingFee, completedRide.fare?.currency ?? null))}</span>
               </div>
               <div
                 className="flex items-center justify-between mt-2"
                 style={{ borderTop: '1px solid var(--border)', paddingTop: 10, fontWeight: 700 }}
               >
-                <span>Total ({completedRide.payment?.method})</span>
-                <span className="mono-nums">{money(completedRide.fare?.total, completedRide.fare?.currency ?? null)}</span>
+                <span>{tr("Total (")}{' '}{tr(completedRide.payment?.method)})</span>
+                <span className="mono-nums">{tr(money(completedRide.fare?.total, completedRide.fare?.currency ?? null))}</span>
               </div>
             </div>
 
             {completedRide.shortfall && (
-              <p className="small" style={{ color: 'var(--warning)', fontWeight: 600 }}>
-                This fare exceeded your wallet balance. Top up to clear the
-                outstanding amount before your next ride.
-              </p>
+              <p className="small" style={{ color: 'var(--warning)', fontWeight: 600 }}>{tr("This fare exceeded your wallet balance. Top up to clear the outstanding amount before your next ride.")}</p>
             )}
 
             <div className="text-center">
-              <p className="small muted mb-2">How was your trip{completedRide.driver ? ` with ${completedRide.driver.name}` : ''}?</p>
+              <p className="small muted mb-2">{tr("How was your trip")}{' '}{completedRide.driver ? ` with ${completedRide.driver.name}` : ''}?</p>
               <StarPicker value={rating} onChange={setRating} />
               {rating > 0 && (
                 <textarea
                   className="input mt-3"
-                  placeholder="Leave a comment (optional)"
+                  placeholder={tr("Leave a comment (optional)")}
                   value={ratingComment}
                   onChange={(e) => setRatingComment(e.target.value)}
                   maxLength={500}

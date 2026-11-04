@@ -56,6 +56,7 @@ export default function EarningsPage() {
     <div className="content-pad" style={{ maxWidth: 860 }}>
       <h1 className="page-title">Earnings</h1><p className="tiny muted">Financial summaries in EGP. Historical amounts retain their recorded currency in ride history.</p>
       <p className="page-sub mb-6">Your money at a glance</p>
+      <section className="card card-pad mb-4"><h2>Delivery earnings</h2><p>Today: {money(data.delivery?.today||0,'EGP')} · Lifetime: {money(data.delivery?.total||0,'EGP')} · {data.delivery?.orders||0} delivered orders</p><Link href="/driver/deliveries">View delivery history →</Link><p className="tiny muted">Taxi earnings are reported separately below.</p></section>
 
       <PayoutCard />
 

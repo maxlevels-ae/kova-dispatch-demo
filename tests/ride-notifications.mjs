@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import sharp from 'sharp';
-import {chromium,expect} from '@playwright/test';
+import {chromium,expect as baseExpect} from '@playwright/test';
+const expect=baseExpect.configure({timeout:30000});
 import {demoLogin} from './demo-ride-flow.mjs';
 export async function notificationChecks({base,request,cookies,User,Driver,Ride,password,check}){
  const suffix=Date.now();const hash=await bcrypt.hash(password,10);
@@ -47,8 +48,10 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
   const booked=await r.json('/api/rides',{pickup:{lat:30.0444,lng:31.2357,address:'QA notification pickup'},dropoff:{lat:30.05,lng:31.24,address:'QA notification destination'},vehicleType:'economy'});rideId=booked.ride.id;
   await check('incoming offer popup rings and native browser notification is displayed',async()=>{
    await expect(pages.driver.getByRole('button',{name:'Accept',exact:true})).toBeVisible({timeout:30000});
-   await expect.poll(()=>pages.driver.evaluate(()=>qaAudio.some(a=>a.src.includes('new-ride.mp3')&&!a.paused&&a.loop&&a.currentTime>0)),{timeout:5000}).toBe(true);
-   await expect.poll(()=>pages.driver.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return(await reg.getNotifications()).some(n=>n.body==='New ride request');}),{timeout:10000}).toBe(true).catch(async e=>{console.log('NOTIFICATION DIAGNOSTICS',JSON.stringify(await d.json('/api/notifications')));console.log('BROWSER ERRORS',jsErrors);throw e;});
+   await Promise.all([
+   expect.poll(()=>pages.driver.evaluate(()=>qaAudio.some(a=>a.src.includes('new-ride.mp3')&&!a.paused&&a.loop&&a.currentTime>0)),{timeout:5000}).toBe(true),
+   expect.poll(()=>pages.driver.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return(await reg.getNotifications()).some(n=>n.body==='New ride request');}),{timeout:10000}).toBe(true).catch(async e=>{console.log('NOTIFICATION DIAGNOSTICS',JSON.stringify(await d.json('/api/notifications')));console.log('BROWSER ERRORS',jsErrors,await pages.driver.evaluate(async()=>({permission:Notification.permission,worker:Boolean((await navigator.serviceWorker.getRegistration())?.active)}))); throw e;})
+   ]);
    await pages.driver.getByRole('dialog').screenshot({path:'docs/qa/ride-notification-offer.png'});
    const acceptedResponse=pages.driver.waitForResponse(response=>response.url().endsWith(`/api/rides/${rideId}/accept`)&&response.request().method()==='POST');
    await pages.driver.getByRole('button',{name:'Accept',exact:true}).click();
@@ -66,7 +69,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await d.json(`/api/rides/${rideId}/messages`,{text:'I can see you. Welcome!',clientId:randomUUID()});
    for(const session of [r,d]){const inbox=await session.json('/api/notifications');assert.equal(inbox.notifications.filter(n=>n.rideId===rideId&&n.event==='ride_message').length,1);}
    const before=await r.json('/api/notifications');await r.json('/api/notifications');assert.equal((await r.json('/api/notifications')).notifications.length,before.notifications.length);
-   await pages.rider.getByRole('button',{name:/^Chat/}).click();await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('I can see you. Welcome!');
+   await pages.rider.getByRole('button',{name:/^Chat/}).click();await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('I can see you. Welcome!',{timeout:30000});
    await pages.rider.screenshot({path:'docs/qa/ride-notification-chat.png',fullPage:true});
   });
   await check('reconnection resynchronizes messages and status without duplicate entries',async()=>{

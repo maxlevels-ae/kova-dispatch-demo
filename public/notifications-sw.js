@@ -1,7 +1,7 @@
 /* No app/data caching. Push payloads contain no credentials or chat content. */
 self.addEventListener('install',()=>self.skipWaiting());
 self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
-function safeLink(value){return /^\/(?:rides|driver\/trips)\/[a-f\d]{24}$/i.test(value)||/^\/driver\/dashboard(?:\?ride=[a-f\d]{24})?$/i.test(value)?value:'/dashboard';}
+function safeLink(value){return /^\/(?:rides|deliveries|driver\/deliveries|driver\/trips)\/[a-f\d]{24}$/i.test(value)||/^\/driver\/dashboard(?:\?ride=[a-f\d]{24})?$/i.test(value)?value:'/dashboard';}
 self.addEventListener('push',event=>event.waitUntil((async()=>{
  let data;try{data=event.data.json();}catch{return;}
  if(data.expiresAt&&Date.parse(data.expiresAt)<Date.now())return;

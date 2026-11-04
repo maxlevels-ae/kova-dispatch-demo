@@ -1,3 +1,4 @@
+import {isTaxiEnabled} from '@/lib/service-availability';
 import { getSettings } from '@/lib/settings';
 import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/helpers';
@@ -20,6 +21,7 @@ export async function POST(request) {
   if (error) return error;
 
   try {
+    if(!await isTaxiEnabled())return Response.json({error:'Taxi bookings are currently paused.'},{status:409});
     const body = await request.json();
     const parsed = estimateSchema.safeParse(body);
     if (!parsed.success) {

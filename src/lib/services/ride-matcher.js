@@ -59,6 +59,7 @@ export async function findBestDriver({
             isOnline: true,
             isApproved: true,
             currentRideId: null,
+            currentDeliveryId:null,'services.rides':{$ne:false},
             'vehicle.type': vehicleType,
           },
         },
@@ -150,6 +151,7 @@ async function findBestDriverGeoNear({
             isOnline: true,
             isApproved: true,
             currentRideId: null,
+              currentDeliveryId:null,'services.rides':{$ne:false},
             'vehicle.type': vehicleType,
             _id: { $nin: excludeObjectIds },
           },
@@ -231,6 +233,7 @@ export async function findNearbyDrivers({
         isOnline: true,
         isApproved: true,
         currentRideId: null,
+        currentDeliveryId:null,'services.rides':{$ne:false},
       };
 
       if (vehicleType) {
@@ -309,6 +312,7 @@ async function findNearbyDriversGeoNear({
     isOnline: true,
     isApproved: true,
     currentRideId: null,
+      currentDeliveryId:null,'services.rides':{$ne:false},
   };
 
   if (vehicleType) {

@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
@@ -12,6 +14,7 @@ export default function Modal({
   closable = true,
   maxWidth = 440,
 }) {
+  useI18n();
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -42,12 +45,12 @@ export default function Modal({
       >
         {(title || closable) && (
           <div className="flex items-center justify-between mb-4">
-            {title ? <h3 style={{ fontSize: '1.15rem' }}>{title}</h3> : <span />}
+            {title ? <h3 style={{ fontSize: '1.15rem' }}>{tr(title)}</h3> : <span />}
             {closable && (
               <button
                 className="btn btn-ghost btn-icon"
                 onClick={onClose}
-                aria-label="Close dialog"
+                aria-label={tr("Close dialog")}
                 style={{ minHeight: 36, width: 36 }}
               >
                 <X size={18} />

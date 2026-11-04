@@ -6,5 +6,5 @@ export function rideLink(role,id,offer=false) {
   return role==='driver'?(offer?`/driver/dashboard?ride=${id}`:`/driver/trips/${id}`):`/rides/${id}`;
 }
 export function safeNotificationLink(value) {
-  return /^\/(?:rides|driver\/trips)\/[a-f\d]{24}$/i.test(value)||/^\/driver\/dashboard(?:\?ride=[a-f\d]{24})?$/i.test(value)?value:'/dashboard';
+  return /^\/(?:rides|deliveries|driver\/deliveries|driver\/trips)\/[a-f\d]{24}$/i.test(value)||/^\/driver\/dashboard(?:\?ride=[a-f\d]{24})?$/i.test(value)?value:'/dashboard';
 }

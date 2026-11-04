@@ -1,0 +1,4 @@
+import User from '@/lib/db/models/User';
+import {deliveryGuard,deliveryBody,deliveryFailure} from '@/lib/delivery-http';
+export async function GET(request){const {session,error}=await deliveryGuard(request);if(error)return error;try{const user=await User.findById(session.user.id).select('language').lean();return Response.json({language:user.language||'en'},{headers:{'Cache-Control':'no-store'}});}catch(e){return deliveryFailure(e);}}
+export async function PUT(request){const {session,error}=await deliveryGuard(request,['rider']);if(error)return error;try{const {language}=await deliveryBody(request);if(!['en','ar'].includes(language))return Response.json({error:'Invalid language'},{status:400});await User.updateOne({_id:session.user.id},{$set:{language}});return Response.json({language,message:'Settings saved successfully'});}catch(e){return deliveryFailure(e);}}

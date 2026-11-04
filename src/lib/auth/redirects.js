@@ -14,7 +14,7 @@ export function safeCallback(value, role, origin = 'http://localhost:3000') {
     if (/^\/(api|login|signup)(\/|$)/.test(path)) return fallback;
     if (/^\/admin(\/|$)/.test(path) && role !== 'admin') return fallback;
     if (/^\/driver(\/|$)/.test(path) && role !== 'driver') return fallback;
-    if (/^\/(dashboard|rides|wallet)(\/|$)/.test(path) && !['rider', 'customer'].includes(role)) return fallback;
+    if (/^\/(dashboard|rides|wallet|deliveries)(\/|$)/.test(path) && !['rider', 'customer'].includes(role)) return fallback;
     return (path === '/admin' ? '/admin/dashboard' : path === '/driver' ? '/driver/dashboard' : url.pathname) + url.search + url.hash;
   } catch { return fallback; }
 }

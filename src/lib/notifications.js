@@ -10,6 +10,7 @@ import User from '@/lib/db/models/User';
 import {emitToUser} from '@/lib/realtime/emit';
 import {rideLink} from '@/lib/notification-policy';
 import {sendPush} from '@/lib/web-push';
+import {translate} from '@/lib/i18n';
 const eventMap = {
   searching: "booking_created",
   accepted: "driver_accepted",
@@ -34,7 +35,7 @@ export async function syncNotifications(userId) {
     .limit(50)
     .lean();
   const writes = [];
-  const user=await User.findById(userId).select('role').lean();
+  const user=await User.findById(userId).select('role language').lean();
   if(!user)return;
   const role=user.role;
   const enqueue=(ride,event,text,key,at,expiresAt)=>writes.push({updateOne:{filter:{key},update:{$setOnInsert:{key,userId,event,text,rideId:ride._id,role,href:rideLink(role,ride._id,event==='booking_offer'),createdAt:at||new Date(),expiresAt}},upsert:true}});
@@ -122,7 +123,7 @@ export async function syncNotifications(userId) {
     }
   }
   if (writes.length) {
-    for(const write of writes){const value=write.updateOne.update.$setOnInsert;value.createdAt ||= new Date();value.updatedAt=value.createdAt;}
+    for(const write of writes){const value=write.updateOne.update.$setOnInsert;value.text=translate(value.text,user.language);value.createdAt ||= new Date();value.updatedAt=value.createdAt;}
     // Reconciliation is not a new delivery attempt; preserve its recorded time.
     await NotificationJob.bulkWrite(writes, { ordered: false,timestamps:false });
   }
@@ -156,7 +157,7 @@ export async function deliverNotifications(userId) {
       const preference = await NotificationPreference.findById(
         job.userId,
       ).lean();
-      if (preference?.inApp === false || (job.event==='ride_message'&&preference?.messages===false) || (job.event!=='ride_message'&&preference?.rideEvents===false)) {
+      if (preference?.inApp === false || (['ride_message','delivery_message'].includes(job.event)&&preference?.messages===false) || (!['ride_message','delivery_message'].includes(job.event)&&preference?.rideEvents===false)) {
         job.status = "suppressed";
       } else {
         await Notification.updateOne(

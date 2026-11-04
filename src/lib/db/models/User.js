@@ -4,6 +4,7 @@ import { CURRENCY } from '@/lib/currency';
 const userSchema = new mongoose.Schema(
   {
     authVersion: { type: Number, default: 0 },
+    language:{type:String,enum:['en','ar'],default:'en'},
     egpWallet: { type: new mongoose.Schema({ balance: { type: Number, default: 0 }, currency: { type: String, enum: ['EGP'], default: 'EGP' } }, { _id: false }), default: undefined },
     username: {
       type: String,

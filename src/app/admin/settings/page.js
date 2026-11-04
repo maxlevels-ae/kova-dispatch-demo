@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from 'next/link';
 import {
   Building2,
   Route,
@@ -176,6 +177,7 @@ export default function SettingsPage() {
         />
       }
     >
+      <div className="flex gap-2 wrap mb-4"><Link className="btn btn-secondary" href="/admin/settings/services">Taxi / Delivery switches →</Link><Link className="btn btn-secondary" href="/admin/settings/delivery">Delivery settings →</Link></div>
       {groups
         .flatMap((g) => g.items)
         .map(

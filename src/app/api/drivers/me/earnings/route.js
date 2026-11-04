@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
 import Ride from '@/lib/db/models/Ride';
+import Delivery from '@/lib/db/models/Delivery';
 import Driver from '@/lib/db/models/Driver';
 import WalletTransaction from '@/lib/db/models/WalletTransaction';
 import { requireAuth } from '@/lib/auth/helpers';
@@ -86,7 +87,9 @@ export async function GET(request) {
       { $match: { driverId: driverObjectId, status: 'completed', 'fare.currency': CURRENCY } },
       { $group: { _id: null, total: { $sum: '$fare.driverEarnings' } } },
     ]);
+    const deliveryEarnings=await Delivery.aggregate([{$match:{courierId:driverObjectId,status:'DELIVERED','fare.currency':CURRENCY}},{$group:{_id:null,total:{$sum:'$fare.earnings'},orders:{$sum:1},today:{$sum:{$cond:[{$gte:['$deliveredAt',today]},'$fare.earnings',0]}}}}]);
     return Response.json({
+      delivery:deliveryEarnings[0]||{total:0,orders:0,today:0},
       currency: CURRENCY,
       financialScope: 'EGP only; historical currencies remain in trip history',
       wallet: walletAccount(user) || { balance: 0, currency: null },

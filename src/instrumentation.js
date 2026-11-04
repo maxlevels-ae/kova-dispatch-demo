@@ -12,6 +12,8 @@ export async function register() {
   startNotificationWorker();
   startDispatchSweeper();
   startLocationFlusher();
+  const {startDeliveryWorker}=await import('@/lib/delivery-dispatch');
+  startDeliveryWorker();
 
   console.log('[Maxride] Background workers started (dispatch sweeper, location flusher)');
 }

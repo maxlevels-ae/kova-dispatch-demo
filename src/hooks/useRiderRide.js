@@ -44,7 +44,7 @@ export default function useRiderRide({ onEvent } = {}) {
       else if(active&&['cancelled','no_drivers'].includes(active.status)){setRide(null);setDriverPosition(null);}
       else {setRide(active||null);setDriverPosition(active?.driver?.location||null);}
     }catch{}};
-    socket.on('connect',sync);if(isConnected)sync();return()=>{live=false;socket.off('connect',sync);};
+    const visible=()=>{if(!document.hidden)sync();};socket.on('connect',sync);socket.on('notification:new',sync);document.addEventListener('visibilitychange',visible);const timer=setInterval(visible,10000);if(isConnected)sync();return()=>{live=false;clearInterval(timer);socket.off('connect',sync);socket.off('notification:new',sync);document.removeEventListener('visibilitychange',visible);};
   },[socket,isConnected]);
 
   // ── Resume active ride from the server ──

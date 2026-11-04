@@ -1,3 +1,4 @@
+import {isTaxiEnabled} from '@/lib/service-availability';
 import { getSettings } from '@/lib/settings';
 import {notifyRideParticipants} from '@/lib/notifications';
 import { bookingPolicy } from '@/lib/settings-schema';
@@ -126,6 +127,7 @@ async function loadDriverBundle(ride) {
 
 export async function createRide({ riderId, pickup, dropoff, vehicleType, scheduledAt }) {
   await connectDB();
+  if(!await isTaxiEnabled())throw new RideError('Taxi bookings are currently paused.',409);
 
   const settings = await getSettings();
   const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
@@ -239,7 +241,7 @@ export async function acceptRide({ rideId, driverUserId }) {
 
   // Claim the driver first (prevents accepting two rides at once)
   const claimedDriver = await Driver.findOneAndUpdate(
-    { _id: driver._id, currentRideId: null },
+    { _id: driver._id, currentRideId: null, currentDeliveryId:null,'services.rides':{$ne:false} },
     { currentRideId: rideId },
     { returnDocument: 'after' }
   );

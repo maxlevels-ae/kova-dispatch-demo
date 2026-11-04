@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -17,12 +19,16 @@ const TXN_LABEL = {
   topup: 'Wallet top-up',
   ride_payment: 'Ride payment',
   ride_earning: 'Trip earnings',
+  delivery_payment:'Delivery payment',
+  delivery_earning:'Delivery earnings',
+  delivery_cancellation:'Delivery cancellation fee',
   refund: 'Refund',
   cancellation_fee: 'Cancellation fee',
   payout: 'Payout',
 };
 
 export default function WalletPanel() {
+  useI18n();
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -146,8 +152,8 @@ export default function WalletPanel() {
 
   return (
     <div className="content-pad" style={{ maxWidth: 720 }}>
-      <h1 className="page-title">Wallet</h1>
-      <p className="page-sub mb-6">Pay for rides instantly, no card fumbling</p>
+      <h1 className="page-title">{tr("Wallet")}</h1>
+      <p className="page-sub mb-6">{tr("Pay for rides instantly, no card fumbling")}</p>
 
       <div
         className="card card-pad"
@@ -156,7 +162,7 @@ export default function WalletPanel() {
         <div className="flex items-center justify-between">
           <div>
             <div className="tiny" style={{ opacity: 0.7 }}>
-              {owes ? 'Outstanding balance' : 'Available balance'}
+              {tr(owes ? 'Outstanding balance' : 'Available balance')}
             </div>
             <div
               style={{
@@ -167,30 +173,25 @@ export default function WalletPanel() {
               }}
               className="mono-nums"
             >
-              {wallet ? money(Math.abs(wallet.balance), wallet.currency ?? null) : '—'}
+              {tr(wallet ? money(Math.abs(wallet.balance), wallet.currency ?? null) : '—')}
             </div>
           </div>
           <Wallet size={36} style={{ opacity: 0.35 }} />
         </div>
 
-        {accounts.filter(a=>a.currency!==wallet?.currency).map((a,i)=><p key={i} className="card" style={{padding:16}}>Historical balance: {money(a.balance,a.currency??null)}. Kept separately from EGP ride funds.</p>)}
+        {accounts.filter(a=>a.currency!==wallet?.currency).map((a,i)=><p key={i} className="card" style={{padding:16}}>{tr("Historical balance:")}{' '}{tr(money(a.balance,a.currency??null))}{' '}{tr(". Kept separately from EGP ride funds.")}</p>)}
       {owes && (
-          <p className="small mt-3" style={{ color: '#fca5a5' }}>
-            You owe {money(Math.abs(wallet.balance), wallet.currency ?? null)} — top up to book rides again.
-          </p>
+          <p className="small mt-3" style={{ color: '#fca5a5' }}>{tr("You owe")}{' '}{tr(money(Math.abs(wallet.balance), wallet.currency ?? null))}{' '}{tr("— top up to book rides again.")}</p>
         )}
         <button className="btn btn-gold mt-4" disabled={!stripeEnabled && !topupEnabled} onClick={() => setTopupOpen(true)}>
-          <Plus size={17} /> Add funds
-        </button>
+          <Plus size={17} />{tr("Add funds")}</button>
       </div>
 
-      <h2 className="small mt-8 mb-3" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>
-        Activity
-      </h2>
+      <h2 className="small mt-8 mb-3" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-3)' }}>{tr("Activity")}</h2>
 
-      {transactions === null && <Loading label="Loading activity…" />}
+      {transactions === null && <Loading label={tr("Loading activity…")} />}
       {transactions?.length === 0 && (
-        <Empty icon={Receipt} title="No activity yet" hint="Top-ups and ride payments will show up here." />
+        <Empty icon={Receipt} title={tr("No activity yet")} hint="Top-ups and ride payments will show up here." />
       )}
 
       <div className="card">
@@ -213,23 +214,23 @@ export default function WalletPanel() {
               </span>
               <div className="flex-1" style={{ minWidth: 0 }}>
                 <div className="small truncate" style={{ fontWeight: 600 }}>
-                  {TXN_LABEL[t.type] || t.type}
+                  {tr(TXN_LABEL[t.type] || t.type)}
                 </div>
-                <div className="tiny muted truncate">{t.note || formatRelativeTime(t.createdAt)}</div>
+                <div className="tiny muted truncate">{tr(t.note || formatRelativeTime(t.createdAt))}</div>
               </div>
               <div className="text-right">
                 <div className="small mono-nums" style={{ fontWeight: 700, color: credit ? 'var(--success)' : 'var(--text)' }}>
-                  {credit ? '+' : ''}{money(t.amount, t.currency ?? null)}
+                  {tr(credit ? '+' : '')}{' '}{tr(money(t.amount, t.currency ?? null))}
                 </div>
-                <div className="tiny muted mono-nums">{money(t.balanceAfter, t.currency ?? null)}</div>
+                <div className="tiny muted mono-nums">{tr(money(t.balanceAfter, t.currency ?? null))}</div>
               </div>
             </div>
           );
         })}
       </div>
 
-      {limitation && <p className="small muted mt-4">{limitation}</p>}
-      <Modal open={topupOpen} onClose={() => setTopupOpen(false)} title="Add funds">
+      {limitation && <p className="small muted mt-4">{tr(limitation)}</p>}
+      <Modal open={topupOpen} onClose={() => setTopupOpen(false)} title={tr("Add funds")}>
         <div className="flex-col gap-4">
           <div className="flex gap-2">
             {QUICK_AMOUNTS.map((a) => (
@@ -239,12 +240,12 @@ export default function WalletPanel() {
                 style={{ padding: '10px 0', justifyContent: 'center' }}
                 onClick={() => setAmount(String(a))}
               >
-                <span className="small" style={{ fontWeight: 700 }}>{money(a)}</span>
+                <span className="small" style={{ fontWeight: 700 }}>{tr(money(a))}</span>
               </button>
             ))}
           </div>
           <div className="field">
-            <label htmlFor="custom-amount">Custom amount</label>
+            <label htmlFor="custom-amount">{tr("Custom amount")}</label>
             <input
               id="custom-amount"
               className="input"
@@ -257,15 +258,15 @@ export default function WalletPanel() {
             />
           </div>
           <p className="tiny muted">
-            {stripeEnabled
+            {tr(stripeEnabled
               ? 'You’ll be taken to a secure Stripe page to pay by card. Funds appear instantly after payment.'
-              : 'Demo wallet — funds are credited instantly without a card charge.'}
+              : 'Demo wallet — funds are credited instantly without a card charge.')}
           </p>
           <button className="btn btn-primary btn-full" onClick={topup} disabled={processing}>
             {processing ? (
               <span className="spinner" />
             ) : stripeEnabled ? (
-              <><CreditCard size={17} /> Pay {money(parseFloat(amount) || 0)} by card</>
+              <><CreditCard size={17} />{tr("Pay")}{' '}{tr(money(parseFloat(amount) || 0))}{' '}{tr("by card")}</>
             ) : (
               `Add ${money(parseFloat(amount) || 0)}`
             )}

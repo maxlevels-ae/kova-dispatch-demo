@@ -20,6 +20,7 @@ const walletTransactionSchema = new mongoose.Schema(
         'topup', 'manual_credit', 'manual_debit', 'demo_initialization',
         'ride_payment',
         'ride_earning',
+        'delivery_payment','delivery_earning','delivery_cancellation',
         'refund',
         'cancellation_fee',
         'payout',
@@ -42,6 +43,7 @@ const walletTransactionSchema = new mongoose.Schema(
       ref: 'Ride',
       default: null,
     },
+    deliveryId:{type:mongoose.Schema.Types.ObjectId,ref:'Delivery',default:null,index:true},
     note: {
       type: String,
       maxlength: 200,

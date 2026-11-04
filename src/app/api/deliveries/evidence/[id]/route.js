@@ -1,0 +1,6 @@
+import mongoose from 'mongoose';
+import DeliveryEvidence from '@/lib/db/models/DeliveryEvidence';
+import {deliveryGuard,deliveryFailure} from '@/lib/delivery-http';
+import {loadDelivery,DeliveryError} from '@/lib/delivery-service';
+import AdminAudit from '@/lib/db/models/AdminAudit';
+export async function GET(request,{params}){const {session,error}=await deliveryGuard(request);if(error)return error;try{const {id}=await params;if(!mongoose.isValidObjectId(id))throw new DeliveryError('Not found',404);const evidence=await DeliveryEvidence.findOne({_id:id,expiresAt:{$gt:new Date()}}).select('+bytes');if(!evidence)throw new DeliveryError('Evidence unavailable or retention period ended',404);if(String(evidence.ownerId)!==session.user.id){if(!evidence.deliveryId)throw new DeliveryError('Forbidden',403);await loadDelivery(evidence.deliveryId,session.user);}if(session.user.role==='admin')await AdminAudit.create({actorId:session.user.id,targetId:evidence.ownerId,action:'delivery.evidence.viewed',changes:{evidenceId:id,deliveryId:evidence.deliveryId}});return new Response(new Uint8Array(evidence.bytes),{headers:{'Content-Type':evidence.contentType,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});}catch(e){return deliveryFailure(e);}}

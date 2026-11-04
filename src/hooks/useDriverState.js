@@ -46,8 +46,8 @@ export default function useDriverState({ onEvent } = {}) {
   useEffect(()=>{
     if(!socket)return;
     let live=true;
-    const sync=async()=>{try{const [a,o]=await Promise.all([fetch('/api/rides/active'),fetch('/api/drivers/me/offer')]);if(!live)return;if(a.ok){const d=await a.json();setRide(d.ride||null);}if(o.ok){const d=await o.json();setOffer(d.offer?{...d.offer,receivedAt:Date.now()}:null);}}catch{}};
-    socket.on('connect',sync);if(isConnected)sync();return()=>{live=false;socket.off('connect',sync);};
+    const sync=async(includeOffer=false)=>{const started=Date.now();try{const [a,o]=await Promise.all([fetch('/api/rides/active'),includeOffer?fetch('/api/drivers/me/offer'):Promise.resolve(null)]);if(!live)return;if(a.ok){const d=await a.json();setRide(d.ride||null);}if(o?.ok){const d=await o.json();setOffer(old=>old?.receivedAt>started?old:d.offer?(old?.offerId===d.offer.offerId?old:{...d.offer,receivedAt:Date.now()}):null);}}catch{}};
+    const reconnect=()=>sync(true),refresh=()=>sync(false);const visible=()=>{if(!document.hidden)refresh();};socket.on('connect',reconnect);socket.on('notification:new',refresh);document.addEventListener('visibilitychange',visible);const timer=setInterval(visible,10000);if(isConnected)reconnect();return()=>{live=false;clearInterval(timer);socket.off('connect',reconnect);socket.off('notification:new',refresh);document.removeEventListener('visibilitychange',visible);};
   },[socket,isConnected]);
 
   // ── Initial load: profile + active ride ──
@@ -83,8 +83,7 @@ export default function useDriverState({ onEvent } = {}) {
     const shouldTrack = online || Boolean(ride);
     if (!shouldTrack || !navigator.geolocation) return undefined;
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
+    const onPosition=(pos) => {
         const point = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
@@ -101,12 +100,14 @@ export default function useDriverState({ onEvent } = {}) {
             rideId: rideRef.current?.id,
           });
         }
-      },
-      () => { /* watch errors are non-fatal; next fix retries */ },
-      { enableHighAccuracy: true, maximumAge: 2000, timeout: 15000 }
-    );
+      };
+    const options={enableHighAccuracy:true,maximumAge:2000,timeout:12000};
+    watchIdRef.current=navigator.geolocation.watchPosition(onPosition,()=>{},options);
+    // A stationary online driver still needs a fresh, permission-backed fix.
+    const heartbeat=setInterval(()=>navigator.geolocation.getCurrentPosition(onPosition,()=>{},options),15000);
 
     return () => {
+      clearInterval(heartbeat);
       if (watchIdRef.current != null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;

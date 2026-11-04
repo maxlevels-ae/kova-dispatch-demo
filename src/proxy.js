@@ -3,11 +3,11 @@ import { safeCallback, dashboardForRole } from '@/lib/auth/redirects';
 import { auth } from '@/lib/auth/config';
 
 // Routes that require authentication
-const protectedRoutes = ['/dashboard', '/driver', '/admin', '/profile', '/wallet', '/rides'];
+const protectedRoutes = ['/dashboard', '/driver', '/admin', '/profile', '/wallet', '/rides','/deliveries'];
 const authRoutes = ['/login', '/signup'];
 const adminRoutes = ['/admin'];
 const driverRoutes = ['/driver'];
-const riderRoutes = ['/dashboard', '/rides', '/wallet'];
+const riderRoutes = ['/dashboard', '/rides', '/wallet','/deliveries'];
 
 // ─── Per-IP limits on the unauthenticated auth and contact endpoints ────────
 // POST only. Held in this process's memory, which is exact for Maxride's single

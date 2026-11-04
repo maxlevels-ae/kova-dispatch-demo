@@ -75,6 +75,8 @@ const driverSchema = new mongoose.Schema(
       ref: 'Ride',
       default: null,
     },
+    currentDeliveryId:{type:mongoose.Schema.Types.ObjectId,ref:'Delivery',default:null},
+    services:{rides:{type:Boolean,default:true},deliveries:{type:Boolean,default:false}},
     stats: {
       currency: { type: String },
       totalTrips: { type: Number, default: 0 },

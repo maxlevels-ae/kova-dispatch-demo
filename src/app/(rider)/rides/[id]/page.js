@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 import AssignedVehicleCard from '@/components/ride/AssignedVehicleCard';
 
 import { useEffect, useState } from 'react';
@@ -9,6 +11,7 @@ import { RideStatusBadge, Avatar, Stars, Loading, VEHICLE_LABELS, money } from '
 import { formatDate, formatDistance, formatDuration } from '@/lib/utils/geo';
 
 export default function RideDetailPage() {
+  useI18n();
   const { id } = useParams();
   const router = useRouter();
   const [data, setData] = useState(null);
@@ -32,7 +35,7 @@ export default function RideDetailPage() {
   if (notFound) {
     return (
       <div className="content-pad">
-        <p className="muted">Ride not found.</p>
+        <p className="muted">{tr("Ride not found.")}</p>
       </div>
     );
   }
@@ -44,13 +47,12 @@ export default function RideDetailPage() {
   return (
     <div className="content-pad" style={{ maxWidth: 760 }}>
       <button className="btn btn-ghost btn-sm mb-4" onClick={() => router.back()}>
-        <ArrowLeft size={16} /> Back
-      </button>
+        <ArrowLeft size={16} />{tr("Back")}</button>
 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="page-title">{VEHICLE_LABELS[ride.vehicleType]}</h1>
-          <p className="page-sub">{formatDate(ride.createdAt)}</p>
+          <h1 className="page-title">{tr(VEHICLE_LABELS[ride.vehicleType])}</h1>
+          <p className="page-sub">{tr(formatDate(ride.createdAt))}</p>
         </div>
         <RideStatusBadge status={ride.status} />
       </div>
@@ -77,8 +79,8 @@ export default function RideDetailPage() {
           </div>
         </div>
         <div className="flex gap-4 mt-3 tiny muted">
-          <span>{formatDistance(ride.route?.distanceMeters || 0)}</span>
-          <span>{formatDuration(ride.route?.durationSeconds || 0)}</span>
+          <span>{tr(formatDistance(ride.route?.distanceMeters || 0))}</span>
+          <span>{tr(formatDuration(ride.route?.durationSeconds || 0))}</span>
         </div>
       </div>
 
@@ -86,21 +88,21 @@ export default function RideDetailPage() {
 
       {(ride.status === 'completed' || ride.fare?.cancellationFee > 0) && (
         <div className="card card-pad mt-4">
-          <h3 className="small mb-3" style={{ fontWeight: 700 }}>Receipt</h3>
+          <h3 className="small mb-3" style={{ fontWeight: 700 }}>{tr("Receipt")}</h3>
           <div className="flex-col gap-1 small">
             {ride.status === 'completed' ? (
               <>
-                <Row label="Base fare" value={money(ride.fare.baseFare, ride.fare?.currency ?? null)} />
-                <Row label="Distance" value={money(ride.fare.distanceFare, ride.fare?.currency ?? null)} />
-                <Row label="Time" value={money(ride.fare.timeFare, ride.fare?.currency ?? null)} />
+                <Row label={tr("Base fare")} value={money(ride.fare.baseFare, ride.fare?.currency ?? null)} />
+                <Row label={tr("Distance")} value={money(ride.fare.distanceFare, ride.fare?.currency ?? null)} />
+                <Row label={tr("Time")} value={money(ride.fare.timeFare, ride.fare?.currency ?? null)} />
                 {ride.fare.surgeFare > 0 && <Row label={`Surge ${ride.fare.surgeMultiplier}×`} value={money(ride.fare.surgeFare, ride.fare?.currency ?? null)} />}
-                <Row label="Booking fee" value={money(ride.fare.bookingFee, ride.fare?.currency ?? null)} />
+                <Row label={tr("Booking fee")} value={money(ride.fare.bookingFee, ride.fare?.currency ?? null)} />
                 <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
-                  <Row label={<b>Total ({ride.payment?.method})</b>} value={<b>{money(ride.fare.total, ride.fare?.currency ?? null)}</b>} />
+                  <Row label={<b>{tr("Total (")}{' '}{tr(ride.payment?.method)})</b>} value={<b>{tr(money(ride.fare.total, ride.fare?.currency ?? null))}</b>} />
                 </div>
               </>
             ) : (
-              <Row label="Cancellation fee" value={money(ride.fare.cancellationFee, ride.fare?.currency ?? null)} />
+              <Row label={tr("Cancellation fee")} value={money(ride.fare.cancellationFee, ride.fare?.currency ?? null)} />
             )}
           </div>
         </div>
@@ -108,9 +110,9 @@ export default function RideDetailPage() {
 
       {ride.rating?.byRider && (
         <div className="card card-pad mt-4">
-          <h3 className="small mb-2" style={{ fontWeight: 700 }}>Your rating</h3>
+          <h3 className="small mb-2" style={{ fontWeight: 700 }}>{tr("Your rating")}</h3>
           <Stars value={ride.rating.byRider} />
-          {ride.rating.riderComment && <p className="small muted mt-2">“{ride.rating.riderComment}”</p>}
+          {ride.rating.riderComment && <p className="small muted mt-2">“{tr(ride.rating.riderComment)}”</p>}
         </div>
       )}
     </div>
@@ -118,10 +120,11 @@ export default function RideDetailPage() {
 }
 
 function Row({ label, value }) {
+  useI18n();
   return (
     <div className="flex items-center justify-between">
-      <span className="muted">{label}</span>
-      <span className="mono-nums">{value}</span>
+      <span className="muted">{tr(label)}</span>
+      <span className="mono-nums">{tr(value)}</span>
     </div>
   );
 }

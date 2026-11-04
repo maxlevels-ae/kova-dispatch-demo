@@ -1,4 +1,6 @@
 'use client';
+import {t as tr,customerLocale} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
@@ -8,6 +10,7 @@ import { useToast } from '@/components/ui/Toast';
 
 /** Shared profile editor for riders and drivers. */
 export default function ProfileCard({ children }) {
+  useI18n();
   const toast = useToast();
   const { update } = useSession();
   const [user, setUser] = useState(null);
@@ -87,7 +90,7 @@ export default function ProfileCard({ children }) {
     }
   }
 
-  if (!user) return <Loading label="Loading profile…" />;
+  if (!user) return <Loading label={tr("Loading profile…")} />;
 
   return (
     <>
@@ -96,8 +99,8 @@ export default function ProfileCard({ children }) {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            aria-label="Change profile picture"
-            title="Change profile picture"
+            aria-label={tr("Change profile picture")}
+            title={tr("Change profile picture")}
             style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
             disabled={uploading}
           >
@@ -133,20 +136,19 @@ export default function ProfileCard({ children }) {
             style={{ display: 'none' }}
           />
           <div className="flex-1">
-            <h2 style={{ fontSize: '1.2rem' }}>{user.name}</h2>
+            <h2 style={{ fontSize: '1.2rem' }}><bdi>{user.name}</bdi></h2>
             <div className="flex items-center gap-3 mt-1">
-              <span className="tiny muted">@{user.username}</span>
+              <bdi dir="ltr" className="tiny muted">@{user.username}</bdi>
               <Stars value={user.rating?.average ?? 5} />
             </div>
           </div>
           {!editing ? (
             <button className="btn btn-secondary btn-sm" onClick={() => setEditing(true)}>
-              <Pencil size={14} /> Edit
-            </button>
+              <Pencil size={14} />{tr("Edit")}</button>
           ) : (
             <div className="flex gap-2">
               <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
-                {saving ? <span className="spinner" /> : <><Check size={14} /> Save</>}
+                {saving ? <span className="spinner" /> : <><Check size={14} />{tr("Save")}</>}
               </button>
               <button
                 className="btn btn-ghost btn-sm"
@@ -162,32 +164,32 @@ export default function ProfileCard({ children }) {
         </div>
 
         <div className="flex-col gap-4">
-          <FieldRow label="Full name" editing={editing}>
+          <FieldRow label={tr("Full name")} editing={editing}>
             {editing ? (
               <input className="input" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
             ) : (
-              user.name
+              <bdi>{user.name}</bdi>
             )}
           </FieldRow>
-          <FieldRow label="Phone" editing={editing}>
+          <FieldRow label={tr("Phone")} editing={editing}>
             {editing ? (
-              <input className="input" value={form.phone} placeholder="+1 555 000 1234" onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              <input className="input" value={form.phone} placeholder={tr("+1 555 000 1234")} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
             ) : (
-              user.phone || <span className="muted">Not set</span>
+              user.phone ? <bdi dir="ltr">{user.phone}</bdi> : <span className="muted">{tr("Not set")}</span>
             )}
           </FieldRow>
-          <FieldRow label="Email" editing={editing}>
+          <FieldRow label={tr("Email")} editing={editing}>
             {editing ? (
-              <input className="input" type="email" value={form.email} placeholder="you@example.com" onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+              <input className="input" type="email" value={form.email} placeholder={tr("you@example.com")} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
             ) : (
-              user.email || <span className="muted">Not set</span>
+              user.email || <span className="muted">{tr("Not set")}</span>
             )}
           </FieldRow>
-          <FieldRow label="Wallet">
-            <span className="mono-nums" style={{ fontWeight: 700 }}>{money(user.wallet?.balance, user.wallet?.currency ?? null)}</span>
+          <FieldRow label={tr("Wallet")}>
+            <span className="mono-nums" style={{ fontWeight: 700 }}>{tr(money(user.wallet?.balance, user.wallet?.currency ?? null))}</span>
           </FieldRow>
-          <FieldRow label="Member since">
-            {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          <FieldRow label={tr("Member since")}>
+            {tr(new Date(user.createdAt).toLocaleDateString(customerLocale(), { month: 'long', year: 'numeric' }))}
           </FieldRow>
         </div>
       </div>
@@ -198,17 +200,17 @@ export default function ProfileCard({ children }) {
         className="btn btn-danger btn-full mt-4"
         onClick={() => signOut({ callbackUrl: '/' })}
       >
-        <LogOut size={17} /> Sign out
-      </button>
+        <LogOut size={17} />{tr("Sign out")}</button>
     </>
   );
 }
 
 function FieldRow({ label, children }) {
+  useI18n();
   return (
     <div className="flex-col gap-1">
       <span className="tiny muted" style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-        {label}
+        {tr(label)}
       </span>
       <div className="small">{children}</div>
     </div>

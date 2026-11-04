@@ -268,7 +268,7 @@ app.prepare().then(() => {
               isOnline: true,
               isApproved: true,
             },
-            { projection: { vehicle: 1, currentRideId: 1 } },
+            { projection: { vehicle: 1, currentRideId: 1,currentDeliveryId:1 } },
           );
         if (!user || !driver) return;
         await updateDriverLocation(socket.profileId, lat, lng, heading);
@@ -283,11 +283,15 @@ app.prepare().then(() => {
           riderNs
             .to("ride:" + rideId)
             .emit("driver:location", { ...payload, rideId });
+        if(driver.currentDeliveryId){
+          const delivery=await (await socketDB()).collection('deliveries').findOne({_id:driver.currentDeliveryId,courierId:new ObjectId(socket.userId),status:{$nin:['DELIVERED','CANCELLED','NO_COURIER','RETURNED']}},{projection:{customerId:1,recipientId:1}});
+          if(delivery){const update={...payload,driverId:socket.userId,id:String(delivery._id)};riderNs.to(`user:${delivery.customerId}`).emit('delivery:location',update);riderNs.to(`user:${delivery.recipientId}`).emit('delivery:location',update);adminNs.emit('delivery:location',update);}
+        }
         adminNs.emit("driver:location", {
           ...payload,
           name: user.name,
           vehicle: driver.vehicle,
-          status: driver.currentRideId ? "on_trip" : "available",
+          status: driver.currentRideId ? "on_trip" : driver.currentDeliveryId?'on_delivery':"available",
         });
       } catch {
         /* Fail closed; next GPS ping retries. */

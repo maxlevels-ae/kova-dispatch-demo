@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { createContext, useCallback, useContext, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
@@ -12,6 +14,7 @@ const ICONS = {
 };
 
 export function ToastProvider({ children }) {
+  useI18n();
   const [toasts, setToasts] = useState([]);
   const idRef = useRef(0);
 
@@ -32,7 +35,7 @@ export function ToastProvider({ children }) {
           return (
             <div key={id} className={`toast toast-${type}`}>
               <Icon size={18} />
-              <span>{message}</span>
+              <span>{tr(message)}</span>
             </div>
           );
         })}

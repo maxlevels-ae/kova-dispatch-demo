@@ -1,10 +1,13 @@
 'use client';
+import {t as tr,customerLocale} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 import {useEffect,useState} from 'react';
 import {CheckCircle2} from 'lucide-react';
 import {useNotifications} from '@/context/NotificationProvider';
 export default function NotificationControls(){
- const n=useNotifications();const [ready,setReady]=useState(false),[push,setPush]=useState(null),[subscribed,setSubscribed]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[saved,setSaved]=useState(null);
- useEffect(()=>{fetch('/api/notifications/push').then(r=>r.json()).then(setPush).catch(()=>setPush({enabled:false})).finally(()=>setReady(true));navigator.serviceWorker?.getRegistration().then(r=>r?.pushManager.getSubscription()).then(s=>setSubscribed(Boolean(s))).catch(()=>{});},[]);
+  useI18n();
+ const n=useNotifications();const [hydrated,setHydrated]=useState(false);const [ready,setReady]=useState(false),[push,setPush]=useState(null),[subscribed,setSubscribed]=useState(false),[busy,setBusy]=useState(false),[status,setStatus]=useState(''),[saved,setSaved]=useState(null);
+ useEffect(()=>{setHydrated(true);fetch('/api/notifications/push').then(r=>r.json()).then(setPush).catch(()=>setPush({enabled:false})).finally(()=>setReady(true));navigator.serviceWorker?.getRegistration().then(r=>r?.pushManager.getSubscription()).then(s=>setSubscribed(Boolean(s))).catch(()=>{});},[]);
  if(!n)return null;
  const run=async(fn,save=false)=>{if(busy)return;setBusy(true);setStatus('');try{await fn();if(save){setStatus('Settings saved successfully · تم حفظ الإعدادات بنجاح');setSaved(new Date());}}catch(e){setStatus(e.message);}finally{setBusy(false);}};
  const subscription=async()=>{
@@ -17,12 +20,12 @@ export default function NotificationControls(){
   const {endpoint,keys}=sub.toJSON();const r=await fetch('/api/notifications/push',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({endpoint,keys})});const d=await r.json();if(!r.ok)throw Error(d.error);setSubscribed(true);
  };
  return <div className="notification-preferences">
-  <div className="flex gap-2 wrap"><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!ready} onClick={()=>run(n.enable)}>Enable notifications</button><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!ready} onClick={()=>run(()=>n.testSound(false))}>Test sound</button><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!ready} onClick={()=>run(()=>n.testSound(true))}>Preview new booking sound</button></div>
-  <p className="tiny muted">Browser permission: {n.permission}. Sound: {n.audioReady?'ready':'tap Enable notifications or Test sound'}.</p>
-  {n.permission==='denied'&&<p role="status">Browser notifications are blocked. Change this site’s permission in browser settings. Ride popups remain visible.</p>}
-  <p className="tiny muted">Background push: {push?.enabled?(subscribed?'subscribed on this browser':'configured, not subscribed on this browser'):'disabled — VAPID is not configured'}.</p>
-  {push?.enabled&&<button type="button" className="btn btn-secondary btn-sm" disabled={busy||!ready} onClick={()=>run(subscription)}>{subscribed?'Disable background push':'Subscribe to background push'}</button>}
-  <details><summary className="small">Notification preferences</summary>{Object.entries({inApp:'In-app inbox',driverSound:'Driver new booking sound',riderSound:'Rider trip sound',messages:'Message notifications',rideEvents:'Ride-event notifications',browser:'Browser notifications',push:'Background push',muted:'Mute sound and browser alerts'}).map(([key,label])=><label className="flex gap-2 mt-2" key={key}><input type="checkbox" checked={n.preferences[key]} disabled={busy||!ready} onChange={e=>run(()=>n.save({[key]:e.target.checked}),true)}/>{label}</label>)}</details>
-  <p role="status" aria-live="polite">{status&&saved&&status.startsWith('Settings saved')&&<CheckCircle2 size={16}/>} {status}{saved&&status.startsWith('Settings saved')&&<time dateTime={saved.toISOString()}> · Saved {saved.toLocaleTimeString()}</time>}</p>
+  <div className="flex gap-2 wrap"><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!hydrated} onClick={()=>run(n.enable)}>{tr("Enable notifications")}</button><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!hydrated} onClick={()=>run(()=>n.testSound(false))}>{tr("Test sound")}</button><button type="button" className="btn btn-secondary btn-sm" disabled={busy||!hydrated} onClick={()=>run(()=>n.testSound(true))}>{tr("Preview new booking sound")}</button></div>
+  <p className="tiny muted">{tr("Browser permission:")}{' '}{tr(n.permission)}{' '}{tr(". Sound:")}{' '}{tr(n.audioReady?'ready':'tap Enable notifications or Test sound')}.</p>
+  {n.permission==='denied'&&<p role="status">{tr("Browser notifications are blocked. Change this site’s permission in browser settings. Ride popups remain visible.")}</p>}
+  <p className="tiny muted">{tr("Background push:")}{' '}{tr(push?.enabled?(subscribed?'subscribed on this browser':'configured, not subscribed on this browser'):'disabled — VAPID is not configured')}.</p>
+  {push?.enabled&&<button type="button" className="btn btn-secondary btn-sm" disabled={busy||!ready} onClick={()=>run(subscription)}>{tr(subscribed?'Disable background push':'Subscribe to background push')}</button>}
+  <details><summary className="small">{tr("Notification preferences")}</summary>{Object.entries({inApp:'In-app inbox',driverSound:'Driver new booking sound',riderSound:'Rider trip sound',messages:'Message notifications',rideEvents:'Ride-event notifications',browser:'Browser notifications',push:'Background push',muted:'Mute sound and browser alerts'}).map(([key,label])=><label className="flex gap-2 mt-2" key={key}><input type="checkbox" checked={n.preferences[key]} disabled={busy||!ready} onChange={e=>run(()=>n.save({[key]:e.target.checked}),true)}/>{tr(label)}</label>)}</details>
+  <p role="status" aria-live="polite">{status&&saved&&status.startsWith('Settings saved')&&<CheckCircle2 size={16}/>} {tr(status)}{' '}{saved&&status.startsWith('Settings saved')&&<time dateTime={saved.toISOString()}>{tr("· Saved")}{' '}{tr(saved.toLocaleTimeString(customerLocale()))}</time>}</p>
  </div>;
 }

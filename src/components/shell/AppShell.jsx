@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import Link from 'next/link';
 import NotificationInbox from '@/components/NotificationInbox';
@@ -13,6 +15,7 @@ import { Avatar } from '@/components/ui/bits';
  * @param {{nav: Array<{href:string,label:string,icon:any}>, children:any}} props
  */
 export default function AppShell({ nav, children }) {
+  useI18n();
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user;
@@ -21,18 +24,18 @@ export default function AppShell({ nav, children }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <Link href="/" aria-label="Maxride home">
+          <Link href="/" aria-label={tr("Maxride home")}>
             <KovaLogo size={30} />
           </Link>
         </div>
 
-        <nav className={`sidebar-nav${nav.length > 6 ? ' sidebar-nav--extended' : ''}`} aria-label="Main">
+        <nav className={`sidebar-nav${nav.length > 6 ? ' sidebar-nav--extended' : ''}`} aria-label={tr("Main")}>
           {nav.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <Link key={href} href={href} className={`nav-item ${active ? 'active' : ''}`}>
                 <Icon size={19} strokeWidth={2} />
-                <span>{label}</span>
+                <span>{tr(label)}</span>
               </Link>
             );
           })}
@@ -40,20 +43,20 @@ export default function AppShell({ nav, children }) {
 
         <div className="sidebar-footer">
           <div className="sidebar-user">
-            <Link href={user?.role === 'admin' ? '/admin/profile' : user?.role === 'driver' ? '/driver/profile' : '/profile'} className="flex items-center gap-2 flex-1" aria-label="My profile"><Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
+            <Link href={user?.role === 'admin' ? '/admin/profile' : user?.role === 'driver' ? '/driver/profile' : '/profile'} className="flex items-center gap-2 flex-1" aria-label={tr("My profile")}><Avatar name={user?.name || ''} src={user?.avatar || ''} size="sm" />
             <div className="flex-1 truncate">
               <div className="small truncate" style={{ fontWeight: 600 }}>
                 {user?.name || '—'}
               </div>
-              <div className="tiny muted truncate">@{user?.username || ''}</div>
+              <div className="tiny muted truncate"><bdi dir="ltr">@{user?.username || ''}</bdi></div>
             </div>
             </Link>
             <button
               className="btn btn-ghost btn-icon"
               style={{ minHeight: 36, width: 36 }}
               onClick={() => signOut({ callbackUrl: '/' })}
-              aria-label="Sign out"
-              title="Sign out"
+              aria-label={tr("Sign out")}
+              title={tr("Sign out")}
             >
               <LogOut size={17} />
             </button>
@@ -61,7 +64,7 @@ export default function AppShell({ nav, children }) {
         </div>
       </aside>
 
-      <main className="content"><header className="app-header" aria-label="Account controls">{user?.role === 'admin' && <div className="admin-mobile-profile"><Link href="/admin/profile" className="btn btn-ghost"><Avatar name={user.name} src={user.avatar} size="sm"/>My profile</Link></div>}<NotificationInbox /></header>{children}</main>
+      <main className="content"><header className="app-header" aria-label={tr("Account controls")}>{user?.role === 'admin' && <div className="admin-mobile-profile"><Link href="/admin/profile" className="btn btn-ghost"><Avatar name={user.name} src={user.avatar} size="sm"/>{tr("My profile")}</Link></div>}<NotificationInbox /></header>{children}</main>
     </div>
   );
 }

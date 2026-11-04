@@ -1,10 +1,13 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useState } from 'react';
 import { Star } from 'lucide-react';
 
 /** Initials avatar with optional image. */
 export function Avatar({ name = '', src = '', size = 'md' }) {
+  useI18n();
   const cls = size === 'lg' ? 'avatar avatar-lg' : size === 'sm' ? 'avatar avatar-sm' : 'avatar';
   const initials = name
     .split(' ')
@@ -23,11 +26,12 @@ export function Avatar({ name = '', src = '', size = 'md' }) {
 
 /** Read-only star display, e.g. ratings on cards. */
 export function Stars({ value = 5, size = 14 }) {
+  useI18n();
   return (
     <span className="flex items-center gap-1" style={{ color: 'var(--gold-600)' }}>
       <Star size={size} fill="currentColor" strokeWidth={0} />
       <span className="small mono-nums" style={{ color: 'var(--text)', fontWeight: 600 }}>
-        {Number(value).toFixed(1)}
+        {tr(Number(value).toFixed(1))}
       </span>
     </span>
   );
@@ -35,9 +39,10 @@ export function Stars({ value = 5, size = 14 }) {
 
 /** Interactive 1-5 star picker. */
 export function StarPicker({ value, onChange, size = 32 }) {
+  useI18n();
   const [hover, setHover] = useState(0);
   return (
-    <div className="flex gap-1 justify-center" role="radiogroup" aria-label="Rating">
+    <div className="flex gap-1 justify-center" role="radiogroup" aria-label={tr("Rating")}>
       {[1, 2, 3, 4, 5].map((n) => {
         const active = n <= (hover || value);
         return (
@@ -67,22 +72,24 @@ export function StarPicker({ value, onChange, size = 32 }) {
 
 /** Centered loading block. */
 export function Loading({ label = 'Loading…' }) {
+  useI18n();
   return (
     <div className="empty" style={{ padding: 32 }}>
       <span className="spinner" style={{ color: 'var(--ink-500)' }} />
-      <p className="small">{label}</p>
+      <p className="small">{tr(label)}</p>
     </div>
   );
 }
 
 /** Empty state with icon + message. */
 export function Empty({ icon: Icon, title, hint, action }) {
+  useI18n();
   return (
     <div className="empty">
       {Icon && <Icon size={40} strokeWidth={1.5} />}
-      <h3>{title}</h3>
-      {hint && <p>{hint}</p>}
-      {action}
+      <h3>{tr(title)}</h3>
+      {hint && <p>{tr(hint)}</p>}
+      {tr(action)}
     </div>
   );
 }
@@ -99,8 +106,9 @@ const STATUS_BADGE = {
 
 /** Consistent ride status chip. */
 export function RideStatusBadge({ status }) {
+  useI18n();
   const [cls, label] = STATUS_BADGE[status] || ['badge-neutral', status];
-  return <span className={`badge badge-dot ${cls}`}>{label}</span>;
+  return <span className={`badge badge-dot ${cls}`}>{tr(label)}</span>;
 }
 
 export const VEHICLE_LABELS = {

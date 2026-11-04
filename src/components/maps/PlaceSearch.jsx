@@ -1,4 +1,6 @@
 'use client';
+import {t as tr} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -29,6 +31,7 @@ export default function PlaceSearch({
   bias,
   autoFocus = false,
 }) {
+  useI18n();
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -195,18 +198,14 @@ export default function PlaceSearch({
       {results.length === 0 && outcome === 'empty' && (
         <div className="flex items-center gap-2" style={{ padding: '13px 14px' }}>
           <SearchX size={15} style={{ color: 'var(--ink-400)', flexShrink: 0 }} />
-          <span className="tiny muted">
-            No places found — try adding the street or city name
-          </span>
+          <span className="tiny muted">{tr("No places found — try adding the street or city name")}</span>
         </div>
       )}
 
       {results.length === 0 && outcome === 'error' && (
         <div className="flex items-center gap-2" style={{ padding: '13px 14px' }}>
           <WifiOff size={15} style={{ color: 'var(--danger)', flexShrink: 0 }} />
-          <span className="tiny" style={{ color: 'var(--danger)' }}>
-            Can’t reach the server — check your connection and refresh the page
-          </span>
+          <span className="tiny" style={{ color: 'var(--danger)' }}>{tr("Can’t reach the server — check your connection and refresh the page")}</span>
         </div>
       )}
     </div>
@@ -236,7 +235,7 @@ export default function PlaceSearch({
         />
       </div>
 
-      {dropdown && createPortal(dropdown, document.body)}
+      {tr(dropdown && createPortal(dropdown, document.body))}
     </div>
   );
 }

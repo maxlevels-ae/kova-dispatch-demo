@@ -89,7 +89,7 @@ export async function POST(request) {
       driver.h3Cell = h3Cell || driver.h3Cell;
       await driver.save();
     } else {
-      if (driver.currentRideId) {
+      if (driver.currentRideId || driver.currentDeliveryId) {
         return Response.json(
           { error: 'Finish your current trip before going offline' },
           { status: 409 }

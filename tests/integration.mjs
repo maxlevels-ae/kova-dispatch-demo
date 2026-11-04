@@ -200,7 +200,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only")) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -1229,7 +1229,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only")) await check(
+  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1246,16 +1246,20 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
     const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
     const {notificationChecks}=await import('./ride-notifications.mjs');
     await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
+    const {deliveryChecks}=await import('./delivery-integration.mjs');
+    await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});
     const {accountsChecks}=await import('./accounts-integration.mjs');
     await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});
   }
+  if(process.argv.includes('--notifications-only')){const {notificationChecks}=await import('./ride-notifications.mjs');await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});}
+  if(process.argv.includes('--delivery-only')){const {deliveryChecks}=await import('./delivery-integration.mjs');await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
   console.log(
     `${passed} database/API integration checks passed; only disposable database ${dbName} was written.`,
   );

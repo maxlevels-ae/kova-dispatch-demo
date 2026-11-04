@@ -21,10 +21,10 @@ export function NotificationProvider({children}){
   const claim=()=>{try{const storageKey='maxride-notification-seen:'+n.userId;const entries=JSON.parse(localStorage.getItem(storageKey)||'[]').filter(e=>Date.now()-e.at<300000);if(entries.some(e=>e.key===n.key))return false;localStorage.setItem(storageKey,JSON.stringify([...entries,{key:n.key,at:Date.now()}].slice(-200)));}catch{/* Private storage may be unavailable. */}return true;};
   const claimed=navigator.locks?await navigator.locks.request('maxride-notification-display',claim):claim();if(!claimed)return;
   const {preferences:p,policy:s}=state.current;
-  if(!p.inApp||(n.event==='ride_message'?!p.messages:!p.rideEvents))return;
-  if(n.event!=='booking_offer')toast(n.text,'info');
-  const sound=n.event==='ride_message'?s.messageSound!==false:role==='driver'?s.driverSound!==false:s.riderSound!==false;
-  if(n.event!=='booking_offer'&&sound&&!p.muted&&(role==='driver'?p.driverSound:p.riderSound)){
+  if(!p.inApp||(['ride_message','delivery_message'].includes(n.event)?!p.messages:!p.rideEvents))return;
+  if(!['booking_offer','delivery_offer'].includes(n.event))toast(n.text,'info');
+  const sound=['ride_message','delivery_message'].includes(n.event)?s.messageSound!==false:role==='driver'?s.driverSound!==false:s.riderSound!==false;
+  if(!['booking_offer','delivery_offer'].includes(n.event)&&sound&&!p.muted&&(role==='driver'?p.driverSound:p.riderSound)){
    if(!await playAlert({key:n.key}))setAudioReady(false);
   }
   if(p.browser&&!p.muted&&await browserNotificationPermission()==='granted'){
@@ -33,6 +33,7 @@ export function NotificationProvider({children}){
    const subscription=await registration?.pushManager?.getSubscription().catch(()=>null);
    if(document.visibilityState==='hidden'&&subscription)return;
    const options={body:n.text,tag:String(n._id),data:{href:safeNotificationLink(n.href)}};
+   if(registration&&!registration.active)await navigator.serviceWorker.ready;
    if(registration)await registration.showNotification('Maxride',options).catch(()=>setError('Browser notification could not be displayed. Check browser and operating-system notification permissions.'));
    else {try{const notice=new Notification('Maxride',options);notice.onclick=()=>{window.focus();window.location.assign(safeNotificationLink(n.href));notice.close();};}catch{/* Browser requires a service worker. */}}
   }
@@ -55,7 +56,7 @@ export function NotificationProvider({children}){
   if(typeof Notification==='undefined'){setError('Browser notifications are not supported here. In-app alerts remain available.');return;}
   const result=await Notification.requestPermission();setPermission(result);
   if(result==='denied'){setError('Notifications are blocked. Allow notifications in your browser site settings; visible ride alerts still work.');return;}
-  if(result==='granted'&&'serviceWorker' in navigator)await navigator.serviceWorker.register('/notifications-sw.js');
+  if(result==='granted'&&'serviceWorker' in navigator){await navigator.serviceWorker.register('/notifications-sw.js');await navigator.serviceWorker.ready;}
  };
  const testSound=async offer=>{setAudioReady(await unlockAudio());if(!await playAlert({key:'preview',offer,expiresAt:new Date(Date.now()+3000).toISOString()}))throw Error('Sound is blocked by the browser. Try enabling notifications first.');};
  return <Context.Provider value={{items,unread,preferences,policy,error,permission,audioReady,refresh,save,markRead,enable,testSound}}>{children}</Context.Provider>;

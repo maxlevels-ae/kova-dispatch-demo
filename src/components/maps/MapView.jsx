@@ -1,4 +1,6 @@
 "use client";
+import {t} from '@/lib/i18n';
+import {useI18n} from '@/context/LanguageProvider';
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -51,6 +53,7 @@ export default function MapView({
   const center = requestedCenter || config.center;
   const zoom = requestedZoom ?? config.settings.initialZoom;
   const [mapState, setMapState] = useState("loading");
+  useI18n();
   const [mapError, setMapError] = useState("");
   const [fallback, setFallback] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -404,11 +407,11 @@ export default function MapView({
           height: "100%",
           opacity: mapState === "error" ? 0.25 : 1,
         }}
-        aria-label="Map"
+        aria-label={t('Map')}
       />
       {(mapState === "error" || mapError || config.error) && (
         <div className="map-notice" role="alert">
-          {mapError || config.error}
+          {t(mapError || config.error)}
           <br />
           <button
             className="btn btn-secondary btn-sm"
@@ -417,13 +420,13 @@ export default function MapView({
               setRetry((n) => n + 1);
             }}
           >
-            Use OpenFreeMap Standard
+            {t('Use OpenFreeMap Standard')}
           </button>
         </div>
       )}
       {mapState === "loading" && !mapError && (
         <div className="map-notice" role="status">
-          Loading map…
+          {t('Loading map…')}
         </div>
       )}
     </div>
