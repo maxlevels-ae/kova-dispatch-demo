@@ -360,6 +360,13 @@ async function headerInbox(page, role) {
   await trigger.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('region',{name:'Notification inbox'})).toBeVisible();
+  if(role==='rider'){
+    await expect(page.getByRole('button',{name:'Test sound',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Test Incoming Booking Sound',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Enable Sound',exact:true})).toHaveCount(0);
+    await expect(page.getByText('Driver new booking sound',{exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Enable notifications',exact:true})).toBeVisible();
+  }
   const bounds=await page.locator('.notification-panel').boundingBox();
   assert.ok(bounds.x>=0 && bounds.x+bounds.width<=page.viewportSize().width, 'Inbox fits viewport');
   await page.screenshot({path:`docs/qa/notifications-header-${role}.png`,fullPage:true});

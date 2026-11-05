@@ -27,8 +27,14 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    const page=await c.newPage();pages[role]=page;page.on('pageerror',e=>jsErrors.push(e.message));
    await page.goto(base+(role==='driver'?'/driver/dashboard':'/dashboard'),{waitUntil:'domcontentloaded'});
    const summary=page.getByLabel('Notifications',{exact:true});await expect(summary).toBeVisible({timeout:30000});await summary.click();
-   await page.getByRole('button',{name:'Enable notifications',exact:true}).click();await page.getByRole('button',{name:'Test sound',exact:true}).click();
+   await page.getByRole('button',{name:'Enable notifications',exact:true}).click();
+   if(role==='driver'){
+   await page.getByRole('button',{name:'Test sound',exact:true}).click();
    await expect.poll(()=>page.evaluate(()=>qaPlayed.some(a=>a.src.includes('all-notify.mp3')&&a.time>0&&a.volume>0)),{timeout:10000}).toBe(true).catch(async e=>{console.log('AUDIO DIAGNOSTICS',role,await page.evaluate(()=>({played:qaPlayed,players:qaAudio.map(a=>({src:a.src,time:a.currentTime,paused:a.paused,volume:a.volume,ready:a.readyState,error:a.error?.message}))})),await page.locator('.notification-panel').innerText());throw e;});
+   }else{
+    await expect(page.getByRole('button',{name:'Test sound',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Test Incoming Booking Sound',exact:true})).toHaveCount(0);
+   }
    await expect(page.getByText(/VAPID is not configured/).first()).toBeVisible();await page.getByRole('button',{name:'Close notifications',exact:true}).click();
   }
   await check('real Chromium sound playback, granted notification permission, and explicit disabled push status',async()=>{
