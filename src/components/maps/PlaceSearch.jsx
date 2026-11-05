@@ -61,7 +61,11 @@ export default function PlaceSearch({
 
     const update = () => {
       const rect = wrapRef.current?.getBoundingClientRect();
-      if (rect) setAnchor({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+      if (rect) {
+        const below=window.innerHeight-rect.bottom-22,above=rect.top-22;
+        const flip=below<160&&above>below;
+        setAnchor({top:flip?undefined:rect.bottom+6,bottom:flip?window.innerHeight-rect.top+6:undefined,left:rect.left,width:rect.width,maxHeight:Math.max(60,Math.min(280,flip?above:below))});
+      }
     };
     update();
 
@@ -155,12 +159,13 @@ export default function PlaceSearch({
       style={{
         position: 'fixed',
         top: anchor.top,
+        bottom: anchor.bottom,
         left: anchor.left,
         width: anchor.width,
-        zIndex: 70, // above panels, modals and toasts — never clipped
+        zIndex: 1100, // above panels, modals and toasts — never clipped
         boxShadow: 'var(--shadow-lg)',
         overflow: 'hidden',
-        maxHeight: Math.min(280, window.innerHeight - anchor.top - 16),
+        maxHeight: anchor.maxHeight,
         overflowY: 'auto',
       }}
     >

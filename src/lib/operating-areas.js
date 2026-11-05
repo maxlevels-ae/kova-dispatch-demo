@@ -2,10 +2,11 @@ import mongoose from 'mongoose';
 import OperatingAreas from '@/lib/db/models/OperatingAreas';
 import OperatingAreaAudit from '@/lib/db/models/OperatingAreaAudit';
 import connectDB from '@/lib/db/mongodb';
-import {countries,countryForConfig} from '@/lib/countries';
+import {countries,countryForConfig,currencyDigits} from '@/lib/countries';
 import {initialCountries,countryConfigSchema,readiness} from '@/lib/operating-policy';
 import {countryBoundaries,contains,geometryError} from '@/lib/operating-geometry';
 import {getSettings} from '@/lib/settings';
+import {deliveryPaymentDefaults} from '@/lib/delivery-policy';
 import {getDeliverySettings} from '@/lib/delivery-settings';
 import {cityCenter} from '@/lib/map-config';
 import {walletAccount} from '@/lib/currency';
@@ -18,7 +19,7 @@ export async function getOperatingAreas(){
  return {_id:'global',activeCountry:'EG',revision:0,countries:configs,audit:[]};
 }
 export function enabledZones(config,service){return config.zones.filter(z=>z.active&&z[service]&&config.activeCities.includes(z.city));}
-export function zoneAt(snapshot,point,service){if(!contains(countryBoundaries[snapshot.country.code],point))return null;return enabledZones(snapshot.config,service).filter(z=>contains(z.geometry,point)).sort((a,b)=>a.id.localeCompare(b.id))[0]||null;}
+export function zoneAt(snapshot,point,service){if(!contains(countryBoundaries[snapshot.country.code],point))return null;if(snapshot.config.enforceZones?.[service]===false)return {id:'country-'+snapshot.country.code,name:snapshot.country.name};return enabledZones(snapshot.config,service).filter(z=>contains(z.geometry,point)).sort((a,b)=>a.id.localeCompare(b.id))[0]||null;}
 export async function activeOperations(){const record=await getOperatingAreas();const metadata=countryForConfig(record.activeCountry,record.countries[record.activeCountry]);const country=Object.fromEntries(Object.entries(metadata).filter(([key])=>!['cities','provinces'].includes(key)));return {country,config:record.countries[record.activeCountry],revision:record.revision};}
 export async function bookingArea(service,pickup,dropoff,at=new Date()){
  const snapshot=await activeOperations();const {country,config}=snapshot;
@@ -29,7 +30,7 @@ export async function bookingArea(service,pickup,dropoff,at=new Date()){
 }
 export async function saveCountry(code,input,revision,actor,activate=false){
  if(!Object.hasOwn(countries,code))throw new AreaError('Unsupported country',400);
- const config=countryConfigSchema.parse(input);
+ const config=countryConfigSchema.parse(input);const digits=currencyDigits[countryForConfig(code,config).currency];if(config.deliveryPayments?.cod&&(!Number.isInteger(digits)||Math.abs(config.deliveryPayments.codMaximum*10**digits-Math.round(config.deliveryPayments.codMaximum*10**digits))>1e-6))throw new AreaError('COD limit must use the configured currency precision',400);
  if(activate){const blockers=readiness(code,config);if(blockers.length)throw new AreaError(blockers.join('; '),400);}
  if(!contains(countryBoundaries[code],config.center))throw new AreaError('Map center must be inside the selected country',400);
  if(config.activeCities.some(city=>!countries[code].cities.some(c=>c.name===city)))throw new AreaError('Choose cities from the country catalog',400);
@@ -74,7 +75,7 @@ export function courierReadiness(driver,user,{snapshot,service='delivery',pickup
 
 export function deliveryOperationsPolicy(settings,operations){
  const s=structuredClone(settings),config=operations.config;
- s.currency=operations.country.currency;s.general.regions=config.activeCities;
+ s.payments={...deliveryPaymentDefaults,...config.deliveryPayments};s.currency=operations.country.currency;s.general.regions=config.activeCities;
  s.general.enabled=s.general.enabled&&config.delivery;
  s.general.startHour=config.deliveryHours.start;s.general.endHour=config.deliveryHours.end;
  if(config.deliveryPricing)s.pricing=config.deliveryPricing;

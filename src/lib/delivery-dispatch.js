@@ -24,9 +24,9 @@ export async function dispatchDeliveries(){
    if(!driver){
     const closed=await mongoose.connection.transaction(async session=>{
      const current=await Delivery.findOne({_id:order._id,status:'SEARCHING_COURIER'}).session(session);if(!current)return null;
-     const updated=await User.findByIdAndUpdate(current.customerId,walletDelta(current.quote.total,current.quote.currency),{session,returnDocument:'after',updatePipeline:true});
-     await WalletTransaction.create([{userId:current.customerId,type:'refund',amount:current.quote.total,currency:current.quote.currency,balanceAfter:walletAccount(updated,current.quote.currency).balance,deliveryId:current._id,ref:`delivery:${current._id}:refund`,note:'No courier — delivery refund'}],{session});
-     current.status='NO_COURIER';current.offer=undefined;current.settlement={status:'refunded',at:new Date()};current.timeline.push({status:current.status,event:'no_eligible_courier',role:'system'});await current.save({session});return current;
+     if(current.payment?.method!=='cash'){const updated=await User.findByIdAndUpdate(current.customerId,walletDelta(current.quote.total,current.quote.currency),{session,returnDocument:'after',updatePipeline:true});
+     await WalletTransaction.create([{userId:current.customerId,type:'refund',amount:current.quote.total,currency:current.quote.currency,balanceAfter:walletAccount(updated,current.quote.currency).balance,deliveryId:current._id,ref:`delivery:${current._id}:refund`,note:'No courier — delivery refund'}],{session});}
+     current.status='NO_COURIER';current.offer=undefined;current.settlement={status:current.payment?.method==='cash'?'cancelled_unpaid':'refunded',at:new Date()};current.timeline.push({status:current.status,event:'no_eligible_courier',role:'system'});await current.save({session});return current;
     });if(closed)await deliveryNotify(closed,closed.status,closed.timeline.at(-1)._id);continue;
    }
    const offer={id:crypto.randomUUID(),courierId:driver.userId,profileId:driver._id,expiresAt:new Date(Date.now()+s.dispatch.acceptanceSeconds*1000)};

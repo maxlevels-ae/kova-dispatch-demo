@@ -1,3 +1,4 @@
+import DeliveryCashEntry from '@/lib/db/models/DeliveryCashEntry';
 import {bookingArea,courierReadiness,deliveryOperationsPolicy} from '@/lib/operating-areas';
 import {currencyDigits} from '@/lib/countries';
 import {mobileContact} from '@/lib/contact-phone';
@@ -16,7 +17,7 @@ import redis from '@/lib/db/redis';
 import {walletAccount,walletDelta,minorUnits} from '@/lib/currency';
 import {getRoute} from '@/lib/services/routing';
 import {getDeliverySettings} from '@/lib/delivery-settings';
-import {deliveryBookingSchema,selectedPackageBounds,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '@/lib/delivery-policy';
+import {deliveryPoint,deliveryBookingSchema,selectedPackageBounds,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '@/lib/delivery-policy';
 import {emitToUser,emitToAdmin} from '@/lib/realtime/emit';
 import {deliverNotifications} from '@/lib/notifications';
 export class DeliveryError extends Error{constructor(message,status=409){super(message);this.status=status;}}
@@ -36,13 +37,13 @@ export async function loadDelivery(id,user){
 }
 export async function deliveryView(order,user){
  const data=order.toObject?order.toObject():structuredClone(order);
- delete data.guestAccess;
+ delete data.guestAccess;if(user.role==='admin'||equal(order.courierId,user.id)||equal(order.customerId,user.id))data.cashEntries=await DeliveryCashEntry.find({deliveryId:order._id}).sort({createdAt:1}).lean();
  data.recipientType=order.recipientType||(order.recipientId?'registered':'guest');data.verificationMethod=order.verificationMethod||(order.recipientId?'account_otp':'private_link');
  if(user.role==='admin')data.verificationAttempts={pickup:order.pickupCode?.attempts||0,delivery:order.deliveryCode?.attempts||0};
  data.country=data.operations?.country;data.zones=data.operations?{pickup:data.operations.pickupZone,dropoff:data.operations.dropoffZone}:undefined;delete data.operations;
  delete data.pickupCode;delete data.deliveryCode;delete data.policy;delete data.idempotencyKey;delete data.__v;
- const [courier,driver]=order.courierId?await Promise.all([User.findById(order.courierId).select('name avatar').lean(),Driver.findById(order.driverProfileId).select('location lastLocationUpdate stats.averageRating').lean()]):[null,null];
- data.courier=courier?{name:courier.name,avatar:courier.avatar,rating:driver?.stats?.averageRating,location:!terminalDeliveryStates.includes(order.status)&&driver?.lastLocationUpdate&&Date.now()-new Date(driver.lastLocationUpdate)<90000?{lng:driver.location.coordinates[0],lat:driver.location.coordinates[1]}:null}:null;
+ const [courier,driver]=order.courierId?await Promise.all([User.findById(order.courierId).select('name avatar phone').lean(),Driver.findById(order.driverProfileId).select('location lastLocationUpdate stats.averageRating').lean()]):[null,null];
+ data.courier=courier?{name:courier.name,avatar:courier.avatar,rating:driver?.stats?.averageRating,lastLocationAt:driver?.lastLocationUpdate||null,phone:!terminalDeliveryStates.includes(order.status)&&(user.role==='admin'||equal(order.customerId,user.id))?courier.phone:undefined,location:!terminalDeliveryStates.includes(order.status)&&driver?.lastLocationUpdate&&Date.now()-new Date(driver.lastLocationUpdate)<90000?{lng:driver.location.coordinates[0],lat:driver.location.coordinates[1]}:null}:null;
  if(user.role!=='admin')delete data.attempted;
  if(equal(order.recipientId,user.id)&&!equal(order.customerId,user.id)){delete data.sender;delete data.pickup;delete data.route;data.messages=[];}
  return data;
@@ -73,23 +74,24 @@ async function notifySafely(order,event,id,exclude){try{await deliveryNotify(ord
 export async function quoteDelivery(input,user){
  await connectDB();if(!user?.id)fail('Authentication required',401);
  const senderAccount=await User.findOne({_id:user.id,isActive:true,role:'rider'}).select('name phone phoneCountry').lean();
- if(!senderAccount?.name||!senderAccount.phone)fail('Complete your name and phone in your profile before sending a package.',400);
- const accountContact=mobileContact(senderAccount.phone,senderAccount.phoneCountry);if(accountContact.error)fail('Account contact: '+accountContact.error,400);
+ if(!senderAccount?.name)fail('Complete your name and phone in your profile before sending a package.',400);
+ const pickup=deliveryPoint.safeParse(input.pickup),dropoff=deliveryPoint.safeParse(input.dropoff);if(!pickup.success||!dropoff.success)fail('Choose valid pickup and dropoff locations.',400);const operations=await bookingArea('delivery',pickup.data,dropoff.data);const localCountry=operations.country.code;const accountContact=mobileContact(senderAccount.phone,senderAccount.phoneCountry||localCountry);if((accountContact.error||accountContact.phoneCountry!==localCountry)&&!input.alternatePickupContact)fail('A valid pickup contact is required.',400);
  const sender=input.alternatePickupContact?{...input.pickupContact,instructions:input.sender?.instructions||''}:{name:senderAccount.name,...accountContact,instructions:input.sender?.instructions||''};
- const parsed=deliveryBookingSchema.safeParse({...input,sender});if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
+ if(input.mode==='bring'&&!input.recipientOverride&&(accountContact.error||accountContact.phoneCountry!==localCountry))fail('Add a local recipient contact for this delivery.',400);
+ const recipient=input.mode==='bring'&&!input.recipientOverride?{name:senderAccount.name,...accountContact,instructions:input.recipient?.instructions||''}:input.recipient;const parsed=deliveryBookingSchema.safeParse({...input,sender,recipient});if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
  const b=parsed.data,{settings:s}=await getDeliverySettings();if(!s.general.enabled)fail('Delivery service is currently disabled');
- const operations=await bookingArea('delivery',b.pickup,b.dropoff);
- for(const [field,label] of [['sender','Pickup contact'],['recipient','Recipient contact']]){const contact=mobileContact(b[field].phone,b[field].phoneCountry);if(contact.error)fail(label+': '+contact.error,400);Object.assign(b[field],contact);}
+ for(const [field,label] of [['sender','Pickup contact'],['recipient','Recipient contact']]){const contact=mobileContact(b[field].phone,b[field].phoneCountry||localCountry);if(contact.error)fail(label+': '+contact.error,400);if(field==='sender'&&contact.phoneCountry!==localCountry)fail('Pickup contact must use a valid local mobile number',400);Object.assign(b[field],contact);}
  Object.assign(s,deliveryOperationsPolicy(s,operations));
+ if(!s.payments[b.paymentMethod])fail('Payment method is unavailable',400);if(b.codAmount&&b.mode==='bring')fail('Merchandise COD is supported only for Send Package',400);if(b.codAmount&&(!s.payments.cod||b.paymentMethod!=='cash'||b.codAmount>s.payments.codMaximum))fail('Merchandise COD is unavailable or exceeds the configured limit',400);if(Math.abs(b.codAmount*10**currencyDigits[s.currency]-Math.round(b.codAmount*10**currencyDigits[s.currency]))>1e-6)fail('Invalid currency precision',400);
  const bounds=selectedPackageBounds(b.package.size,s.packages);for(const [key,value] of Object.entries(bounds))if(b.package[key]===undefined)b.package[key]=value;
  if(Object.entries(bounds).some(([key,max])=>b.package[key]>max))fail('Package exceeds the selected size limits. Choose a larger package size.',400);
- b.senderAccount={id:String(senderAccount._id),name:senderAccount.name,...accountContact};
+ b.senderAccount={id:String(senderAccount._id),name:senderAccount.name,phone:accountContact.phone||senderAccount.phone,phoneCountry:accountContact.phoneCountry||senderAccount.phoneCountry,contactValid:!accountContact.error};
  if(!s.packages.categories.includes(b.package.category)||b.package.weight>s.packages.maxWeight||b.package.length>s.packages.maxLength||b.package.width>s.packages.maxWidth||b.package.height>s.packages.maxHeight)fail('Package exceeds configured category, weight or dimensions',400);
- const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone phoneCountry').lean():null;
- if(b.recipient.username&&(!recipient||mobileContact(recipient.phone,recipient.phoneCountry).phone!==b.recipient.phone))fail('Registered recipient account and phone do not match.',400);
+ const registeredRecipient=b.mode==='bring'&&!b.recipientOverride?senderAccount:b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone phoneCountry').lean():null;
+ if(b.recipient.username&&(!registeredRecipient||mobileContact(registeredRecipient.phone,registeredRecipient.phoneCountry).phone!==b.recipient.phone))fail('Registered recipient account and phone do not match.',400);
  const route=await getRoute(b.pickup,b.dropoff);
  const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}},{$limit:1}]):[];
- return {input:b,settings:s,operations,recipientId:recipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
+ return {input:b,settings:s,operations,recipientId:registeredRecipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
 }
 export async function createDelivery(input,user){
  await Promise.all([Delivery.init(),WalletTransaction.init()]);
@@ -98,8 +100,8 @@ export async function createDelivery(input,user){
  const orderId=new mongoose.Types.ObjectId();
  const result=await mongoose.connection.transaction(async session=>{
   if(b.package.photoId){const photo=await DeliveryEvidence.findOne({_id:b.package.photoId,ownerId:user.id,kind:'package',deliveryId:null,expiresAt:{$gt:new Date()}}).session(session);if(!photo)fail('Invalid package photo',400);photo.deliveryId=orderId;photo.expiresAt=new Date(Date.now()+s.proof.retentionDays*86400000);await photo.save({session});}
-  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,senderAccount:b.senderAccount,alternatePickupContact:b.alternatePickupContact,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,operations,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
-  await postLedger(user.id,-quote.total,'delivery_payment',order,`delivery:${orderId}:payment`,session);return order;
+  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,mode:b.mode,payment:{method:b.paymentMethod,status:b.paymentMethod==='wallet'?'paid':'unpaid',payer:b.paymentMethod==='wallet'?'sender':s.payments.payer,cashStage:s.payments.cashStage,codAmount:b.codAmount,codPayee:user.id,codStatus:b.codAmount?'uncollected':'none'},recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,senderAccount:b.senderAccount,alternatePickupContact:b.alternatePickupContact,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,operations,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
+  if(b.paymentMethod==='wallet')await postLedger(user.id,-quote.total,'delivery_payment',order,`delivery:${orderId}:payment`,session);return order;
  });
  await notifySafely(result,result.status,'created');return result;
 }
@@ -146,13 +148,14 @@ export async function transitionDelivery(id,user,to,note=''){
   if(to==='RETURNED'&&!order.pickupCode.verifiedAt)fail('Verify the sender return code first');
   if(to==='DELIVERED'&&order.policy.proof.photoRequired&&!order.proof.photoId)fail('Proof photo is required');
   if(to==='AT_PICKUP')order.arrivedAt=new Date();
-  if(to==='PICKED_UP'){order.pickedUpAt=new Date();const minutes=Math.max(0,(Date.now()-new Date(order.arrivedAt))/60000);order.fare=deliveryPrice(order.policy,order.route,order.package.size,Math.floor(minutes));const extra=order.fare.total-order.quote.total;if(extra>0)await postLedger(order.customerId,-extra,'delivery_payment',order,`delivery:${id}:waiting`,session);}
+  if(to==='PICKED_UP'){order.pickedUpAt=new Date();const minutes=Math.max(0,(Date.now()-new Date(order.arrivedAt))/60000);order.fare=deliveryPrice(order.policy,order.route,order.package.size,Math.floor(minutes));const extra=order.fare.total-order.quote.total;if(extra>0&&order.payment?.method!=='cash')await postLedger(order.customerId,-extra,'delivery_payment',order,`delivery:${id}:waiting`,session);}
   if(to==='RETURN_REQUESTED')order.pickupCode=generateCode(order.policy.proof.expiryMinutes);
   if(to==='DELIVERED'){
-   await postLedger(order.courierId,order.fare.earnings,'delivery_earning',order,`delivery:${id}:earning`,session);
-   order.settlement={status:'settled',at:new Date()};order.deliveredAt=new Date();order.proof.confirmedAt=new Date();order.proof.recipientConfirmed=true;order.proof.recipientId=order.recipientId;
+   if(order.payment?.method!=='cash')await postLedger(order.courierId,order.fare.earnings,'delivery_earning',order,`delivery:${id}:earning`,session);
+   if(order.payment?.method==='cash'&&(order.payment.status!=='collected'||order.payment.feeCollected!==order.fare.total||(order.payment.codAmount>0&&order.payment.codStatus!=='collected')))fail('Confirm actual cash collection before delivery');order.settlement={status:order.payment?.method==='cash'?(order.fare.commission+(order.payment.codAmount||0)>0?'cash_reconciliation_pending':'cash_reconciled'):'settled',at:new Date()};order.deliveredAt=new Date();order.proof.confirmedAt=new Date();order.proof.recipientConfirmed=true;order.proof.recipientId=order.recipientId;
   }
-  if(['CANCELLED','RETURNED'].includes(to)){
+  if(['CANCELLED','RETURNED'].includes(to)&&order.payment?.method==='cash'){order.settlement={status:order.payment.status==='collected'||order.payment.codStatus==='collected'?'cash_refund_review':'cancelled_unpaid',at:new Date()};}
+  if(['CANCELLED','RETURNED'].includes(to)&&order.payment?.method!=='cash'){
    const fee=to==='CANCELLED'&&order.courierId?Math.min(order.fare.total,order.policy.pricing.cancellation):0;
    const refund=order.fare.total-fee;if(refund>0)await postLedger(order.customerId,refund,'refund',order,`delivery:${id}:refund`,session);
    if(fee>0)await postLedger(order.courierId,fee,'delivery_earning',order,`delivery:${id}:cancellation`,session);

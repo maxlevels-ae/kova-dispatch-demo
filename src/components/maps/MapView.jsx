@@ -245,11 +245,11 @@ export default function MapView({
 
   useEffect(() => {
     syncMarker("pickup", pickup, () => prototypeMarkers ? prototypeMarker('pickup_pin') : el("marker-pin pickup", PIN_SVG));
-  }, [pickup?.lat, pickup?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, pickup?.lat, pickup?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     syncMarker("dropoff", dropoff, () => prototypeMarkers ? prototypeMarker('dropoff_pin') : el("marker-pin dropoff", SQUARE_SVG));
-  }, [dropoff?.lat, dropoff?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, dropoff?.lat, dropoff?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     syncMarker("user", userPosition, () => {
@@ -258,7 +258,7 @@ export default function MapView({
         "width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.3)";
       return dot;
     });
-  }, [userPosition?.lat, userPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, userPosition?.lat, userPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Assigned driver marker (smoothly animated) ──
   useEffect(() => {
@@ -296,7 +296,7 @@ export default function MapView({
       if (t < 1) animRef.current = requestAnimationFrame(step);
     };
     animRef.current = requestAnimationFrame(step);
-  }, [driverPosition?.lat, driverPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, driverPosition?.lat, driverPosition?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Authorized admin metadata is optional; rider nearby payloads stay anonymous.
   useEffect(() => {
@@ -429,7 +429,7 @@ export default function MapView({
     // driverPosition is intentionally not a dep — refitting on every GPS
     // ping would make the camera jitter. It's included in bounds whenever
     // a route/endpoint change triggers a refit.
-  }, [fit, fitBottom, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, fit, fitBottom, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Recenter when no fit target ──
   useEffect(() => {

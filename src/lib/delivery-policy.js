@@ -30,8 +30,10 @@ export const deliveryDefaults={
 };
 export const deliveryPoint=z.object({lat:z.number().min(-90).max(90),lng:z.number().min(-180).max(180),address:z.string().trim().min(3).max(300)});
 const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().trim().min(1).max(40),phoneCountry:z.string().regex(/^[A-Z]{2}$/).optional().or(z.literal('')),instructions:z.string().max(500).default('')});
+export const deliveryPaymentDefaults={wallet:true,cash:false,payer:'sender',cashStage:'pickup',cod:false,codMaximum:0};
+export const deliveryPaymentSchema=z.object({wallet:z.boolean(),cash:z.boolean(),payer:z.enum(['sender','recipient']),cashStage:z.enum(['pickup','dropoff']),cod:z.boolean(),codMaximum:z.number().finite().min(0).max(100000)}).strict().refine(p=>p.wallet||p.cash,'Enable at least one payment method').refine(p=>!p.cod||(p.cash&&p.codMaximum>0),'COD requires cash and a positive limit').refine(p=>!p.cash||(p.payer==='sender'?p.cashStage==='pickup':p.cashStage==='dropoff'),'Cash collection stage must match the payer');
 export const deliveryBookingSchema=z.object({
- alternatePickupContact:z.boolean().default(false),pickupContact:contact.optional(),pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
+ mode:z.enum(['send','bring']).default('send'),recipientOverride:z.boolean().default(false),paymentMethod:z.enum(['wallet','cash']).default('wallet'),codAmount:z.number().finite().min(0).max(100000).default(0),alternatePickupContact:z.boolean().default(false),pickupContact:contact.optional(),pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
  package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive().optional(),length:z.number().positive().optional(),width:z.number().positive().optional(),height:z.number().positive().optional(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),
  acknowledged:z.literal(true),idempotencyKey:z.uuid(),
 }).strict();

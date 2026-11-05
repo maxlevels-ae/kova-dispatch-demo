@@ -1,0 +1,60 @@
+.rider-reference-shell:has(.delivery-booking),.rider-reference-shell:has(.delivery-customer-tracking){padding:0}
+.delivery-booking{position:relative;height:calc(100dvh - 70px);min-height:620px;padding:0!important;background:#f5f0e8;overflow:hidden;font-family:var(--font-sans),Arial,sans-serif}
+.delivery-floating-header{position:absolute;inset:18px 20px auto;z-index:5;display:flex;gap:12px;align-items:center}
+.delivery-back{border:0;border-radius:50%;background:#fff;width:46px;height:46px;display:grid;place-items:center;box-shadow:0 4px 16px #0001;flex-shrink:0}
+.delivery-back img{width:20px;height:20px}
+[dir=rtl] .delivery-back img{transform:scaleX(-1)}
+.delivery-mode-switch{display:flex;gap:4px;padding:4px;background:#fff;border-radius:22px;box-shadow:0 4px 16px #0001}
+.delivery-mode-switch button{border:0;padding:10px 13px;border-radius:18px;background:transparent;color:#111;font:600 13px inherit}
+.delivery-mode-switch button[aria-pressed=true]{background:#111;color:#fff}
+.delivery-booking .delivery-steps{display:none}
+.delivery-booking-grid{display:block!important;height:100%;margin:0!important}
+.delivery-booking-grid>form{position:absolute;inset:auto 0 0;z-index:4;border:0;border-radius:28px 28px 0 0;box-shadow:0 -6px 24px #0001;background:#faf8f5;padding:10px 20px 24px;max-height:60%;overflow:auto;overscroll-behavior:contain;margin:0}
+.delivery-sheet-handle{height:4px;width:40px;background:#d6d0c8;border-radius:4px;margin:0 auto 20px}
+.delivery-booking-grid>form h2{font-size:20px;font-weight:700;margin-bottom:16px}
+.delivery-booking .input,.delivery-booking select{background:#fff;border:1px solid #e5e0d8;border-radius:14px;min-height:46px;min-width:0;width:100%}
+.delivery-booking .delivery-field{margin-block:12px}
+.delivery-booking .btn-primary{background:#111;color:#fff;border:0;border-radius:16px;min-height:52px;flex:1;justify-content:center}
+.delivery-booking .btn-secondary{border:0;background:#eee9e1;border-radius:18px;color:#111}
+.delivery-booking-map{position:absolute!important;inset:0!important;height:auto!important;min-height:0!important;z-index:0}
+.delivery-booking-map>.map-frame{height:100%!important}
+.delivery-booking .maplibregl-ctrl-bottom-right,.delivery-booking .maplibregl-ctrl-bottom-left{bottom:60%}
+.delivery-route-preview{position:absolute;inset:78px 20px auto;z-index:2;border:0;border-radius:14px!important;padding:8px 14px!important;pointer-events:auto}
+.delivery-route-preview:empty{display:none}
+.delivery-booking>p[role=alert]{position:absolute;inset:120px 20px auto;z-index:6;background:#fff;padding:12px;border-radius:14px}
+.delivery-payment-choice{margin-block:20px;border-block:1px solid #e5e0d8;padding-block:16px}
+.delivery-payment-choice>label{display:inline-flex;gap:8px;margin-inline-end:20px;padding-block:10px}
+.delivery-booking .delivery-summary{border:0;padding:0;background:transparent}
+.delivery-customer-tracking .delivery-tracking-map{height:52dvh;min-height:300px}
+.delivery-customer-tracking .card{border-radius:24px;background:#faf8f5}
+.delivery-customer-tracking .assigned-vehicle-card{border:0;background:transparent}
+@media(min-width:768px){.delivery-booking{height:calc(100dvh - 100px);min-height:700px}.delivery-booking-grid>form{max-width:480px;inset:auto auto 0 20px;max-height:72%;width:calc(100% - 40px)}.delivery-floating-header{max-width:480px}.delivery-route-preview{max-width:440px}.delivery-booking .maplibregl-ctrl-bottom-right{bottom:0}}
+
+.reference-subpage:has(.delivery-booking)>header,.reference-subpage:has(.delivery-customer-tracking)>header{display:none}
+.delivery-customer-tracking{padding:0!important}
+.delivery-live-surface{position:relative;height:calc(100dvh - 70px);min-height:650px;overflow:hidden;background:#f5f0e8}
+.delivery-live-map{position:absolute;inset:0}
+.delivery-live-map>.map-frame{height:100%!important}
+.delivery-live-sheet{position:absolute;inset:auto 0 0;background:#faf8f5;border-radius:28px 28px 0 0;padding:10px 20px 24px;max-height:55%;overflow:auto;box-shadow:0 -5px 20px #0001}
+.delivery-live-sheet h1{font-size:22px}
+.delivery-courier-summary{display:flex;gap:14px;align-items:center;margin-block:12px}
+.delivery-vehicle{width:120px;height:70px;object-fit:contain}
+.delivery-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover}
+.delivery-live-sheet .btn{border-radius:18px;font-size:12px}
+.delivery-live-sheet .btn-primary{background:#111;color:white}
+.delivery-live-sheet .flex{flex-wrap:wrap}
+.delivery-original-map{display:none}
+.delivery-customer-tracking>#delivery-details,.delivery-customer-tracking>header{padding:20px}
+.delivery-customer-tracking .maplibregl-ctrl-bottom-right,.delivery-customer-tracking .maplibregl-ctrl-bottom-left{bottom:45%}
+@media(min-width:768px){.delivery-live-sheet{max-width:460px;inset:auto auto 0 20px;width:calc(100% - 40px)}}
+
+.reference-subpage:has(.delivery-booking),.reference-subpage:has(.delivery-customer-tracking){padding:0;max-width:480px}
+.rider-app:has(.delivery-booking)>.reference-nav,.rider-app:has(.delivery-customer-tracking)>.reference-nav{display:none}
+.delivery-booking,.delivery-live-surface{height:100dvh;min-height:620px}
+.delivery-live-map>.map-frame,.delivery-booking-map{border:0!important;border-radius:0!important}
+.delivery-customer-tracking>#delivery-record-details{padding:16px 20px 40px}
+.delivery-tracking-back{position:absolute;inset:20px auto auto 20px;z-index:5}
+.delivery-live-sheet .btn{min-height:44px;display:inline-flex;align-items:center;gap:8px}
+@media(min-width:768px){.delivery-booking-grid>form,.delivery-live-sheet{inset:auto 0 0;max-width:none;width:100%;max-height:60%}}
+
+.delivery-customer-tracking .maplibregl-ctrl-bottom-right,.delivery-customer-tracking .maplibregl-ctrl-bottom-left{bottom:var(--delivery-sheet-height,45%)}

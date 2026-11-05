@@ -1,4 +1,30 @@
 export const arabic={
+ 'Delivery details and chat':'تفاصيل التوصيل والمحادثة',
+
+ 'Awaiting collection':'بانتظار التحصيل', 'Not applicable':'لا ينطبق', 'Refunded':'تم ردّ المبلغ', 'Paid to sender':'تم الدفع للمرسل', 'Awaiting courier remittance':'بانتظار توريد المندوب', 'Cash reconciled':'تمت تسوية النقد', 'Awaiting merchandise payout':'بانتظار دفع قيمة البضاعة', 'Refund review required':'يلزم مراجعة ردّ المبلغ', 'Cancelled without collection':'أُلغي دون تحصيل', 'Cash refunded':'تم ردّ النقد', 'Delivery fee collection':'تحصيل رسوم التوصيل', 'Merchandise collection':'تحصيل قيمة البضاعة', 'Courier remittance':'توريد المندوب', 'Delivery fee refund':'ردّ رسوم التوصيل', 'Merchandise refund':'ردّ قيمة البضاعة', 'Merchandise payment to sender':'دفع قيمة البضاعة للمرسل',
+
+ 'Pickup contact must use a valid local mobile number':'يجب إدخال رقم جوال محلي صالح لجهة اتصال الاستلام', 'A valid pickup contact is required.':'يرجى إضافة جهة اتصال صالحة للاستلام.', 'Add a local recipient contact for this delivery.':'أضف جهة اتصال محلية للمستلم في هذا الطلب.',
+ 'For an emergency, contact local emergency services directly. A message here does not dispatch emergency assistance.':'في حالات الطوارئ، اتصل بخدمات الطوارئ المحلية مباشرةً. إرسال رسالة هنا لا يستدعي مساعدة طارئة.', 'Describe the problem':'اشرح المشكلة', 'Send message to courier':'إرسال رسالة للمندوب',
+
+ 'Send Package':'أرسل طرد', 'Bring me a package':'جيبلي طلب',
+ 'Local mobile number':'رقم جوال محلي', 'My location':'موقعي',
+ 'Finding your location…':'جارٍ تحديد موقعك…', 'Using your GPS location':'نستخدم موقعك الحالي من GPS',
+ 'Location unavailable. Choose a saved place or search for an address.':'تعذّر تحديد موقعك. اختر موقعًا محفوظًا أو ابحث عن عنوان.',
+ 'Add a local pickup contact for this delivery. Your account details will not be changed.':'أضف جهة اتصال محلية لاستلام هذا الطرد. لن تتغيّر بيانات حسابك.',
+ 'Someone else will receive the package':'سيستلم الطرد شخص آخر', 'Delivering to your account':'التوصيل إليك',
+ 'Payment method':'طريقة الدفع', 'Cash':'نقدًا', 'Sender pays at pickup':'يدفع المرسل عند الاستلام', 'Recipient pays at dropoff':'يدفع المستلم عند التسليم',
+ 'Card payments are unavailable until a verified provider is operational.':'الدفع بالبطاقة غير متاح حتى تشغيل مزوّد دفع موثّق.',
+ 'Merchandise COD amount':'قيمة البضاعة المحصّلة عند التسليم',
+ 'Merchandise funds are separate from the delivery fee and payable to your account holder after reconciliation.':'قيمة البضاعة منفصلة عن رسوم التوصيل وتُدفع لصاحب حسابك بعد تسوية التحصيل.',
+ 'Finding a courier':'جارٍ البحث عن مندوب', 'Near destination':'بالقرب من الوجهة', 'To pickup':'إلى موقع الاستلام', 'To recipient':'إلى المستلم',
+ 'Approximate estimate':'تقدير تقريبي', 'Location temporarily unavailable':'الموقع غير متاح مؤقتًا', 'Last GPS update':'آخر تحديث للموقع',
+ 'Waiting for an eligible courier to accept. No live courier location is available yet.':'بانتظار قبول مندوب متاح. لا يوجد موقع مباشر للمندوب بعد.',
+ 'Chat and delivery details':'المحادثة وتفاصيل التوصيل', 'Call courier':'اتصل بالمندوب', 'Safety and support':'السلامة والدعم',
+ 'Cash payment':'الدفع النقدي', 'Collected':'تم تحصيل', 'Settlement':'التسوية', 'Commission':'العمولة', 'Courier retained earnings':'أرباح المندوب المحتفظ بها',
+ 'Record delivery fee collected':'تسجيل تحصيل رسوم التوصيل', 'Record merchandise cash collected':'تسجيل تحصيل قيمة البضاعة',
+ 'Confirm cash transaction':'تأكيد العملية النقدية', 'Record only money physically received or returned. This does not initiate an external transfer.':'سجّل المبالغ التي تم استلامها أو ردّها فعليًا فقط. هذا الإجراء لا ينفّذ تحويلًا خارجيًا.',
+ 'Receipt or collection reference':'رقم الإيصال أو مرجع التحصيل', 'I confirm the actual cash transaction':'أؤكد إتمام العملية النقدية فعليًا', 'Cash audit history':'سجل العمليات النقدية',
+
  'Service is not available in this area.':'الخدمة غير متاحة في هذه المنطقة.',
  'This location is outside the active service zone.':'هذا الموقع خارج نطاق الخدمة المفعّل.',
  'Booking is outside local operating hours.':'الحجز خارج ساعات العمل المحلية.',

@@ -42,3 +42,16 @@ test('contact phones are independent of operating country and require explicit c
  assert.equal(mobileContact('+971501234567 ext 12').error,'Phone number invalid');
  assert.equal(mobileContact('+20223456789').error,'Phone number invalid');
 });
+
+
+test('cash methods require an explicit consistent country policy and never accept card simulation',async()=>{
+ const {deliveryPaymentSchema,deliveryPaymentDefaults,deliveryBookingSchema}=await import('../src/lib/delivery-policy.js');
+ assert.equal(deliveryPaymentDefaults.cash,false);assert.equal(deliveryPaymentDefaults.cod,false);
+ assert.equal(deliveryPaymentSchema.safeParse({...deliveryPaymentDefaults,cash:true,payer:'recipient',cashStage:'pickup'}).success,false);
+ assert.equal(deliveryPaymentSchema.safeParse({...deliveryPaymentDefaults,cod:true,codMaximum:10}).success,false);
+ assert.equal(deliveryPaymentSchema.safeParse({...deliveryPaymentDefaults,cash:true,cod:true,codMaximum:10}).success,true);
+ assert.equal(deliveryBookingSchema.shape.paymentMethod.safeParse('card').success,false);
+});
+test('active-country local phone normalization does not mutate account identity',async()=>{
+ const {mobileContact}=await import('../src/lib/contact-phone.js');assert.equal(mobileContact('0793088001','JO').phone,'+962793088001');assert.ok(mobileContact('0793088001','EG').error);assert.equal(mobileContact('+971501234567','JO').phoneCountry,'AE');
+});
