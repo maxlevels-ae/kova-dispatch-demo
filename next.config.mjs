@@ -3,6 +3,7 @@ const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
   experimental: {
+    cpus: 2,
     serverActions: {
       bodySizeLimit: '2mb',
     },
