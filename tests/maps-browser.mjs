@@ -35,16 +35,11 @@ export async function mapBrowserChecks({
     400,
     "Unconfigured CARTO cannot be saved",
   );
-  assert.equal(
-    (
-      await write(
-        "maps",
-        { ...maps, governorate: "Alexandria", city: "Cairo" },
-        revision,
-      )
-    ).status,
-    400,
-  );
+  const legacySave=await write("maps",{...maps,governorate:"Alexandria",city:"Cairo"},revision);
+  assert.equal(legacySave.status,200);revision++;
+  const preserved=await (await request('/api/admin/settings/platform',cookies.admin)).json();
+  assert.equal(preserved.settings.maps.governorate,maps.governorate);
+  assert.equal(preserved.settings.maps.city,maps.city);
   assert.equal(
     (await write("maps", { ...maps, locationRefreshSeconds: 5, autoFitDrivers: false }, revision))
       .status,
@@ -162,14 +157,10 @@ export async function mapBrowserChecks({
     await page.goto(base + "/admin/settings",{waitUntil:"domcontentloaded"});
     const nav = page.getByRole("navigation", { name: "Settings sections" });
     await nav
-      .getByRole("button", { name: "Maps & Service Zones", exact: true })
+      .getByRole("button", { name: "Maps & Appearance", exact: true })
       .click();
-    await page
-      .getByLabel("Governorate", { exact: true })
-      .selectOption("Alexandria");
-    await expect(page.getByLabel("City", { exact: true })).toHaveValue(
-      "Alexandria",
-    );
+    await expect(page.getByLabel("Governorate", {exact:true})).toHaveCount(0);
+    await expect(page.getByLabel("City", { exact: true })).toHaveCount(0);
     await page.getByLabel("Map style", { exact: true }).selectOption("light");
     await page
       .getByRole("button", { name: "Save changes", exact: true })
@@ -192,15 +183,13 @@ export async function mapBrowserChecks({
     });
     await page.reload();
     await nav
-      .getByRole("button", { name: "Maps & Service Zones", exact: true })
+      .getByRole("button", { name: "Maps & Appearance", exact: true })
       .click();
-    await expect(page.getByLabel("City", { exact: true })).toHaveValue(
-      "Alexandria",
-    );
+    await expect(page.getByLabel("City", { exact: true })).toHaveCount(0);
     const config = await (
       await request("/api/maps/config", cookies.admin)
     ).json();
-    assert.deepEqual(config.center, { lat: 31.2001, lng: 29.9187 });
+    assert.deepEqual(config.center, { lat: 30.0444, lng: 31.2357 });
     assert.equal(config.settings.mapStyle, "light");
     await page.goto(base + "/admin/dashboard");
     await expect(page.locator(".map-frame")).toHaveAttribute(
@@ -230,7 +219,7 @@ export async function mapBrowserChecks({
     await page.unroute("https://tiles.openfreemap.org/styles/positron");
     await page.goto(base + "/admin/settings");
     await nav
-      .getByRole("button", { name: "Maps & Service Zones", exact: true })
+      .getByRole("button", { name: "Maps & Appearance", exact: true })
       .click();
     await page.getByLabel("Map style", { exact: true }).selectOption("dark");
     await page
@@ -246,9 +235,9 @@ export async function mapBrowserChecks({
     assert.ok(requests.some((u) => u.includes("/styles/dark")));
     await page.goto(base + "/admin/settings");
     await nav
-      .getByRole("button", { name: "Maps & Service Zones", exact: true })
+      .getByRole("button", { name: "Maps & Appearance", exact: true })
       .click();
-    await page.getByLabel("Governorate", { exact: true }).selectOption("Cairo");
+
     await page
       .getByLabel("Map style", { exact: true })
       .selectOption("standard");
@@ -311,7 +300,8 @@ export async function mapBrowserChecks({
     const restarted = await (
       await request("/api/maps/config", cookies.admin)
     ).json();
-    assert.equal(restarted.settings.city, "Cairo");
+    assert.equal(restarted.settings.city, undefined);
+    assert.equal(restarted.country.code,"EG");
     assert.equal(restarted.settings.mapStyle, "standard");
     const routeRide=await makeRide("EGP","in_progress");
     routeRide.route={distanceMeters:1500,durationSeconds:300,geometry:[[31,30],[31.05,30.07],[31.1,30.1]]};await routeRide.save();

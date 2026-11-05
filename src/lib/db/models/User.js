@@ -1,11 +1,12 @@
 import mongoose from 'mongoose';
+import {currencyDigits} from '@/lib/countries';
 import { CURRENCY } from '@/lib/currency';
 
 const userSchema = new mongoose.Schema(
   {
     authVersion: { type: Number, default: 0 },
     language:{type:String,enum:['en','ar'],default:'en'},
-    currencyWallets:{JOD:{balance:Number,currency:{type:String,enum:['JOD']}},IQD:{balance:Number,currency:{type:String,enum:['IQD']}}},
+    currencyWallets:Object.fromEntries(Object.keys(currencyDigits).filter(c=>c!=='EGP').map(c=>[c,{balance:Number,currency:{type:String,enum:[c]}}])),
     egpWallet: { type: new mongoose.Schema({ balance: { type: Number, default: 0 }, currency: { type: String, enum: ['EGP'], default: 'EGP' } }, { _id: false }), default: undefined },
     username: {
       type: String,

@@ -1,0 +1,60 @@
+{
+  "task": "MX-038 / MX-039 / MX-040",
+  "date": "2026-11-05",
+  "countries": [
+    "EG",
+    "JO",
+    "IQ",
+    "SA",
+    "AE",
+    "BH",
+    "QA",
+    "KW",
+    "OM",
+    "SY",
+    "LB",
+    "PS",
+    "YE",
+    "TR",
+    "IR",
+    "MA",
+    "DZ",
+    "TN",
+    "LY",
+    "SD",
+    "MR"
+  ],
+  "checks": {
+    "lint": "Passed: 0 errors, 43 existing warnings",
+    "unit": "52 passed",
+    "http": "21 passed",
+    "build": "Node 22 production build passed",
+    "productionDependencyAudit": "0 vulnerabilities",
+    "operatingAreas": "24 passed; Jordan restart persistence, Saudi activation/pricing, Palestine explicit USD settlement, legacy three-country record compatibility",
+    "delivery": "20 passed",
+    "accountManagement": "9 passed",
+    "tripSafety": "11 passed",
+    "audioHydration": "4 passed; exact native MP3 playback, no replacement audio",
+    "broaderRegression": "51 checks passed before a guest-map centering failure. Fixed the public-map center, then reran all 20 Delivery checks successfully; remaining operating, audio and safety suites run separately."
+  },
+  "financialEvidence": [
+    "Disposable databases only for activation, GPS, booking and settlement tests",
+    "Original USD/EGP accounts preserved in country-specific ledger tests",
+    "JOD/IQD precision and idempotency tested",
+    "SAR pricing and currency-isolated credit tested",
+    "Palestine USD cancellation uses the recorded local fee, not legacy USD fallback"
+  ],
+  "visualQA": [
+    "360px",
+    "390px",
+    "768px",
+    "1440px"
+  ],
+  "limitations": [
+    "GeoNames catalog includes cities above 15,000 population plus preserved legacy cities; original names retained when Arabic alternates are unavailable",
+    "Country boundaries are attributed generalized geographic data, not official operational zone polygons or legal boundary determinations",
+    "New countries require administrator-defined enabled zones and independent local pricing",
+    "No production country activation, fabricated GPS, production seed, payment activation or financial write performed",
+    "Browser media playback does not establish audible playback on a physical mobile device"
+  ]
+}

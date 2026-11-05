@@ -16,7 +16,7 @@ export async function POST(request) {
   if (error) return error;
 
   if (!isStripeEnabled()) {
-    return Response.json({ error: 'Card payments are disabled pending Egypt merchant verification' }, { status: 501 });
+    return Response.json({ error: 'Card payments are disabled pending local merchant verification' }, { status: 501 });
   }
 
   try {
@@ -73,7 +73,7 @@ export async function GET(request) {
   if (error) return error;
 
   if (!getStripe()) {
-    return Response.json({ error: 'Card payments are disabled pending Egypt merchant verification' }, { status: 501 });
+    return Response.json({ error: 'Card payments are disabled pending local merchant verification' }, { status: 501 });
   }
 
   try {

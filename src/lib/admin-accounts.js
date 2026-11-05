@@ -205,7 +205,7 @@ export async function editAccount(id, input, actor) {
 }
 export const adjustmentSchema = z
   .object({
-    currency: z.enum(["EGP", "USD", "JOD", "IQD"]),
+    currency: z.enum(Object.keys(currencyDigits)),
     direction: z.enum(["credit", "debit"]),
     amount: z
       .number()
@@ -245,7 +245,7 @@ export async function adjustWallet(id, input, actor) {
       if (!user) fail("Account not found", 404);
       if (!["rider", "driver"].includes(user.role))
         fail("Wallet adjustments are limited to riders and drivers", 403);
-      const account = walletAccount(user, data.currency);
+      const account = walletAccount(user, data.currency)||(data.currency==='USD'&&data.direction==='credit'?{currency:'USD',balance:0}:null);
       if (!account) fail("This currency account does not exist", 409);
       const before = minorUnits(account.balance,data.currency),
         after = before + minorUnits(amount,data.currency);

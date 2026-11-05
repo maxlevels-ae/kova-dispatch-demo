@@ -1,8 +1,9 @@
+import {countryCodes} from '@/lib/countries';
 import mongoose from 'mongoose';
 
 const driverSchema = new mongoose.Schema(
   {
-    operatingCountry:{type:String,enum:['EG','JO','IQ']},
+    operatingCountry:{type:String,enum:countryCodes},
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

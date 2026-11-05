@@ -1,3 +1,4 @@
+import {countries} from '@/lib/countries';
 import {validSettingsOrigin} from '@/lib/settings-origin';
 import mongoose from 'mongoose';
 import { startDispatch } from '@/lib/realtime/dispatch';
@@ -20,7 +21,7 @@ export async function GET(request) {
 
     const query = {};
     const country=searchParams.get('country');
-    if(['EG','JO','IQ'].includes(country))query['operations.country.code']=country;
+    if(Object.hasOwn(countries,country))query['operations.country.code']=country;
     if (status) query.status = status;
 
     const [rides, total] = await Promise.all([

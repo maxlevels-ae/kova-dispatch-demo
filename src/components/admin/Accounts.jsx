@@ -890,7 +890,7 @@ function WalletAdmin({ id }) {
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
             >
-              {['EGP','JOD','IQD',...(data?.accounts.some(a=>a.currency==='USD')?['USD']:[])].map(code=><option key={code}>{code}</option>)}
+              {Object.keys(currencyDigits).map(code=><option key={code}>{code}</option>)}
             </select>
           </Field>
           <Field label="Adjustment">

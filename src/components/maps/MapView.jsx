@@ -54,11 +54,11 @@ export default function MapView({
   style,
 }) {
   const config = useMapSettings(!publicMap);
-  const center = requestedCenter || config.center;
+  const center = requestedCenter || (publicMap ? dropoff || pickup || driverPosition : config.center);
   const zoom = requestedZoom ?? config.settings.initialZoom;
   const [mapState, setMapState] = useState("loading");
   const [routeReady, setRouteReady] = useState(false);
-  useI18n();
+  const {language}=useI18n();
   const [mapError, setMapError] = useState("");
   const [fallback, setFallback] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -91,7 +91,7 @@ export default function MapView({
     const draw=()=>{
       if(!map.isStyleLoaded())return;
       if(appliedSource&&map.getSource('operating-zones')===appliedSource)return;
-      const data={type:'FeatureCollection',features:zones.map(z=>({type:'Feature',id:z.id,properties:{id:z.id,name:z.name,active:!!z.active},geometry:z.geometry}))};
+      const data={type:'FeatureCollection',features:zones.map(z=>({type:'Feature',id:z.id,properties:{id:z.id,name:language==='ar'&&z.nameAr?z.nameAr:t(z.name),active:!!z.active},geometry:z.geometry}))};
       if(map.getSource('operating-zones'))map.getSource('operating-zones').setData(data);
       else{
         map.addSource('operating-zones',{type:'geojson',data});
@@ -103,14 +103,14 @@ export default function MapView({
     const select=e=>{if(onZoneClick&&map.getLayer('operating-zones-fill')){const f=map.queryRenderedFeatures(e.point,{layers:['operating-zones-fill']})[0];if(f)onZoneClick(f.properties.id);}};
     draw();map.on('idle',draw);map.on('click',select);
     return()=>{map.off('idle',draw);map.off('click',select);};
-  },[zones,onZoneClick,mapState,fitZones]);
+  },[zones,onZoneClick,mapState,fitZones,language]);
   useEffect(() => {
     onClickRef.current = onClick;
   }, [onClick]);
 
   // ── Init once ──
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return undefined;
+    if (!containerRef.current || mapRef.current || !center) return undefined;
 
     // MapLibre 6 uses a separate module worker. Serve its matching shared module
     // from public assets rather than resolving relative to a Next.js chunk.
@@ -195,7 +195,7 @@ export default function MapView({
       readyRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [!!center]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -426,8 +426,9 @@ export default function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || fit || pickup || dropoff) return;
+    if(!center)return;
     map.easeTo({ center: [center.lng, center.lat], zoom, duration: 600 });
-  }, [center.lat, center.lng, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [center?.lat, center?.lng, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div

@@ -159,6 +159,7 @@ export const schemas = {
     .strict(),
   security: z.object({ sessionHours: number(1, 720).int() }).strict(),
 };
+// Legacy-only validator retained for compatibility tests. New bookings must use bookingArea().
 export function bookingPolicy(
   settings,
   pickup,

@@ -119,3 +119,5 @@ export const arabic={
 "Early endings: only verified service may be charged after your confirmation and administrator review. No automatic penalty.":"عند إنهاء المشوار مبكراً، لا تُحتسب إلا الخدمة التي أمكن التحقق منها، وبعد موافقتك ومراجعة الإدارة. لا توجد غرامة تلقائية.",
 "Early endings: no automatic charge or penalty; administrator review is required.":"عند إنهاء المشوار مبكراً، لا تُفرض رسوم أو غرامات تلقائية، وتُحال الحالة لمراجعة الإدارة.",
 };
+
+Object.assign(arabic,{"Top-ups are disabled pending local payment-provider verification":"شحن المحفظة غير متاح حتى التحقق من مزود الدفع المحلي","Card payments are disabled pending local merchant verification":"الدفع بالبطاقة غير متاح حتى التحقق من حساب التاجر المحلي"});

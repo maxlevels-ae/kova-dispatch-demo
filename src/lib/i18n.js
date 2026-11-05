@@ -1,5 +1,6 @@
 import {arabic} from './locales/ar';
 import {countries} from './countries';
+const placeTranslations=new Map(Object.values(countries).flatMap(c=>[[c.name,c.arabic],...c.cities.filter(v=>v.arabic).map(v=>[v.name,v.arabic])]));
 let currentLanguage='en';
 let currentCountry='EG';
 export function setClientCountry(code){if(typeof window!=='undefined'&&countries[code])currentCountry=code;}
@@ -8,9 +9,9 @@ const patterns=Object.entries(arabic).filter(([english])=>english.includes('{'))
 export function setClientLanguage(value){if(typeof window!=='undefined')currentLanguage=value==='ar'?'ar':'en';}
 export function customerLocale(){return currentLanguage+'-'+currentCountry;}
 export function translate(value,language=currentLanguage){
- if(typeof value==='number'&&language==='ar')return new Intl.NumberFormat('ar-EG').format(value);
+ if(typeof value==='number'&&language==='ar')return new Intl.NumberFormat(customerLocale()).format(value);
  if(typeof value!=='string'||language!=='ar')return value;
- const text=value.trim();if(Object.hasOwn(arabic,text))return arabic[text];
+ const text=value.trim();if(!Object.hasOwn(arabic,text)&&placeTranslations.has(text))return placeTranslations.get(text);if(Object.hasOwn(arabic,text))return arabic[text];
  for(const {pattern,translated} of patterns){
   const match=text.match(pattern);
   if(match)return translated.replace(/\{(\d+)\}/g,(_,i)=>'\u2068'+match[Number(i)+1]+'\u2069');

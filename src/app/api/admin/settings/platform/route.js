@@ -1,4 +1,5 @@
-import { cartoConfigured, cityCenter } from "@/lib/map-config";
+import {activeOperations} from '@/lib/operating-areas';
+import { cartoConfigured } from "@/lib/map-config";
 import { validSettingsOrigin } from "@/lib/settings-origin";
 import { readSettingsJSON } from "@/lib/settings-http";
 import { requireAuth } from "@/lib/auth/helpers";
@@ -37,7 +38,9 @@ export async function PUT(request) {
         { error: "Invalid section or revision" },
         { status: 400 },
       );
-    const parsed = schemas[section].safeParse(value);
+    const existing=await getSettings();
+    const preserved={...value};if(section==='maps')for(const key of ['country','governorate','city','restrictPickup','restrictDropoff','south','north','west','east'])preserved[key]=existing.maps[key];
+    const parsed = schemas[section].safeParse(preserved);
     if (!parsed.success)
       return Response.json(
         {
@@ -75,7 +78,7 @@ export async function PUT(request) {
         { error: "Settings changed. Reload before saving." },
         { status: 409 },
       );
-    return Response.json({ revision: row.revision, savedAt: row.updatedAt, ...(section === "maps" ? { center: cityCenter(parsed.data) } : {}) });
+    return Response.json({ revision: row.revision, savedAt: row.updatedAt, ...(section === "maps" ? { center: (await activeOperations()).config.center } : {}) });
   } catch (e) {
     if (e.status)
       return Response.json({ error: e.message }, { status: e.status });

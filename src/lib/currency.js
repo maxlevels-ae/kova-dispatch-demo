@@ -33,17 +33,18 @@ export const DEFAULT_PRICING = {
 
 export function walletAccount(user, currency = CURRENCY) {
   if (sameCurrency(user?.wallet?.currency, currency)) return user.wallet;
+  if(currency==='USD'&&user?.currencyWallets?.USD?.currency!=='USD')return null;
   if (currency === CURRENCY && user) return { balance: user.egpWallet?.balance ?? 0, currency: CURRENCY };
-  if(['JOD','IQD'].includes(currency)&&user)return {currency,balance:user.currencyWallets?.[currency]?.balance??0};
+  if(Object.hasOwn(currencyDigits,currency)&&currency!=='EGP'&&user)return {currency,balance:user.currencyWallets?.[currency]?.balance??0};
   return null;
 }
 export function walletAccounts(user) {
   const accounts=user?.wallet?.currency === CURRENCY ? [user.wallet] : [walletAccount(user), user?.wallet].filter(Boolean);
-  for(const code of ['JOD','IQD'])if(user?.currencyWallets?.[code]&&!accounts.some(a=>a.currency===code))accounts.push(walletAccount(user,code));return accounts;
+  for(const code of Object.keys(currencyDigits).filter(c=>c!=='EGP'))if(user?.currencyWallets?.[code]?.currency===code&&!accounts.some(a=>a.currency===code))accounts.push(walletAccount(user,code));return accounts;
 }
 export function walletDelta(amount, currency) {
   if(!Object.hasOwn(currencyDigits,currency))throw new Error('Unsupported wallet currency');
-  if(['JOD','IQD'].includes(currency)){const digits=currencyDigits[currency],delta=minorUnits(amount,currency)/10**digits;return [{$set:{'wallet.balance':{$cond:[{$eq:['$wallet.currency',currency]},{$round:[{$add:['$wallet.balance',delta]},digits]},'$wallet.balance']},['currencyWallets.'+currency]:{$cond:[{$eq:['$wallet.currency',currency]},'$currencyWallets.'+currency,{currency,balance:{$round:[{$add:[{$ifNull:['$currencyWallets.'+currency+'.balance',0]},delta]},digits]}}]}}}];}
+  if(Object.hasOwn(currencyDigits,currency)&&currency!=='EGP'){const digits=currencyDigits[currency],delta=minorUnits(amount,currency)/10**digits;return [{$set:{'wallet.balance':{$cond:[{$eq:['$wallet.currency',currency]},{$round:[{$add:['$wallet.balance',delta]},digits]},'$wallet.balance']},['currencyWallets.'+currency]:{$cond:[{$eq:['$wallet.currency',currency]},'$currencyWallets.'+currency,{currency,balance:{$round:[{$add:[{$ifNull:['$currencyWallets.'+currency+'.balance',0]},delta]},digits]}}]}}}];}
   if (currency === CURRENCY) return [{ $set: {
     'wallet.balance': { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, { $round: [{ $add: ['$wallet.balance', minorUnits(amount) / 100] }, 2] }, '$wallet.balance'] },
     egpWallet: { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, '$egpWallet', { currency: CURRENCY, balance: { $round: [{ $add: [{ $ifNull: ['$egpWallet.balance', 0] }, minorUnits(amount) / 100] }, 2] } }] },

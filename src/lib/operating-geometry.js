@@ -6,7 +6,25 @@ import {feature,featureCollection} from '@turf/helpers';
 import EG from './geography/EG.json' with {type:'json'};
 import JO from './geography/JO.json' with {type:'json'};
 import IQ from './geography/IQ.json' with {type:'json'};
-export const countryBoundaries={EG,JO,IQ};
+import SA from './geography/SA.json' with {type:'json'};
+import AE from './geography/AE.json' with {type:'json'};
+import BH from './geography/BH.json' with {type:'json'};
+import QA from './geography/QA.json' with {type:'json'};
+import KW from './geography/KW.json' with {type:'json'};
+import OM from './geography/OM.json' with {type:'json'};
+import SY from './geography/SY.json' with {type:'json'};
+import LB from './geography/LB.json' with {type:'json'};
+import PS from './geography/PS.json' with {type:'json'};
+import YE from './geography/YE.json' with {type:'json'};
+import TR from './geography/TR.json' with {type:'json'};
+import IR from './geography/IR.json' with {type:'json'};
+import MA from './geography/MA.json' with {type:'json'};
+import DZ from './geography/DZ.json' with {type:'json'};
+import TN from './geography/TN.json' with {type:'json'};
+import LY from './geography/LY.json' with {type:'json'};
+import SD from './geography/SD.json' with {type:'json'};
+import MR from './geography/MR.json' with {type:'json'};
+export const countryBoundaries={EG,JO,IQ,SA,AE,BH,QA,KW,OM,SY,LB,PS,YE,TR,IR,MA,DZ,TN,LY,SD,MR};
 export function contains(geometry,point){if(!geometry||!Number.isFinite(point?.lat)||!Number.isFinite(point?.lng))return false;return pointInPolygon([point.lng,point.lat],geometry,{ignoreBoundary:false});}
 export function geometryError(geometry,country){
  try{

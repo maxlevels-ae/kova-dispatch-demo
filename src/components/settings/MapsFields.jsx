@@ -1,7 +1,5 @@
 "use client";
 import {
-  egyptLocations,
-  cityCenter,
   mapStyles,
   cartoConfigured,
 } from "@/lib/map-config";
@@ -10,11 +8,9 @@ import {
   SettingsSelect,
   SettingsToggle,
   SettingsStatus,
-  SettingsField,
 } from "./SettingsUI";
-export default function MapsFields({ value, onChange, busy, errors }) {
+export default function MapsFields({ value, onChange, busy }) {
   const choose = (key) => (e) => onChange(key, e.target.value);
-  const center = cityCenter(value);
   return (
     <>
       <SettingsSection
@@ -54,44 +50,6 @@ export default function MapsFields({ value, onChange, busy, errors }) {
                 : "CARTO unavailable"
               : "OpenFreeMap available · No API key required"}
           </SettingsStatus>
-        </p>
-      </SettingsSection>
-      <SettingsSection
-        title="Operating location"
-        description="Controlled Egypt catalogue: all 27 governorates, with their capital cities and selected additional cities."
-      >
-        <div className="settings-fields">
-          <SettingsSelect
-            label="Country"
-            value={value.country}
-            disabled={busy}
-            onChange={choose("country")}
-            options={["Egypt"]}
-          />
-          <SettingsSelect
-            label="Governorate"
-            value={value.governorate}
-            disabled={busy}
-            onChange={(e) =>
-              onChange({
-                governorate: e.target.value,
-                city: Object.keys(egyptLocations[e.target.value])[0],
-              })
-            }
-            options={Object.keys(egyptLocations)}
-          />
-          <SettingsSelect
-            label="City"
-            value={value.city}
-            error={errors.city}
-            disabled={busy}
-            onChange={choose("city")}
-            options={Object.keys(egyptLocations[value.governorate] || {})}
-          />
-        </div>
-        <p className="settings-hint">
-          Default map center: {center.lat.toFixed(4)}, {center.lng.toFixed(4)} ·
-          Derived from selected city.
         </p>
       </SettingsSection>
       <SettingsSection
@@ -182,52 +140,7 @@ export default function MapsFields({ value, onChange, busy, errors }) {
           ]}
         />
       </SettingsSection>
-      <SettingsSection
-        title="Service zones"
-        description="Apply the saved rectangular service boundary to new booking requests."
-      >
-        <SettingsToggle
-          label="Restrict pickups to boundary"
-          checked={value.restrictPickup}
-          disabled={busy}
-          onChange={(v) => onChange("restrictPickup", v)}
-        />
-        <SettingsToggle
-          label="Restrict dropoffs to boundary"
-          checked={value.restrictDropoff}
-          disabled={busy}
-          onChange={(v) => onChange("restrictDropoff", v)}
-        />
-      </SettingsSection>
-      <SettingsSection
-        title="Advanced service boundary coordinates"
-        description="Latitude ranges from −90 to 90; longitude from −180 to 180. These bounds do not change the city center."
-      >
-        <div className="settings-fields">
-          {[
-            ["south", "Southern latitude"],
-            ["north", "Northern latitude"],
-            ["west", "Western longitude"],
-            ["east", "Eastern longitude"],
-          ].map(([key, label]) => (
-            <SettingsField
-              key={key}
-              label={label}
-              type="number"
-              step="any"
-              disabled={busy}
-              value={value[key]}
-              error={errors[key]}
-              onChange={(e) =>
-                onChange(
-                  key,
-                  e.target.value === "" ? "" : Number(e.target.value),
-                )
-              }
-            />
-          ))}
-        </div>
-      </SettingsSection>
+      <p className="settings-hint">Operating countries and service boundaries are managed in <a href="/admin/settings/operating-areas">Countries &amp; Service Zones</a>.</p>
     </>
   );
 }

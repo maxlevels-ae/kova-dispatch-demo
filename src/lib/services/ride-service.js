@@ -4,7 +4,6 @@ import {bookingArea,courierReadiness} from '@/lib/operating-areas';
 import {isTaxiEnabled} from '@/lib/service-availability';
 import { getSettings } from '@/lib/settings';
 import {notifyRideParticipants} from '@/lib/notifications';
-import { bookingPolicy } from '@/lib/settings-schema';
 import mongoose from 'mongoose';
 import { CURRENCY, LATE_CANCEL_FEE as EGP_CANCEL_FEE, sameCurrency, LEGACY_USD_CANCEL_FEE, walletDelta, walletAccount, minorUnits } from '@/lib/currency';
 import crypto from 'crypto';
@@ -36,7 +35,6 @@ import {
 } from '@/lib/realtime/emit';
 
 /** Fee charged when a rider cancels after the driver has already arrived. */
-const LATE_CANCEL_FEE = LEGACY_USD_CANCEL_FEE;
 
 class RideError extends Error {
   constructor(message, status = 400) {
@@ -143,7 +141,7 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType, schedu
   if (scheduledDate && (!settings.dispatch.scheduledEnabled || !Number.isFinite(+scheduledDate) || +scheduledDate < Date.now() + 60000 || +scheduledDate > Date.now() + settings.dispatch.maxScheduleDays * 86400000)) throw new RideError('Scheduled booking is disabled or outside the allowed advance window');
   operations.taxiDispatch={...settings.dispatch,...operations.config.dispatch,searchRadiusKm:operations.config.dispatch.radiusKm};
   if(!operations.config.vehicles.includes(vehicleType))throw new RideError('Vehicle category is unavailable');
-  const policyError = operations.country.code==='EG'&&bookingPolicy(settings, pickup, dropoff, vehicleType, scheduledDate || new Date());
+  const policyError = !operations.config.vehicles.includes(vehicleType) ? 'Vehicle category is unavailable' : null;
   if (policyError) throw new RideError(policyError);
 
   // One live ride per rider
@@ -538,7 +536,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
 
   if (role === 'rider' && ride.status === 'arrived') {
     const wallets = await User.find({ _id: { $in: [ride.riderId, ride.driverId].filter(Boolean) } }).select('wallet egpWallet currencyWallets').lean();
-    if (!['EGP', 'USD', 'JOD', 'IQD'].includes(ride.fare?.currency) || wallets.some(u => !sameCurrency(walletAccount(u, ride.fare?.currency)?.currency, ride.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
+    if (!Object.hasOwn(currencyDigits,ride.fare?.currency) || wallets.some(u => !sameCurrency(walletAccount(u, ride.fare?.currency)?.currency, ride.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);
   }
   const hadDriver = Boolean(ride.driverProfileId);
 
@@ -583,7 +581,7 @@ export async function cancelRide({ rideId, userId, role, reason }) {
   const settled = await mongoose.connection.transaction(async dbSession => {
     const current = await Ride.findOne(match).session(dbSession);
     if (!current) throw new RideError('This ride can no longer be cancelled', 409);
-    const cancellationFee = current.status === 'arrived' ? (current.fare.currency !== 'USD' ? (current.fare.quotedCancellationFee ?? EGP_CANCEL_FEE) : LATE_CANCEL_FEE) : 0;
+    const cancellationFee = current.status === 'arrived' ? (current.fare.quotedCancellationFee ?? (current.fare.currency==='USD'?LEGACY_USD_CANCEL_FEE:current.fare.currency==='EGP'?EGP_CANCEL_FEE:0)) : 0;
     if (cancellationFee) {
       const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId].filter(Boolean) } }).session(dbSession).lean();
       if (wallets.length !== (current.driverId ? 2 : 1) || wallets.some(u => !sameCurrency(walletAccount(u, current.fare?.currency)?.currency, current.fare?.currency))) throw new RideError('Cancellation settlement requires currency review.', 409);

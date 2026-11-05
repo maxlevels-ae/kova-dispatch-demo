@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import OperatingAreas from '@/lib/db/models/OperatingAreas';
 import OperatingAreaAudit from '@/lib/db/models/OperatingAreaAudit';
 import connectDB from '@/lib/db/mongodb';
-import {countries} from '@/lib/countries';
+import {countries,countryForConfig} from '@/lib/countries';
 import {initialCountries,countryConfigSchema,readiness} from '@/lib/operating-policy';
 import {countryBoundaries,contains,geometryError} from '@/lib/operating-geometry';
 import {getSettings} from '@/lib/settings';
@@ -12,35 +12,36 @@ import {walletAccount} from '@/lib/currency';
 import {haversineDistance} from '@/lib/utils/geo';
 export class AreaError extends Error{constructor(message,status=409){super(message);this.status=status;}}
 export async function getOperatingAreas(){
- await connectDB();const record=await OperatingAreas.findById('global').lean();if(record)return record;
+ await connectDB();const record=await OperatingAreas.findById('global').lean();if(record)return {...record,countries:{...initialCountries(),...record.countries}};
  const configs=initialCountries(),s=await getSettings();configs.EG.dispatch={assignmentMode:s.dispatch.assignmentMode,scheduledEnabled:s.dispatch.scheduledEnabled,maxScheduleDays:s.dispatch.maxScheduleDays,maxTripKm:s.dispatch.maxTripKm,maxDailyTrips:s.fleet.maxDailyTrips,radiusKm:s.dispatch.searchRadiusKm,acceptanceSeconds:s.dispatch.acceptanceSeconds,maxAttempts:s.dispatch.maxAttempts};configs.EG.hours={start:s.dispatch.serviceStartHour,end:s.dispatch.serviceEndHour};configs.EG.vehicles=s.fleet.enabledCategories;configs.EG.documents=s.fleet.requiredDocuments;
  configs.EG.center=cityCenter(s.maps);const delivery=(await getDeliverySettings()).settings;configs.EG.deliveryDispatch=delivery.dispatch;configs.EG.deliveryHours={start:delivery.general.startHour,end:delivery.general.endHour};
  return {_id:'global',activeCountry:'EG',revision:0,countries:configs,audit:[]};
 }
 export function enabledZones(config,service){return config.zones.filter(z=>z.active&&z[service]&&config.activeCities.includes(z.city));}
 export function zoneAt(snapshot,point,service){if(!contains(countryBoundaries[snapshot.country.code],point))return null;return enabledZones(snapshot.config,service).filter(z=>contains(z.geometry,point)).sort((a,b)=>a.id.localeCompare(b.id))[0]||null;}
-export async function activeOperations(){const record=await getOperatingAreas();return {country:countries[record.activeCountry],config:record.countries[record.activeCountry],revision:record.revision};}
+export async function activeOperations(){const record=await getOperatingAreas();const metadata=countryForConfig(record.activeCountry,record.countries[record.activeCountry]);const country=Object.fromEntries(Object.entries(metadata).filter(([key])=>!['cities','provinces'].includes(key)));return {country,config:record.countries[record.activeCountry],revision:record.revision};}
 export async function bookingArea(service,pickup,dropoff,at=new Date()){
  const snapshot=await activeOperations();const {country,config}=snapshot;
- if(!config[service]||readiness(country.code,config).some(v=>v.startsWith(service+':')))throw new AreaError('Service is not available in this area.');
+ if(!config[service]||readiness(country.code,config).some(v=>v.startsWith(service+':')||v.startsWith('settlement:')))throw new AreaError('Service is not available in this area.');
  const p=zoneAt(snapshot,pickup,service),d=zoneAt(snapshot,dropoff,service);if(!p||!d)throw new AreaError('This location is outside the active service zone.',400);
  const hour=Number(new Intl.DateTimeFormat('en',{timeZone:country.timeZone,hour:'numeric',hourCycle:'h23'}).format(at));if(hour<(service==='delivery'?config.deliveryHours:config.hours).start||hour>=(service==='delivery'?config.deliveryHours:config.hours).end)throw new AreaError('Booking is outside local operating hours.',400);
  return {...snapshot,pickupZone:p.id,dropoffZone:d.id,recordedAt:new Date().toISOString()};
 }
-export async function saveCountry(code,input,revision,actor){
+export async function saveCountry(code,input,revision,actor,activate=false){
  if(!Object.hasOwn(countries,code))throw new AreaError('Unsupported country',400);
  const config=countryConfigSchema.parse(input);
+ if(activate){const blockers=readiness(code,config);if(blockers.length)throw new AreaError(blockers.join('; '),400);}
  if(!contains(countryBoundaries[code],config.center))throw new AreaError('Map center must be inside the selected country',400);
  if(config.activeCities.some(city=>!countries[code].cities.some(c=>c.name===city)))throw new AreaError('Choose cities from the country catalog',400);
  const ids=new Set();for(const zone of config.zones){if(ids.has(zone.id)||zone.country!==code)throw new AreaError('Duplicate zone ID or wrong country',400);ids.add(zone.id);const city=countries[code].cities.find(c=>c.name===zone.city&&c.province===zone.province);if(!city)throw new AreaError('Choose a valid city and province',400);const error=geometryError(zone.geometry,code);if(error)throw new AreaError(error,400);}
  return mongoose.connection.transaction(async session=>{
   const current=await getOperatingAreas();if(current.revision!==revision)throw new AreaError('Settings changed. Refresh before saving.');
-  const old=current.countries[code];if(old.zones.some(z=>!ids.has(z.id)))throw new AreaError('Historical zones cannot be deleted. Disable them instead.',400);
+  const old=current.countries[code];if(code==='PS'&&old.settlementCurrency&&old.settlementCurrency!==config.settlementCurrency&&(config.taxiPricing||config.deliveryPricing))throw new AreaError('Save a draft with cleared tariffs before changing settlement currency, then configure new local pricing.',400);if(old.zones.some(z=>!ids.has(z.id)))throw new AreaError('Historical zones cannot be deleted. Disable them instead.',400);
   const now=new Date();config.zones=config.zones.map(z=>({...z,createdAt:old.zones.find(v=>v.id===z.id)?.createdAt||now.toISOString(),updatedAt:now.toISOString()}));
-  const event={at:now,actorId:actor.id,action:'country.saved',country:code,revision:revision+1,changes:{before:old,after:config}};
+  const event={at:now,actorId:actor.id,action:activate?'country.activated':'country.saved',country:code,revision:revision+1,changes:{before:old,after:config,from:current.activeCountry,to:activate?code:current.activeCountry}};
   const {changes,...summary}=event;
-  if(!revision){const exists=await OperatingAreas.findById('global').session(session);if(!exists){await OperatingAreas.create([{...current,countries:{...current.countries,[code]:config},revision:1,audit:[summary]}],{session});await OperatingAreaAudit.create([{...summary,changes}],{session});return getOperatingAreasAfter(session);}}
-  const updated=await OperatingAreas.findOneAndUpdate({_id:'global',revision},{$set:{['countries.'+code]:config},$inc:{revision:1},$push:{audit:{$each:[summary],$slice:-100}}},{session,returnDocument:'after'}).lean();if(!updated)throw new AreaError('Settings changed. Refresh before saving.');await OperatingAreaAudit.create([event],{session});return updated;
+  if(!revision){const exists=await OperatingAreas.findById('global').session(session);if(!exists){await OperatingAreas.create([{...current,activeCountry:activate?code:current.activeCountry,countries:{...current.countries,[code]:config},revision:1,audit:[summary]}],{session});await OperatingAreaAudit.create([{...summary,changes}],{session});return getOperatingAreasAfter(session);}}
+  const updated=await OperatingAreas.findOneAndUpdate({_id:'global',revision},{$set:{['countries.'+code]:config,...(activate?{activeCountry:code}:{})},$inc:{revision:1},$push:{audit:{$each:[summary],$slice:-100}}},{session,returnDocument:'after'}).lean();if(!updated)throw new AreaError('Settings changed. Refresh before saving.');await OperatingAreaAudit.create([event],{session});return updated;
  });
 }
 async function getOperatingAreasAfter(session){return OperatingAreas.findById('global').session(session).lean();}

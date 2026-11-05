@@ -5,6 +5,7 @@ import {
 } from "./settings/SettingsFeedback";
 /* eslint-disable @next/next/no-img-element -- Validated inline logo previews cannot use image optimization. */
 import { useEffect, useRef, useState } from "react";
+import {useMapSettings} from '@/components/maps/useMapSettings';
 import { useBranding } from "@/context/BrandingProvider";
 import { DEFAULT_BRANDING, MAX_LOGO_BYTES } from "@/lib/branding";
 import { KovaIcon } from "@/components/brand/KovaLogo";
@@ -15,7 +16,8 @@ import {
   SettingsStatus,
   useSettingsDirty,
 } from "./settings/SettingsUI";
-export default function BrandingSettings({ onDirty, localization }) {
+export default function BrandingSettings({ onDirty }) {
+  const {country:localization}=useMapSettings();
   const { setBranding } = useBranding();
   const [draft, setDraft] = useState(null),
     [saved, setSaved] = useState(null),
@@ -126,24 +128,24 @@ export default function BrandingSettings({ onDirty, localization }) {
       </SettingsSection>
       <SettingsSection
         title="Country and localization"
-        description="Operating location is managed in Maps & Service Zones. Financial records retain their original currency."
+        description="Operating location is managed in Countries & Service Zones. Financial records retain their original currency."
       >
         <div className="settings-status-list">
           <div>
             <span>Operating location</span>
             <strong>
               {localization
-                ? `${localization.city}, ${localization.country}`
+                ? localization.name
                 : "Loading location…"}
             </strong>
           </div>
           <div>
             <span>Timezone</span>
-            <strong>Africa/Cairo</strong>
+            <strong>{localization?.timeZone||'Loading…'}</strong>
           </div>
           <div>
             <span>Platform currency</span>
-            <SettingsStatus>EGP · Egyptian pound</SettingsStatus>
+            <SettingsStatus>{localization?.currency||'Loading…'}</SettingsStatus>
           </div>
         </div>
       </SettingsSection>

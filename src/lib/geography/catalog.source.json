@@ -1,0 +1,24 @@
+{
+  "retrievedAt": "2026-11-05",
+  "cityArabicNames": {
+    "source": "https://download.geonames.org/export/dump/cities15000.zip",
+    "adminNames": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "license": "CC BY 4.0",
+    "attribution": "GeoNames",
+    "notes": "Arabic alternate names joined by city coordinates; original name retained where no Arabic alternate exists. Palestinian city catalog sourced from GeoNames."
+  },
+  "currency": {
+    "source": "https://www.six-group.com/dam/download/financial-information/data-center/iso-currrency/lists/list-one.xml",
+    "snapshot": "iso4217.xml",
+    "notes": "ISO 4217 minor units. MRU supersedes obsolete MRO in the city catalog. Palestine has no automatic settlement currency; business must choose ILS, JOD or USD."
+  },
+  "countryNames": "Unicode CLDR Arabic display names; requested product display name Palestine / فلسطين. ISO country identifiers remain unchanged.",
+  "boundaries": "Each ISO code has its own .source.json attribution, license and pinned download URL. Generalized geographic data is not a legal border determination.",
+  "countryCityCatalog": {
+    "source": "https://download.geonames.org/export/dump/cities15000.zip",
+    "administrativeNames": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+    "license": "CC BY 4.0",
+    "attribution": "GeoNames",
+    "notes": "Controlled catalog of cities above 15,000 population, supplemented by existing legacy EG/JO/IQ identifiers. City points are not service boundaries. Country names from CLDR; calling codes validated by libphonenumber; time zones use IANA identifiers."
+  }
+}

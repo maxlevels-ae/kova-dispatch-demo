@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { mapDefaults, cityCenter } from "@/lib/map-config";
+import { mapDefaults } from "@/lib/map-config";
 export function useMapSettings(enabled=true) {
   const [config, setConfig] = useState({
     settings: mapDefaults,
-    center: cityCenter(),
+    center: null,
     providers: [],
     error: "",
   });
@@ -25,10 +25,13 @@ export function useMapSettings(enabled=true) {
     const visible = () => {
       if (document.visibilityState === "visible") load();
     };
+    const timer=setInterval(load,15000);
+    window.addEventListener("storage",load);
+    window.addEventListener("focus",load);
     window.addEventListener("maxride:maps-saved", load);
     document.addEventListener("visibilitychange", visible);
     return () => {
-      active = false;
+      active = false;clearInterval(timer);window.removeEventListener("storage",load);window.removeEventListener("focus",load);
       window.removeEventListener("maxride:maps-saved", load);
       document.removeEventListener("visibilitychange", visible);
     };

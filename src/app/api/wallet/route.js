@@ -59,7 +59,7 @@ export async function POST(request) {
 
   if (process.env.DEMO_WALLET_TOPUPS !== 'true' || process.env.NODE_ENV === 'production' || isStripeEnabled()) {
     return Response.json(
-      { error: 'Top-ups are disabled pending Egypt payment verification' },
+      { error: 'Top-ups are disabled pending local payment-provider verification' },
       { status: 409 }
     );
   }

@@ -44,7 +44,7 @@ function request(path, cookie = "", options = {}) {
   return fetch(base + path, {
     redirect: "manual",
     ...options,
-    headers: { cookie, origin: base, ...options.headers },
+    headers: { cookie, origin: base, connection: "close", ...options.headers },
   });
 }
 async function start() {
@@ -1107,7 +1107,7 @@ try {
           branding: "General & Branding",
           dispatch: "Bookings & Dispatch",
           fleet: "Drivers & Fleet",
-          maps: "Maps & Service Zones",
+          maps: "Maps & Appearance",
           payment: "Payment Gateways",
           pricing: "Pricing & Commission",
           notifications: "Notifications",
@@ -1273,7 +1273,7 @@ try {
   if(process.argv.includes('--notifications-only')){const {notificationChecks}=await import('./ride-notifications.mjs');await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});}
   if(process.argv.includes('--delivery-only')){const {deliveryChecks}=await import('./delivery-integration.mjs');await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--account-management-only')){const {accountsChecks}=await import('./accounts-integration.mjs');await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});}
-  if(process.argv.includes('--areas-only')||!process.argv.some(v=>v.endsWith('-only'))){const {operatingChecks}=await import('./operating-integration.mjs');await operatingChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check});}
+  if(process.argv.includes('--areas-only')||!process.argv.some(v=>v.endsWith('-only'))){const {operatingChecks}=await import('./operating-integration.mjs');await operatingChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--audio-only')||!process.argv.some(v=>v.endsWith('-only'))){const {audioHydrationChecks}=await import('./audio-hydration.mjs');await audioHydrationChecks({base,cookies,check});}
   if(process.argv.includes('--safety-only')||!process.argv.some(v=>v.endsWith('-only'))){const {safetyChecks}=await import('./ride-safety-integration.mjs');await safetyChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,check});}
   console.log(

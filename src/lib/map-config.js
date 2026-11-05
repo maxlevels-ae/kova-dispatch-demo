@@ -83,3 +83,6 @@ export function mapRequest(url) {
   return { url: parsed.href };
 }
 export const DRIVER_STALE_MS = 90000;
+
+// Legacy location keys are retained for reading pre-operating-area records only.
+export const mapAppearanceKeys=['basemapProvider','mapStyle','routingMode','initialZoom','autoFitDrivers','showVehicleMarkers','showDriverNames','driverStatusFilter','vehicleCategoryFilter','locationRefreshSeconds'];

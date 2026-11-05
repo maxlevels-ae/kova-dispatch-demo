@@ -1,7 +1,7 @@
 import {activeOperations,enabledZones} from '@/lib/operating-areas';
 import { requireAuth } from "@/lib/auth/helpers";
 import { getSettings } from "@/lib/settings";
-import { cartoConfigured } from "@/lib/map-config";
+import { cartoConfigured,mapAppearanceKeys } from "@/lib/map-config";
 export async function GET() {
   const { error } = await requireAuth();
   if (error) return error;
@@ -10,7 +10,8 @@ export async function GET() {
     const operations=await activeOperations();
     return Response.json(
       {
-        settings: maps,
+        settings: Object.fromEntries(mapAppearanceKeys.map(key=>[key,maps[key]])),
+        revision:operations.revision,
         center: operations.config.center,
         country:operations.country,
         zones: [...new Map([...enabledZones(operations.config,'taxi'),...enabledZones(operations.config,'delivery')].map(z=>[z.id,z])).values()],

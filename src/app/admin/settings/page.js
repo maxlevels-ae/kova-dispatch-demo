@@ -63,9 +63,9 @@ const groups = [
       },
       {
         id: "maps",
-        title: "Maps & Service Zones",
+        title: "Maps & Appearance",
         icon: MapPin,
-        description: "Define where Maxride operates and how trips are routed.",
+        description: "Configure map appearance, routing and live driver display.",
       },
     ],
   },

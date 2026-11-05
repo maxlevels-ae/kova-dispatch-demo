@@ -7,7 +7,7 @@ export function LanguageProvider({children}){
  const {data:session}=useSession(),id=session?.user?.id,role=session?.user?.role;
  const [language,setLanguage]=useState('en');
  const [country,setCountry]=useState('EG');
- useEffect(()=>{if(!id)return;let active=true;const load=()=>fetch('/api/services').then(r=>r.ok?r.json():null).then(d=>{if(active&&d?.country){setClientCountry(d.country.code);setCountry(d.country.code);}}).catch(()=>{});load();const timer=setInterval(load,30000);window.addEventListener('focus',load);return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',load);};},[id]);
+ useEffect(()=>{if(!id)return;let active=true;const load=()=>fetch('/api/services').then(r=>r.ok?r.json():null).then(d=>{if(active&&d?.country){setClientCountry(d.country.code);setCountry(d.country.code);}}).catch(()=>{});load();const timer=setInterval(load,30000);window.addEventListener('focus',load);window.addEventListener('maxride:maps-saved',load);window.addEventListener('storage',load);return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',load);window.removeEventListener('maxride:maps-saved',load);window.removeEventListener('storage',load);};},[id]);
  const apply=value=>{setClientLanguage(value);setLanguage(value);document.documentElement.lang=value;document.documentElement.dir=value==='ar'?'rtl':'ltr';};
  useEffect(()=>{let active=true;if(role!=='rider'){apply('en');return;}
   fetch('/api/me/language').then(r=>r.ok?r.json():Promise.reject()).then(d=>{if(active)apply(d.language);}).catch(()=>{});return()=>{active=false;};

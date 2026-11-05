@@ -1,5 +1,6 @@
 'use client';
 
+import {countries} from '@/lib/countries';
 import { useEffect, useState } from 'react';
 import { Route } from 'lucide-react';
 import Link from 'next/link';
@@ -45,7 +46,7 @@ export default function AdminRidesPage() {
       <p className="page-sub mb-6">Every trip on the platform</p>
 
       <div className="flex gap-2 wrap mb-4">
-        <select className="input" aria-label="Country" value={country} onChange={e=>{setCountry(e.target.value);setPage(1);}}><option value="">All countries (including legacy)</option><option value="EG">Egypt</option><option value="JO">Jordan</option><option value="IQ">Iraq</option></select>
+        <select className="input" aria-label="Country" value={country} onChange={e=>{setCountry(e.target.value);setPage(1);}}><option value="">All countries (including legacy)</option>{Object.values(countries).map(c=><option key={c.code} value={c.code}>{c.name}</option>)}</select>
         {STATUSES.map((s) => (
           <button
             key={s || 'all'}
