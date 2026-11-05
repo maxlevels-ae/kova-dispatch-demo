@@ -16,10 +16,13 @@ export function validFix(fix,policy,now=Date.now()){
  return null;
 }
 export function evaluateProgress(samples,start,pickup,dropoff,policy,now=Date.now()){
- const last=samples.at(-1),straight=meters(pickup,dropoff);let distance=0,seconds=0,jumps=0,gaps=0,validCount=0,previous=null;
- for(const fix of samples){if(new Date(fix.at)<new Date(start)||!Number.isFinite(fix.accuracy)||fix.accuracy<=0||fix.accuracy>policy.maxAccuracyMeters)continue;validCount++;
+ const last=samples.at(-1),straight=meters(pickup,dropoff);let distance=0,seconds=0,jumps=0,gaps=0,validCount=0,previous=null,first=null;
+ for(const fix of samples){if(new Date(fix.at)<new Date(start)||!Number.isFinite(fix.accuracy)||fix.accuracy<=0||fix.accuracy>policy.maxAccuracyMeters)continue;validCount++;first ||= fix;
   if(previous){const dt=(new Date(fix.at)-new Date(previous.at))/1000,d=meters(previous,fix);if(dt<=0||d>policy.maxSpeedKph/3.6*dt+Math.min(50,previous.accuracy+fix.accuracy)){jumps++;previous=fix;continue;}if(dt>policy.maxGapSeconds){gaps++;previous=fix;continue;}distance+=Math.max(0,d-(previous.accuracy+fix.accuracy));seconds+=dt;}previous=fix;
  }
+ // A continuous, plausible track also proves net displacement. This avoids
+ // erasing genuine slow movement by subtracting GPS uncertainty at every ping.
+ if(first&&previous&&!jumps&&!gaps)distance=Math.max(distance,Math.max(0,meters(first,previous)-first.accuracy-previous.accuracy));
  const distanceToDestination=last?meters(last,dropoff):null,requiredProgress=Math.min(policy.minProgressMeters,Math.max(3,straight*.5));
  let error=validFix(last,policy,now);
  if(!error&&straight<policy.shortTripMeters&&last.accuracy>Math.max(5,straight/4))error='GPS accuracy is insufficient for this short trip. Use the early-end review if you cannot continue.';

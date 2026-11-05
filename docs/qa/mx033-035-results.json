@@ -4,8 +4,8 @@
     "MX-034",
     "MX-035"
   ],
-  "verifiedAt": "2026-11-05T01:39:48.352179+00:00",
-  "unitTests": 49,
+  "verifiedAt": "2026-11-05T02:04:02.258398+00:00",
+  "unitTests": 50,
   "httpChecks": 21,
   "integrationSuites": {
     "demo": 7,
@@ -13,7 +13,8 @@
     "delivery": 20,
     "account-management": 9,
     "areas": 21,
-    "safety": 11
+    "safety": 11,
+    "audio-hydration": 4
   },
   "coreAndMapRegression": "Passed in the combined integration run; outdated GPS fixtures were corrected and affected suites rerun separately.",
   "lint": {
@@ -55,5 +56,9 @@
     "Physical mobile-device sound and closed-browser delivery were not verified.",
     "Pre-upgrade in-progress trips without recorded start/progress evidence require the controlled early-end review.",
     "Early-ending charges default to zero. Positive reviewed charges require the saved verified-service policy, observed post-start travel, rider confirmation and explicit administrator settlement."
+  ],
+  "followupRegressions": [
+    "Native incoming MP3 playback survives initial session hydration: reproduced failure before fix and verified playback after fix.",
+    "Dense GPS samples preserve conservative net travel without counting stationary jitter."
   ]
 }

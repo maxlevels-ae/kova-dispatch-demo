@@ -18,3 +18,5 @@ test('incoming sound keeps the exact fixed source, reports blocking, retries and
 test('short-trip uncertainty cannot be counted as meaningful travel',()=>{const end={lat:pickup.lat+.0003,lng:pickup.lng};const samples=[{...fix(pickup,15),accuracy:50},{...fix(end,0),accuracy:50}];assert.equal(evaluateProgress(samples,samples[0].at,pickup,end,p,now).valid,false);});
 
 test('movement before the server-recorded trip start never counts',()=>{const samples=[fix(pickup,25),fix(dropoff,10),fix(dropoff,0)];assert.equal(evaluateProgress(samples,new Date(now-15000),pickup,dropoff,p,now).valid,false);});
+
+test('dense GPS updates preserve genuine slow movement without counting stationary jitter',()=>{const end={lat:pickup.lat+.001,lng:pickup.lng};const samples=Array.from({length:31},(_,i)=>({...fix({lat:pickup.lat+(end.lat-pickup.lat)*i/30,lng:pickup.lng},30-i),accuracy:10}));const result=evaluateProgress(samples,samples[0].at,pickup,end,p,now);assert.equal(result.valid,true);assert.ok(result.verifiedDistanceMeters>80);assert.equal(evaluateProgress(samples.map(s=>({...s,...pickup})),samples[0].at,pickup,end,p,now).valid,false);});

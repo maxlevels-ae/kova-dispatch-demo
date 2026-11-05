@@ -16,7 +16,10 @@ export function NotificationProvider({children}){
  useEffect(()=>{state.current={preferences,policy};},[preferences,policy]);
  const role=session?.user?.role;
  const userId=session?.user?.id;
- useEffect(()=>()=>stopAlert(),[userId]);
+ const audioOwner=useRef(null);
+ // Initial session hydration must not cancel audio started by a direct gesture.
+ useEffect(()=>{if(audioOwner.current&&audioOwner.current!==userId)stopAlert();audioOwner.current=userId;},[userId]);
+ useEffect(()=>()=>stopAlert(),[]);
  const display=useCallback(async n=>{
   if(seen.current.has(n.key))return;seen.current.add(n.key);if(seen.current.size>500)seen.current.delete(seen.current.values().next().value);
   if(n.readAt||Date.now()-new Date(n.createdAt)>60000||(n.expiresAt&&Date.parse(n.expiresAt)<Date.now()))return;
