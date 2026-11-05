@@ -1,5 +1,6 @@
 import {bookingArea,courierReadiness,deliveryOperationsPolicy} from '@/lib/operating-areas';
-import {validCountryPhone,currencyDigits} from '@/lib/countries';
+import {currencyDigits} from '@/lib/countries';
+import {mobileContact} from '@/lib/contact-phone';
 import {translate} from '@/lib/i18n';
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
@@ -71,20 +72,21 @@ export async function deliveryNotify(order,event,eventId,exclude){
 async function notifySafely(order,event,id,exclude){try{await deliveryNotify(order,event,id,exclude);}catch(error){console.error('Delivery notification pending',error.name);}}
 export async function quoteDelivery(input,user){
  await connectDB();if(!user?.id)fail('Authentication required',401);
- const senderAccount=await User.findOne({_id:user.id,isActive:true,role:'rider'}).select('name phone').lean();
+ const senderAccount=await User.findOne({_id:user.id,isActive:true,role:'rider'}).select('name phone phoneCountry').lean();
  if(!senderAccount?.name||!senderAccount.phone)fail('Complete your name and phone in your profile before sending a package.',400);
- const sender=input.alternatePickupContact?{...input.pickupContact,instructions:input.sender?.instructions||''}:{name:senderAccount.name,phone:senderAccount.phone,instructions:input.sender?.instructions||''};
+ const accountContact=mobileContact(senderAccount.phone,senderAccount.phoneCountry);if(accountContact.error)fail('Account contact: '+accountContact.error,400);
+ const sender=input.alternatePickupContact?{...input.pickupContact,instructions:input.sender?.instructions||''}:{name:senderAccount.name,...accountContact,instructions:input.sender?.instructions||''};
  const parsed=deliveryBookingSchema.safeParse({...input,sender});if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
  const b=parsed.data,{settings:s}=await getDeliverySettings();if(!s.general.enabled)fail('Delivery service is currently disabled');
  const operations=await bookingArea('delivery',b.pickup,b.dropoff);
- if(!validCountryPhone(b.sender.phone,operations.country.code)||!validCountryPhone(b.recipient.phone,operations.country.code))fail('Use a valid local mobile number with country prefix '+operations.country.dialCode,400);
+ for(const [field,label] of [['sender','Pickup contact'],['recipient','Recipient contact']]){const contact=mobileContact(b[field].phone,b[field].phoneCountry);if(contact.error)fail(label+': '+contact.error,400);Object.assign(b[field],contact);}
  Object.assign(s,deliveryOperationsPolicy(s,operations));
  const bounds=selectedPackageBounds(b.package.size,s.packages);for(const [key,value] of Object.entries(bounds))if(b.package[key]===undefined)b.package[key]=value;
  if(Object.entries(bounds).some(([key,max])=>b.package[key]>max))fail('Package exceeds the selected size limits. Choose a larger package size.',400);
- b.senderAccount={id:String(senderAccount._id),name:senderAccount.name,phone:senderAccount.phone};
+ b.senderAccount={id:String(senderAccount._id),name:senderAccount.name,...accountContact};
  if(!s.packages.categories.includes(b.package.category)||b.package.weight>s.packages.maxWeight||b.package.length>s.packages.maxLength||b.package.width>s.packages.maxWidth||b.package.height>s.packages.maxHeight)fail('Package exceeds configured category, weight or dimensions',400);
- const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone').lean():null;
- if(b.recipient.username&&(!recipient||recipient.phone?.replace(/\D/g,'')!==b.recipient.phone.replace(/\D/g,'')))fail('Registered recipient account and phone do not match.',400);
+ const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone phoneCountry').lean():null;
+ if(b.recipient.username&&(!recipient||mobileContact(recipient.phone,recipient.phoneCountry).phone!==b.recipient.phone))fail('Registered recipient account and phone do not match.',400);
  const route=await getRoute(b.pickup,b.dropoff);
  const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}},{$limit:1}]):[];
  return {input:b,settings:s,operations,recipientId:recipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};

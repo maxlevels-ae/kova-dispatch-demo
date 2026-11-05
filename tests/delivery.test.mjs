@@ -32,3 +32,13 @@ test('guest booking requires contacts and valid coordinates; country containment
  assert.equal(deliveryBookingSchema.safeParse({...input,recipient:{name:'Guest'}}).success,false);
  assert.equal(deliveryBookingSchema.safeParse({...input,dropoff:{...input.dropoff,lat:91}}).success,false);
 });
+import {mobileContact} from '../src/lib/contact-phone.js';
+test('contact phones are independent of operating country and require explicit context for national numbers',()=>{
+ for(const [phone,phoneCountry] of [['+971501234567','AE'],['+962791234567','JO'],['+966501234567','SA'],['+201012345678','EG']])assert.deepEqual(mobileContact(phone),{phone,phoneCountry});
+ assert.equal(mobileContact('0501234567').error,'Country code required');
+ assert.deepEqual(mobileContact('0501234567','AE'),{phone:'+971501234567',phoneCountry:'AE'});
+ assert.equal(mobileContact('123','AE').error,'Phone number invalid');
+ assert.equal(mobileContact('+971 50 123 4567').phone,'+971501234567');
+ assert.equal(mobileContact('+971501234567 ext 12').error,'Phone number invalid');
+ assert.equal(mobileContact('+20223456789').error,'Phone number invalid');
+});

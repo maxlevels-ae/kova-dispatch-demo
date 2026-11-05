@@ -363,7 +363,7 @@ async function headerInbox(page, role) {
   const bounds=await page.locator('.notification-panel').boundingBox();
   assert.ok(bounds.x>=0 && bounds.x+bounds.width<=page.viewportSize().width, 'Inbox fits viewport');
   await page.screenshot({path:`docs/qa/notifications-header-${role}.png`,fullPage:true});
-  await page.keyboard.press('Escape');
+  await trigger.press('Escape');
   await expect(page.getByRole('region',{name:'Notification inbox'})).not.toBeVisible();
   await expect(trigger).toBeFocused();
 }

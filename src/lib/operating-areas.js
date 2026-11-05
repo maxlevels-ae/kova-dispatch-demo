@@ -23,7 +23,7 @@ export async function activeOperations(){const record=await getOperatingAreas();
 export async function bookingArea(service,pickup,dropoff,at=new Date()){
  const snapshot=await activeOperations();const {country,config}=snapshot;
  if(!config[service]||readiness(country.code,config).some(v=>v.startsWith(service+':')||v.startsWith('settlement:')))throw new AreaError('Service is not available in this area.');
- const p=zoneAt(snapshot,pickup,service),d=zoneAt(snapshot,dropoff,service);if(!p||!d)throw new AreaError('This location is outside the active service zone.',400);
+ const p=zoneAt(snapshot,pickup,service),d=zoneAt(snapshot,dropoff,service);if(!p||!d)throw new AreaError(service==='delivery'?(!p?'Pickup location outside service area':'Destination outside service area'):'This location is outside the active service zone.',400);
  const hour=Number(new Intl.DateTimeFormat('en',{timeZone:country.timeZone,hour:'numeric',hourCycle:'h23'}).format(at));if(hour<(service==='delivery'?config.deliveryHours:config.hours).start||hour>=(service==='delivery'?config.deliveryHours:config.hours).end)throw new AreaError('Booking is outside local operating hours.',400);
  return {...snapshot,pickupZone:p.id,dropoffZone:d.id,recordedAt:new Date().toISOString()};
 }

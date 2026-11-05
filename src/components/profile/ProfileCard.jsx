@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { LogOut, Pencil, Check, X, Camera } from 'lucide-react';
 import { Avatar, Stars, Loading, money } from '@/components/ui/bits';
+import PhoneField from './PhoneField';
 import { useToast } from '@/components/ui/Toast';
 
 /** Shared profile editor for riders and drivers. */
@@ -57,7 +58,7 @@ export default function ProfileCard({ children }) {
           const { user: u } = await res.json();
           if (!ignore) {
             setUser(u);
-            setForm({ name: u.name, phone: u.phone, email: u.email });
+            setForm({ name: u.name, phone: u.phone, phoneCountry:u.phoneCountry||'', email: u.email });
           }
         }
       } catch { /* ignore */ }
@@ -154,7 +155,7 @@ export default function ProfileCard({ children }) {
                 className="btn btn-ghost btn-sm"
                 onClick={() => {
                   setEditing(false);
-                  setForm({ name: user.name, phone: user.phone, email: user.email });
+                  setForm({ name: user.name, phone: user.phone, phoneCountry:user.phoneCountry||'', email: user.email });
                 }}
               >
                 <X size={14} />
@@ -173,7 +174,7 @@ export default function ProfileCard({ children }) {
           </FieldRow>
           <FieldRow label={tr("Phone")} editing={editing}>
             {editing ? (
-              <input className="input" value={form.phone} placeholder={tr("+1 555 000 1234")} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} />
+              <PhoneField value={form.phone} country={form.phoneCountry} required={false} disabled={saving} onChange={v=>setForm(f=>({...f,...v}))}/>
             ) : (
               user.phone ? <bdi dir="ltr">{user.phone}</bdi> : <span className="muted">{tr("Not set")}</span>
             )}

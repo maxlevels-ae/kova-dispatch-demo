@@ -29,7 +29,7 @@ export const deliveryDefaults={
  proof:{pickupOTP:true,deliveryOTP:true,photoRequired:false,expiryMinutes:120,maxAttempts:5,retentionDays:90},
 };
 export const deliveryPoint=z.object({lat:z.number().min(-90).max(90),lng:z.number().min(-180).max(180),address:z.string().trim().min(3).max(300)});
-const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().regex(/^\+?[\d ()-]{7,20}$/),instructions:z.string().max(500).default('')});
+const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().trim().min(1).max(40),phoneCountry:z.string().regex(/^[A-Z]{2}$/).optional().or(z.literal('')),instructions:z.string().max(500).default('')});
 export const deliveryBookingSchema=z.object({
  alternatePickupContact:z.boolean().default(false),pickupContact:contact.optional(),pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
  package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive().optional(),length:z.number().positive().optional(),width:z.number().positive().optional(),height:z.number().positive().optional(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),

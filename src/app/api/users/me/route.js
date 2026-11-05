@@ -3,14 +3,16 @@ import { walletAccount, walletAccounts } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import User from '@/lib/db/models/User';
+import {mobileContact,phoneCountries} from '@/lib/contact-phone';
 import { requireAuth } from '@/lib/auth/helpers';
 
 const updateSchema = z.object({
-  name: z.string().trim().min(2).max(100).optional(),
+  phoneCountry: z.string().refine(value=>value===''||phoneCountries.includes(value),'Country code required').optional(),
+  name: z.string().trim().min(2,'Contact details incomplete').max(100).optional(),
   phone: z
     .string()
     .trim()
-    .regex(/^\+?[0-9\s\-()]{7,20}$/, 'Enter a valid phone number')
+    .max(40, 'Phone number invalid')
     .optional()
     .or(z.literal('')),
   email: z.string().trim().email('Enter a valid email').optional().or(z.literal('')),
@@ -46,6 +48,7 @@ export async function GET() {
         username: user.username,
         name: user.name,
         phone: user.phone || '',
+        phoneCountry: user.phoneCountry || '',
         email: user.email || '',
         avatar: user.avatar || '',
         role: user.role,
@@ -76,6 +79,13 @@ export async function PATCH(request) {
       return Response.json({ error: first?.message || 'Invalid input' }, { status: 400 });
     }
 
+    if(parsed.data.phone){
+      const contact=mobileContact(parsed.data.phone,parsed.data.phoneCountry);
+      if(contact.error)return Response.json({error:contact.error,field:'phone'},{status:400});
+      Object.assign(parsed.data,contact);
+    }else if(parsed.data.phone==='')parsed.data.phoneCountry='';
+    else delete parsed.data.phoneCountry;
+
     await connectDB();
 
     // Drop empty strings so sparse-unique fields stay unset
@@ -101,6 +111,7 @@ export async function PATCH(request) {
         username: user.username,
         name: user.name,
         phone: user.phone || '',
+        phoneCountry: user.phoneCountry || '',
         email: user.email || '',
         avatar: user.avatar || '',
         role: user.role,

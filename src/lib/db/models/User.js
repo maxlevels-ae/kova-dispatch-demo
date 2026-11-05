@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
       maxlength: 100,
     },
+    phoneCountry: {type:String,match:/^[A-Z]{2}$/},
     phone: {
       type: String,
       unique: true,

@@ -94,7 +94,7 @@ function cookieHeader(response, previous = "") {
   }
   return [...map].map(([k, v]) => `${k}=${v}`).join("; ");
 }
-async function login(role) {
+async function login(role, loginPassword=password) {
   const csrf = await request("/api/auth/csrf");
   const cookies = cookieHeader(csrf);
   const { csrfToken } = await csrf.json();
@@ -106,7 +106,7 @@ async function login(role) {
     },
     body: new URLSearchParams({
       username: `qa_${role}`,
-      password,
+      password:loginPassword,
       csrfToken,
       callbackUrl: base + "/dashboard",
     }),
@@ -203,7 +203,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only')) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -856,6 +856,10 @@ try {
           .preference,
         false,
       );
+      assert.equal((await request('/api/notifications',cookies.rider,{
+        method:'PUT',headers:{'content-type':'application/json'},
+        body:JSON.stringify({inApp:inbox.preference}),
+      })).status,200);
     },
   );
   await check(
@@ -1241,7 +1245,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only')) await check(
+  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1258,22 +1262,25 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
     const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
     const {notificationChecks}=await import('./ride-notifications.mjs');
     await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
     const {deliveryChecks}=await import('./delivery-integration.mjs');
     await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});
     const {accountsChecks}=await import('./accounts-integration.mjs');
     await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});
+    // The password-rotation regression deliberately expires the old session.
+    cookies.admin=await login('admin',password+'new');
   }
   if(process.argv.includes('--notifications-only')){const {notificationChecks}=await import('./ride-notifications.mjs');await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});}
   if(process.argv.includes('--delivery-only')){const {deliveryChecks}=await import('./delivery-integration.mjs');await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--account-management-only')){const {accountsChecks}=await import('./accounts-integration.mjs');await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});}
   if(process.argv.includes('--areas-only')||!process.argv.some(v=>v.endsWith('-only'))){const {operatingChecks}=await import('./operating-integration.mjs');await operatingChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
+  if(process.argv.includes('--contacts-only')||!process.argv.some(v=>v.endsWith('-only'))){const {contactChecks}=await import('./contact-integration.mjs');await contactChecks({base,User,password,check});}
   if(process.argv.includes('--audio-only')||!process.argv.some(v=>v.endsWith('-only'))){const {audioHydrationChecks}=await import('./audio-hydration.mjs');await audioHydrationChecks({base,cookies,check});}
   if(process.argv.includes('--safety-only')||!process.argv.some(v=>v.endsWith('-only'))){const {safetyChecks}=await import('./ride-safety-integration.mjs');await safetyChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,check});}
   console.log(
