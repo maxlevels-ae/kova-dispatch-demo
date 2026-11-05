@@ -3,6 +3,7 @@ import { CURRENCY } from '@/lib/currency';
 
 const rideSchema = new mongoose.Schema(
   {
+    operations: mongoose.Schema.Types.Mixed,
     scheduledAt: Date,
     riderId: {
       type: mongoose.Schema.Types.ObjectId,

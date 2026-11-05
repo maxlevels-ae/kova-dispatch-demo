@@ -1,3 +1,4 @@
 import {deliveryGuard,deliveryFailure} from '@/lib/delivery-http';
 import {serviceAvailability} from '@/lib/service-availability';
-export async function GET(request){const {error}=await deliveryGuard(request);if(error)return error;try{const {taxiEnabled,deliveryEnabled}=await serviceAvailability();return Response.json({taxiEnabled,deliveryEnabled},{headers:{'Cache-Control':'no-store'}});}catch(e){return deliveryFailure(e);}}
+import {activeOperations,zoneAt} from '@/lib/operating-areas';
+export async function GET(request){const {error}=await deliveryGuard(request);if(error)return error;try{const services=await serviceAvailability(),q=new URL(request.url).searchParams;let outsideArea=false;if(q.has('lat')&&q.has('lng')){const point={lat:Number(q.get('lat')),lng:Number(q.get('lng'))},o=await activeOperations();services.taxiEnabled=services.taxiEnabled&&!!zoneAt(o,point,'taxi');services.deliveryEnabled=services.deliveryEnabled&&!!zoneAt(o,point,'delivery');outsideArea=!zoneAt(o,point,'taxi')&&!zoneAt(o,point,'delivery');}return Response.json({...services,outsideArea},{headers:{'Cache-Control':'no-store'}});}catch(e){return deliveryFailure(e);}}

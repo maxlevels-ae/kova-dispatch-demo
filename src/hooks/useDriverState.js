@@ -81,7 +81,10 @@ export default function useDriverState({ onEvent } = {}) {
   // ── GPS watch + socket ping while online (or on a trip) ──
   useEffect(() => {
     const shouldTrack = online || Boolean(ride);
-    if (!shouldTrack || !navigator.geolocation) return undefined;
+    if (!shouldTrack || !navigator.geolocation || !isConnected) return undefined;
+    // A reconnect must send its first fresh fix. Do not consume the throttle
+    // window while the socket is absent or still authenticating.
+    lastPingRef.current = 0;
 
     const onPosition=(pos) => {
         const point = {
@@ -93,7 +96,7 @@ export default function useDriverState({ onEvent } = {}) {
         setPosition(point);
 
         const now = Date.now();
-        if (now - lastPingRef.current >= PING_INTERVAL_MS) {
+        if (socketRef.current?.connected && now - lastPingRef.current >= PING_INTERVAL_MS) {
           lastPingRef.current = now;
           socketRef.current?.emit('driver:location', {
             ...point,
@@ -113,7 +116,7 @@ export default function useDriverState({ onEvent } = {}) {
         watchIdRef.current = null;
       }
     };
-  }, [online, Boolean(ride)]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [online, Boolean(ride), isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Socket events ──
   useEffect(() => {

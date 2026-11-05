@@ -1,3 +1,4 @@
+import {currencyDigits} from '@/lib/countries';
 import { CURRENCY, DEFAULT_PRICING, minorUnits } from '@/lib/currency';
 import connectDB from '@/lib/db/mongodb';
 import EgpPricingRule from '@/lib/db/models/EgpPricingRule';
@@ -34,15 +35,19 @@ export async function calculateFare({
   surgeMultiplier,
   pickup,
   city = 'default',
+  operations,
 }) {
   // Try to fetch pricing from DB
-  let pricing;
+  const currency=operations?.country.currency||CURRENCY;
+  const round=n=>minorUnits(n,currency)/10**currencyDigits[currency];
+  let pricing=operations?.config.taxiPricing?.[vehicleType];
+  if(currency!==CURRENCY&&!pricing)throw new Error("Independent country tariff is required");
   try {
     await connectDB();
-    pricing = await EgpPricingRule.findOne({
+    if(!pricing) pricing = await EgpPricingRule.findOne({
       vehicleType,
       city,
-      currency: CURRENCY,
+      currency,
       isActive: true,
     }).lean();
   } catch (err) {
@@ -106,7 +111,7 @@ export async function calculateFare({
     driverEarnings: round(driverEarnings),
     total: round(total),
     estimatedTotal: round(total),
-    currency: CURRENCY,
+    currency,
   };
 
   // Include H3 surge details if available
@@ -131,8 +136,9 @@ export async function getAllFareEstimates({
   surgeMultiplier,
   pickup,
   city = 'default',
+  operations,
 }) {
-  const types = ['economy', 'comfort', 'premium', 'xl'];
+  const types = operations?.config.vehicles||['economy', 'comfort', 'premium', 'xl'];
   const estimates = {};
 
   // Calculate surge once for all vehicle types (they share the same location)
@@ -153,13 +159,9 @@ export async function getAllFareEstimates({
       vehicleType: type,
       surgeMultiplier: sharedSurge,
       pickup,
-      city,
+      city, operations,
     });
   }
 
   return estimates;
-}
-
-function round(num) {
-  return minorUnits(num) / 100;
 }

@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema(
   {
     authVersion: { type: Number, default: 0 },
     language:{type:String,enum:['en','ar'],default:'en'},
+    currencyWallets:{JOD:{balance:Number,currency:{type:String,enum:['JOD']}},IQD:{balance:Number,currency:{type:String,enum:['IQD']}}},
     egpWallet: { type: new mongoose.Schema({ balance: { type: Number, default: 0 }, currency: { type: String, enum: ['EGP'], default: 'EGP' } }, { _id: false }), default: undefined },
     username: {
       type: String,

@@ -14,6 +14,7 @@ export default function AdminRidesPage() {
   async function dispatchRide(rideId) { setDispatchBusy(true); try { const r = await fetch('/api/admin/rides', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rideId }) }); const d = await r.json(); if (!r.ok) throw Error(d.error); setDispatchMessage('Dispatch requested. Refresh the ride list to see progress.'); } catch (e) { setDispatchMessage(e.message); } finally { setDispatchBusy(false); } }
   const [rides, setRides] = useState(null);
   const [status, setStatus] = useState('');
+  const [country,setCountry]=useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
 
@@ -24,6 +25,7 @@ export default function AdminRidesPage() {
       try {
         const params = new URLSearchParams({ page: String(page), limit: '20' });
         if (status) params.set('status', status);
+        if(country)params.set('country',country);
         const res = await fetch(`/api/admin/rides?${params}`);
         const data = await res.json();
         if (!ignore && res.ok) {
@@ -35,7 +37,7 @@ export default function AdminRidesPage() {
       }
     })();
     return () => { ignore = true; };
-  }, [status, page]);
+  }, [status, page,country]);
 
   return (
     <div className="content-pad">
@@ -43,6 +45,7 @@ export default function AdminRidesPage() {
       <p className="page-sub mb-6">Every trip on the platform</p>
 
       <div className="flex gap-2 wrap mb-4">
+        <select className="input" aria-label="Country" value={country} onChange={e=>{setCountry(e.target.value);setPage(1);}}><option value="">All countries (including legacy)</option><option value="EG">Egypt</option><option value="JO">Jordan</option><option value="IQ">Iraq</option></select>
         {STATUSES.map((s) => (
           <button
             key={s || 'all'}

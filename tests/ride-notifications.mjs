@@ -52,15 +52,16 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    expect.poll(()=>pages.driver.evaluate(()=>qaAudio.some(a=>a.src.includes('new-ride.mp3')&&!a.paused&&a.loop&&a.currentTime>0)),{timeout:5000}).toBe(true),
    expect.poll(()=>pages.driver.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return(await reg.getNotifications()).some(n=>n.body==='New ride request');}),{timeout:10000}).toBe(true).catch(async e=>{console.log('NOTIFICATION DIAGNOSTICS',JSON.stringify(await d.json('/api/notifications')));console.log('BROWSER ERRORS',jsErrors,await pages.driver.evaluate(async()=>({permission:Notification.permission,worker:Boolean((await navigator.serviceWorker.getRegistration())?.active)}))); throw e;})
    ]);
-   await pages.driver.getByRole('dialog').screenshot({path:'docs/qa/ride-notification-offer.png'});
+   // Accept within the real offer deadline; screenshot capture can stall on
+   // animated map frames and must not consume the driver's acceptance window.
    const acceptRequests=[];pages.driver.on('request',request=>{if(request.url().includes('/accept'))acceptRequests.push(request.url());});
-   const acceptedResponse=pages.driver.waitForResponse(response=>response.url().endsWith(`/api/rides/${rideId}/accept`)&&response.request().method()==='POST').catch(async error=>{console.log('ACCEPT REQUEST DIAGNOSTIC',{rideId,acceptRequests,jsErrors,body:await pages.driver.locator('body').innerText(),offer:await d.json('/api/drivers/me/offer')});throw error;});
+   const acceptedResponse=pages.driver.waitForResponse(response=>response.url().endsWith(`/api/rides/${rideId}/accept`)&&response.request().method()==='POST',{timeout:60000}).catch(async error=>{console.log('ACCEPT REQUEST DIAGNOSTIC',{rideId,acceptRequests,jsErrors,body:await pages.driver.locator('body').innerText(),offer:await d.json('/api/drivers/me/offer')});throw error;});
    await pages.driver.getByRole('button',{name:'Accept',exact:true}).click();
    const accepted=await acceptedResponse;assert.equal(accepted.status(),200,JSON.stringify(await accepted.json()));
    await expect.poll(()=>pages.driver.evaluate(()=>qaAudio.every(a=>!a.loop||a.paused))).toBe(true);
    await expect(pages.driver.getByText('Head to pickup',{exact:true})).toBeVisible({timeout:15000}).catch(async e=>{console.log('ACCEPT DIAGNOSTIC',await pages.driver.locator('body').innerText());console.log('RIDE STATUS',(await r.json('/api/rides/'+rideId)).ride.status);throw e;});
   });
-  await pages.rider.reload();await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RIDER DIAGNOSTIC',await pages.rider.locator('body').innerText(),jsErrors);console.log('ACTIVE RIDE',JSON.stringify(await r.json('/api/rides/active')));await pages.rider.screenshot({path:'.cache/notification-rider-failure.png'});throw e;});
+  await pages.rider.bringToFront();await pages.rider.reload();await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RIDER DIAGNOSTIC',await pages.rider.locator('body').innerText(),jsErrors);console.log('ACTIVE RIDE',JSON.stringify(await r.json('/api/rides/active')));await pages.rider.screenshot({path:'.cache/notification-rider-failure.png'});throw e;});
   await check('acceptance inbox, vehicle details, arrival, bidirectional chat and duplicate protection',async()=>{
    await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toContainText('QA-NOTIFY');
    assert.ok((await r.json('/api/notifications')).notifications.some(n=>n.event==='driver_accepted'&&n.rideId===rideId));
@@ -93,11 +94,19 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    const page=await denied.newPage();const cdp=await denied.newCDPSession(page);const {targetInfo}=await cdp.send('Target.getTargetInfo');await cdp.send('Browser.setPermission',{permission:{name:'notifications'},setting:'denied',origin:base,browserContextId:targetInfo.browserContextId});await page.goto(base+'/dashboard');await page.getByLabel('Notifications',{exact:true}).click();await expect(page.getByText(/Browser notifications are blocked/)).toBeVisible();await denied.close();
   });
   await check('decline, expiry and rider cancellation stop the offer ring and expired offers cannot be accepted',async()=>{
-   await pages.driver.reload();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible({timeout:30000});
+   await pages.driver.bringToFront();
+   const reloadAt=Date.now();await pages.driver.reload();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RELOAD DIAGNOSTICS',await pages.driver.locator('body').innerText(),await d.json('/api/drivers/me'));throw e;});
    await pages.driver.getByLabel('Notifications',{exact:true}).click();await pages.driver.getByRole('button',{name:'Enable notifications',exact:true}).click();await expect(pages.driver.getByText(/Sound: ready/)).toBeVisible();await pages.driver.keyboard.press('Escape');
+   await expect.poll(async()=>new Date((await Driver.findOne({userId:driver._id}).lean()).lastLocationUpdate).getTime(),{timeout:40000}).toBeGreaterThanOrEqual(reloadAt);
    for(const action of ['decline','expire','cancel']){
+    // Refresh the disposable browser's stationary GPS fixture. Chromium's
+    // static emulated fix otherwise ages out during the long admin checks.
+    // The application must transport and persist it; never write DB GPS here.
+    await pages.driver.waitForTimeout(4000);const sampleAt=Date.now();
+    await contexts.driver.setGeolocation({latitude:30.0444,longitude:31.2357});
+    await expect.poll(async()=>{const profile=await Driver.findOne({userId:driver._id}).lean();return new Date(profile.lastLocationUpdate).getTime();},{timeout:30000}).toBeGreaterThanOrEqual(sampleAt);
     const result=await r.json('/api/rides',{pickup:{lat:30.0444,lng:31.2357,address:'QA offer lifecycle'},dropoff:{lat:30.05,lng:31.24,address:'QA lifecycle destination'},vehicleType:'economy'});rideId=result.ride.id;
-    await expect(pages.driver.getByRole('button',{name:'Accept',exact:true})).toBeVisible({timeout:30000});
+    await expect(pages.driver.getByRole('button',{name:'Accept',exact:true})).toBeVisible({timeout:30000}).catch(async e=>{console.log('OFFER LIFECYCLE DIAGNOSTICS',action,await r.json('/api/rides/'+rideId),await d.json('/api/drivers/me'));throw e;});
     await expect.poll(()=>pages.driver.evaluate(()=>qaAudio.some(a=>a.loop&&!a.paused)),{timeout:10000}).toBe(true).catch(async e=>{console.log('LIFECYCLE AUDIO',action,await pages.driver.evaluate(()=>({audio:qaAudio.map(a=>({src:a.src,paused:a.paused,loop:a.loop,time:a.currentTime})),played:qaPlayed})),await pages.driver.locator('body').innerText());throw e;});
     if(action==='decline')await pages.driver.getByRole('button',{name:'Decline',exact:true}).click();
     if(action==='cancel')await r.json(`/api/rides/${rideId}/cancel`,{reason:'QA rider cancellation'});

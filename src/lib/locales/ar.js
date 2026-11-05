@@ -1,4 +1,13 @@
 export const arabic={
+ 'Service is not available in this area.':'الخدمة غير متاحة في هذه المنطقة.',
+ 'This location is outside the active service zone.':'هذا الموقع خارج نطاق الخدمة المفعّل.',
+ 'Booking is outside local operating hours.':'الحجز خارج ساعات العمل المحلية.',
+ 'Wallet payment':'الدفع من المحفظة',
+ 'All countries':'جميع الدول',
+ 'Jordan':'الأردن',
+ 'Iraq':'العراق',
+ 'Use a valid local mobile number with country prefix {0}':'أدخل رقم هاتف محمول صالحاً مع رمز الدولة {0}',
+ 'Amman':'عمّان','Irbid':'إربد','Zarqa':'الزرقاء','Aqaba':'العقبة','Baghdad':'بغداد','Basra':'البصرة','Erbil':'أربيل','Mosul':'الموصل',
 "No recipient account is needed. Share a private confirmation link after booking. This does not verify phone ownership.":"لا يحتاج المستلم إلى حساب. شارك معه رابط التأكيد الخاص بعد الحجز. هذا لا يُثبت ملكية رقم الهاتف.",
 "Private recipient link":"رابط المستلم الخاص",
 "Share this link only with the recipient. Anyone with the link can see the handover code. Phone ownership is not verified.":"شارك هذا الرابط مع المستلم فقط. يمكن لأي شخص يمتلكه الاطلاع على رمز التسليم. لم يتم التحقق من ملكية رقم الهاتف.",

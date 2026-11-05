@@ -1,3 +1,4 @@
+import {currencyDigits} from './countries';
 import {customerLocale} from './i18n';
 export const CURRENCY = 'EGP';
 export const COUNTRY = 'EG';
@@ -6,15 +7,16 @@ export const CURRENCY_SYMBOL = 'E£';
 export const CURRENCY_LOCALE = 'en-EG';
 export const LATE_CANCEL_FEE = 30;
 export const LEGACY_USD_CANCEL_FEE = 3;
-export const PAYMENT_LIMITATION = 'Card payments and bank payouts are unavailable until an Egypt-compatible provider and merchant account are verified.';
+export const PAYMENT_LIMITATION = 'Card payments and bank payouts are unavailable until a supported provider and merchant account are verified.';
 export function money(amount, currency = CURRENCY) {
   const value = Number(amount ?? 0);
   if (!currency) return `${value.toFixed(2)} (currency unverified)`;
-  return new Intl.NumberFormat(customerLocale(), { style: 'currency', currency: currency.toUpperCase(), currencyDisplay: 'code', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value).replace('EGP', customerLocale()==='ar-EG'?'ج.م.':CURRENCY_SYMBOL);
+  return new Intl.NumberFormat(customerLocale(), { style: 'currency', currency: currency.toUpperCase(), currencyDisplay: 'code', minimumFractionDigits: currencyDigits[currency]??2, maximumFractionDigits: currencyDigits[currency]??2 }).format(value).replace('EGP', customerLocale().startsWith('ar-')?'ج.م.':CURRENCY_SYMBOL);
 }
-export function minorUnits(amount) {
+export function minorUnits(amount, currency = CURRENCY) {
   if (!Number.isFinite(amount)) throw new Error('Invalid monetary amount');
-  const minor = Math.sign(amount) * Math.round((Math.abs(amount) + Number.EPSILON) * 100);
+  if(!Object.hasOwn(currencyDigits,currency))throw new Error('Unsupported currency');
+  const minor = Math.sign(amount) * Math.round((Math.abs(amount) + Number.EPSILON) * 10**currencyDigits[currency]);
   if (!Number.isSafeInteger(minor)) throw new Error('Monetary amount exceeds precision');
   return minor;
 }
@@ -32,12 +34,16 @@ export const DEFAULT_PRICING = {
 export function walletAccount(user, currency = CURRENCY) {
   if (sameCurrency(user?.wallet?.currency, currency)) return user.wallet;
   if (currency === CURRENCY && user) return { balance: user.egpWallet?.balance ?? 0, currency: CURRENCY };
+  if(['JOD','IQD'].includes(currency)&&user)return {currency,balance:user.currencyWallets?.[currency]?.balance??0};
   return null;
 }
 export function walletAccounts(user) {
-  return user?.wallet?.currency === CURRENCY ? [user.wallet] : [walletAccount(user), user?.wallet].filter(Boolean);
+  const accounts=user?.wallet?.currency === CURRENCY ? [user.wallet] : [walletAccount(user), user?.wallet].filter(Boolean);
+  for(const code of ['JOD','IQD'])if(user?.currencyWallets?.[code]&&!accounts.some(a=>a.currency===code))accounts.push(walletAccount(user,code));return accounts;
 }
 export function walletDelta(amount, currency) {
+  if(!Object.hasOwn(currencyDigits,currency))throw new Error('Unsupported wallet currency');
+  if(['JOD','IQD'].includes(currency)){const digits=currencyDigits[currency],delta=minorUnits(amount,currency)/10**digits;return [{$set:{'wallet.balance':{$cond:[{$eq:['$wallet.currency',currency]},{$round:[{$add:['$wallet.balance',delta]},digits]},'$wallet.balance']},['currencyWallets.'+currency]:{$cond:[{$eq:['$wallet.currency',currency]},'$currencyWallets.'+currency,{currency,balance:{$round:[{$add:[{$ifNull:['$currencyWallets.'+currency+'.balance',0]},delta]},digits]}}]}}}];}
   if (currency === CURRENCY) return [{ $set: {
     'wallet.balance': { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, { $round: [{ $add: ['$wallet.balance', minorUnits(amount) / 100] }, 2] }, '$wallet.balance'] },
     egpWallet: { $cond: [{ $eq: ['$wallet.currency', CURRENCY] }, '$egpWallet', { currency: CURRENCY, balance: { $round: [{ $add: [{ $ifNull: ['$egpWallet.balance', 0] }, minorUnits(amount) / 100] }, 2] } }] },

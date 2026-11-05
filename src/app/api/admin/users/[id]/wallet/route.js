@@ -14,7 +14,7 @@ export async function GET(request, { params }) {
   if (!mongoose.isValidObjectId(id))
     return Response.json({ error: "Invalid account ID" }, { status: 400 });
   try {
-    const user = await User.findById(id).select("wallet egpWallet").lean();
+    const user = await User.findById(id).select("wallet egpWallet currencyWallets").lean();
     if (!user)
       return Response.json({ error: "Account not found" }, { status: 404 });
     const page = Math.max(

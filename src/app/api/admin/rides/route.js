@@ -1,3 +1,4 @@
+import {validSettingsOrigin} from '@/lib/settings-origin';
 import mongoose from 'mongoose';
 import { startDispatch } from '@/lib/realtime/dispatch';
 import connectDB from '@/lib/db/mongodb';
@@ -18,6 +19,8 @@ export async function GET(request) {
     const status = searchParams.get('status');
 
     const query = {};
+    const country=searchParams.get('country');
+    if(['EG','JO','IQ'].includes(country))query['operations.country.code']=country;
     if (status) query.status = status;
 
     const [rides, total] = await Promise.all([
@@ -45,7 +48,7 @@ export async function GET(request) {
 // Manual dispatch initiates the existing safe offer cascade; drivers must still accept.
 export async function POST(request) {
  const { error } = await requireAuth(['admin']); if (error) return error;
- if (request.headers.get('origin') !== new URL(request.url).origin) return Response.json({ error: 'Invalid origin' }, { status: 403 });
+ if (!validSettingsOrigin(request)) return Response.json({ error: 'Invalid origin' }, { status: 403 });
  try {
  const { rideId } = await request.json();
  if (!mongoose.isValidObjectId(rideId)) return Response.json({ error: 'Invalid ride' }, { status: 400 });

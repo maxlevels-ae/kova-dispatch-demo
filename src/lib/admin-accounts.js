@@ -1,3 +1,4 @@
+import {currencyDigits} from '@/lib/countries';
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -204,16 +205,12 @@ export async function editAccount(id, input, actor) {
 }
 export const adjustmentSchema = z
   .object({
-    currency: z.enum(["EGP", "USD"]),
+    currency: z.enum(["EGP", "USD", "JOD", "IQD"]),
     direction: z.enum(["credit", "debit"]),
     amount: z
       .number()
       .positive()
-      .max(1000000)
-      .refine(
-        (v) => Math.abs(v * 100 - Math.round(v * 100)) < 0.000001,
-        "Use at most two decimal places",
-      ),
+      .max(1000000),
     reason: z.string().trim().min(5).max(200),
     reference: z.string().trim().max(100).default(""),
     idempotencyKey: z.string().uuid(),
@@ -223,8 +220,9 @@ export const adjustmentSchema = z
 export async function adjustWallet(id, input, actor) {
   const data = adjustmentSchema.parse(input),
     amount =
-      (minorUnits(data.amount) / 100) * (data.direction === "credit" ? 1 : -1),
+      (minorUnits(data.amount,data.currency) / 10**currencyDigits[data.currency]) * (data.direction === "credit" ? 1 : -1),
     ref = `admin:${data.idempotencyKey}`;
+  if(!amount||Math.abs(Math.abs(amount)-data.amount)>1e-8)fail('Amount exceeds currency precision',400);
   const match = (entry) => {
     if (
       String(entry.userId) !== String(id) ||
@@ -249,8 +247,8 @@ export async function adjustWallet(id, input, actor) {
         fail("Wallet adjustments are limited to riders and drivers", 403);
       const account = walletAccount(user, data.currency);
       if (!account) fail("This currency account does not exist", 409);
-      const before = minorUnits(account.balance),
-        after = before + minorUnits(amount);
+      const before = minorUnits(account.balance,data.currency),
+        after = before + minorUnits(amount,data.currency);
       if (after < 0)
         fail(
           "Insufficient balance. Manual adjustments cannot create debt.",
@@ -268,7 +266,7 @@ export async function adjustWallet(id, input, actor) {
             type: amount > 0 ? "manual_credit" : "manual_debit",
             amount,
             currency: data.currency,
-            balanceBefore: before / 100,
+            balanceBefore: before / 10**currencyDigits[data.currency],
             balanceAfter: walletAccount(updated, data.currency).balance,
             actorId: actor.id,
             actorName: actor.name,

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const driverSchema = new mongoose.Schema(
   {
+    operatingCountry:{type:String,enum:['EG','JO','IQ']},
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',

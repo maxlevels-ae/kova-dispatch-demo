@@ -1,3 +1,4 @@
+import {AreaError} from '@/lib/operating-areas';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import Ride from '@/lib/db/models/Ride';
@@ -80,7 +81,7 @@ export async function POST(request) {
 
     return Response.json({ ride: serializeRide(ride) }, { status: 201 });
   } catch (err) {
-    if (err instanceof RideError) {
+    if (err instanceof RideError || err instanceof AreaError) {
       return Response.json({ error: err.message }, { status: err.status });
     }
     console.error('Create ride error:', err);

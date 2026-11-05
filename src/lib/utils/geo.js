@@ -1,4 +1,4 @@
-import {customerLocale,t} from '../i18n';
+import {customerLocale,customerTimeZone,t} from '../i18n';
 /**
  * Geo utility functions for distance calculation and coordinate helpers
  */
@@ -107,6 +107,7 @@ export function formatRelativeTime(date) {
   if (days < 7) return t(`${days}d ago`);
 
   return new Date(date).toLocaleDateString(customerLocale(), {
+    timeZone:customerTimeZone(),
     month: 'short',
     day: 'numeric',
     year: days > 365 ? 'numeric' : undefined,
@@ -120,6 +121,7 @@ export function formatRelativeTime(date) {
  */
 export function formatDate(date) {
   return new Date(date).toLocaleDateString(customerLocale(), {
+    timeZone:customerTimeZone(),
     year: 'numeric',
     month: 'short',
     day: 'numeric',

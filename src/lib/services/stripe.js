@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import {currencyDigits} from '@/lib/countries';
 import { sameCurrency, walletDelta } from '@/lib/currency';
 import Stripe from 'stripe';
 import connectDB from '@/lib/db/mongodb';
@@ -33,7 +34,9 @@ export async function creditCheckoutSession(session) {
   }
 
   const userId = session.metadata?.userId;
-  const amount = (session.amount_total ?? 0) / 100;
+  const currency=session.currency?.toUpperCase();
+  if(!Object.hasOwn(currencyDigits,currency))throw new Error('Unsupported payment currency');
+  const amount = (session.amount_total ?? 0) / 10**currencyDigits[currency];
   if (!userId || amount <= 0) {
     return { credited: false, reason: 'invalid_session' };
   }
@@ -46,7 +49,7 @@ export async function creditCheckoutSession(session) {
     if (existing) return { credited: false, reason: 'already_credited' };
     const user = await User.findById(userId).session(dbSession).lean();
     if (!sameCurrency(user?.wallet?.currency, session.currency)) throw new Error('Payment currency requires manual reconciliation');
-    const updated = await User.findOneAndUpdate({ _id: userId, 'wallet.currency': user.wallet.currency }, walletDelta(amount), { returnDocument: 'after', session: dbSession, updatePipeline: true });
+    const updated = await User.findOneAndUpdate({ _id: userId, 'wallet.currency': user.wallet.currency }, walletDelta(amount,currency), { returnDocument: 'after', session: dbSession, updatePipeline: true });
     await WalletTransaction.create([{ userId, type: 'topup', amount, currency: session.currency.toUpperCase(), balanceAfter: updated.wallet.balance, note: 'Card top-up (Stripe)', ref: session.id }], { session: dbSession });
     return { credited: true, amount, currency: session.currency.toUpperCase(), balance: updated.wallet.balance };
   });

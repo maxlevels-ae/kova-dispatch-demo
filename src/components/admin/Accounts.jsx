@@ -1,4 +1,5 @@
 "use client";
+import {currencyDigits} from '@/lib/countries';
 import VehiclePhotoUpload from '@/components/VehiclePhotoUpload';
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
@@ -828,8 +829,8 @@ function WalletAdmin({ id }) {
       data?.accounts.find((a) => a.currency === currency)?.balance || 0,
     after =
       Math.round(
-        (balance + (direction === "credit" ? 1 : -1) * Number(amount)) * 100,
-      ) / 100;
+        (balance + (direction === "credit" ? 1 : -1) * Number(amount)) * 10**currencyDigits[currency],
+      ) / 10**currencyDigits[currency];
   return (
     <section className="card account-section">
       <h2>
@@ -844,7 +845,7 @@ function WalletAdmin({ id }) {
           <div className="account-balance" key={i}>
             <small>
               {a.currency || "Currency unverified"}
-              {a.currency !== "EGP"
+              {a.currency === "USD"
                 ? " · historical account"
                 : " · ride account"}
             </small>
@@ -889,11 +890,7 @@ function WalletAdmin({ id }) {
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
             >
-              {data?.accounts
-                .filter((a) => ["EGP", "USD"].includes(a.currency))
-                .map((a) => (
-                  <option key={a.currency}>{a.currency}</option>
-                ))}
+              {['EGP','JOD','IQD',...(data?.accounts.some(a=>a.currency==='USD')?['USD']:[])].map(code=><option key={code}>{code}</option>)}
             </select>
           </Field>
           <Field label="Adjustment">
@@ -910,9 +907,9 @@ function WalletAdmin({ id }) {
             <input
               className="input"
               type="number"
-              min="0.01"
+              min={10**-currencyDigits[currency]}
               max="1000000"
-              step="0.01"
+              step={10**-currencyDigits[currency]}
               required
               value={amount}
               onChange={(e) => setAmount(e.target.value)}

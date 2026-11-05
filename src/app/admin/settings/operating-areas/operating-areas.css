@@ -1,0 +1,5 @@
+.operating-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.operating-zone-option { width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: start; margin-block: 4px; }
+.operating-zone-option[aria-pressed="true"] { background: #242220; color: #fff; border-color: #242220; }
+.operating-cities { max-height: 240px; overflow: auto; padding-block: 12px; }
+@media(max-width:600px) { .operating-grid { grid-template-columns: minmax(0,1fr); } }

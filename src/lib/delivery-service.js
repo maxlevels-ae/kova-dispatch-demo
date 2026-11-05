@@ -1,3 +1,5 @@
+import {bookingArea,courierReadiness,deliveryOperationsPolicy} from '@/lib/operating-areas';
+import {validCountryPhone,currencyDigits} from '@/lib/countries';
 import {translate} from '@/lib/i18n';
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
@@ -10,11 +12,10 @@ import NotificationJob from '@/lib/db/models/NotificationJob';
 import AdminAudit from '@/lib/db/models/AdminAudit';
 import connectDB from '@/lib/db/mongodb';
 import redis from '@/lib/db/redis';
-import {walletAccount,walletDelta} from '@/lib/currency';
+import {walletAccount,walletDelta,minorUnits} from '@/lib/currency';
 import {getRoute} from '@/lib/services/routing';
 import {getDeliverySettings} from '@/lib/delivery-settings';
-import {deliveryBookingSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates,deliveryCities} from '@/lib/delivery-policy';
-import {haversineDistance} from '@/lib/utils/geo';
+import {deliveryBookingSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '@/lib/delivery-policy';
 import {emitToUser,emitToAdmin} from '@/lib/realtime/emit';
 import {deliverNotifications} from '@/lib/notifications';
 export class DeliveryError extends Error{constructor(message,status=409){super(message);this.status=status;}}
@@ -37,6 +38,7 @@ export async function deliveryView(order,user){
  delete data.guestAccess;
  data.recipientType=order.recipientType||(order.recipientId?'registered':'guest');data.verificationMethod=order.verificationMethod||(order.recipientId?'account_otp':'private_link');
  if(user.role==='admin')data.verificationAttempts={pickup:order.pickupCode?.attempts||0,delivery:order.deliveryCode?.attempts||0};
+ data.country=data.operations?.country;data.zones=data.operations?{pickup:data.operations.pickupZone,dropoff:data.operations.dropoffZone}:undefined;delete data.operations;
  delete data.pickupCode;delete data.deliveryCode;delete data.policy;delete data.idempotencyKey;delete data.__v;
  const [courier,driver]=order.courierId?await Promise.all([User.findById(order.courierId).select('name avatar').lean(),Driver.findById(order.driverProfileId).select('location lastLocationUpdate stats.averageRating').lean()]):[null,null];
  data.courier=courier?{name:courier.name,avatar:courier.avatar,rating:driver?.stats?.averageRating,location:!terminalDeliveryStates.includes(order.status)&&driver?.lastLocationUpdate&&Date.now()-new Date(driver.lastLocationUpdate)<90000?{lng:driver.location.coordinates[0],lat:driver.location.coordinates[1]}:null}:null;
@@ -45,10 +47,11 @@ export async function deliveryView(order,user){
  return data;
 }
 async function postLedger(userId,amount,type,order,ref,session){
- const before=await User.findById(userId).select('wallet egpWallet').session(session);
- if(!before||walletAccount(before)?.currency!=='EGP'||walletAccount(before).balance+amount<0)fail('Insufficient EGP balance');
- const updated=await User.findByIdAndUpdate(userId,walletDelta(amount,'EGP'),{session,returnDocument:'after',updatePipeline:true});
- await WalletTransaction.create([{userId,type,amount,currency:'EGP',balanceBefore:walletAccount(before).balance,balanceAfter:walletAccount(updated).balance,deliveryId:order._id,ref,note:'Maxride Delivery '+String(order._id)}],{session});
+ const currency=order.fare.currency;amount=minorUnits(amount,currency)/10**currencyDigits[currency];
+ const before=await User.findById(userId).select('wallet egpWallet currencyWallets').session(session);
+ if(!before||walletAccount(before,currency)?.currency!==currency||walletAccount(before,currency).balance+amount<0)fail('Insufficient '+currency+' balance');
+ const updated=await User.findByIdAndUpdate(userId,walletDelta(amount,currency),{session,returnDocument:'after',updatePipeline:true});
+ await WalletTransaction.create([{userId,type,amount,currency,balanceBefore:walletAccount(before,currency).balance,balanceAfter:walletAccount(updated,currency).balance,deliveryId:order._id,ref,note:'Maxride Delivery '+String(order._id)}],{session});
 }
 const eventTexts={"SEARCHING_COURIER":"Looking for a courier","COURIER_ASSIGNED":"Your courier has been assigned","COURIER_ARRIVING":"Your courier is on the way to pickup","AT_PICKUP":"Your courier has arrived at pickup","PICKED_UP":"Your package has been collected","IN_TRANSIT":"Your package is on the way","AT_DROPOFF":"Your courier has reached the recipient","DELIVERED":"Your package was delivered","CANCELLED":"Delivery cancelled","NO_COURIER":"No courier is available","DELIVERY_FAILED":"Delivery needs attention","RETURN_REQUESTED":"Package return requested","RETURNED":"Package returned to sender","offer":"New delivery request","message":"New delivery message"};
 export async function deliveryNotify(order,event,eventId,exclude){
@@ -69,25 +72,24 @@ async function notifySafely(order,event,id,exclude){try{await deliveryNotify(ord
 export async function quoteDelivery(input){
  const parsed=deliveryBookingSchema.safeParse(input);if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
  const b=parsed.data,{settings:s}=await getDeliverySettings();if(!s.general.enabled)fail('Delivery service is currently disabled');
- const hour=Number(new Intl.DateTimeFormat('en',{timeZone:'Africa/Cairo',hour:'numeric',hourCycle:'h23'}).format(new Date()));
- if(hour<s.general.startHour||hour>=s.general.endHour)fail('Delivery is outside operating hours');
- if(!s.general.regions.includes(b.region))fail('Unsupported delivery region',400);
- const center=deliveryCities[b.region];if([b.pickup,b.dropoff].some(p=>haversineDistance(center[0],center[1],p.lat,p.lng)>50))fail('Destination is outside the delivery range',400);
+ const operations=await bookingArea('delivery',b.pickup,b.dropoff);
+ if(!validCountryPhone(b.sender.phone,operations.country.code)||!validCountryPhone(b.recipient.phone,operations.country.code))fail('Use a valid local mobile number with country prefix '+operations.country.dialCode,400);
+ Object.assign(s,deliveryOperationsPolicy(s,operations));
  if(!s.packages.categories.includes(b.package.category)||b.package.weight>s.packages.maxWeight||b.package.length>s.packages.maxLength||b.package.width>s.packages.maxWidth||b.package.height>s.packages.maxHeight)fail('Package exceeds configured category, weight or dimensions',400);
  const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone').lean():null;
  if(b.recipient.username&&(!recipient||recipient.phone?.replace(/\D/g,'')!==b.recipient.phone.replace(/\D/g,'')))fail('Registered recipient account and phone do not match.',400);
- const route=await getRoute(b.pickup,b.dropoff);if(route.distanceMeters>s.dispatch.radiusKm*1000*5)fail('Destination is outside the delivery range',400);
+ const route=await getRoute(b.pickup,b.dropoff);
  const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}},{$limit:1}]):[];
- return {input:b,settings:s,recipientId:recipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
+ return {input:b,settings:s,operations,recipientId:recipient?._id,route,quote:deliveryPrice(s,route,b.package.size),vehicleTypes:s.eligibility.vehicles,pickupETA:nearby.length?Math.max(1,Math.ceil(nearby[0].meters/1000*1.35/25*60)):null};
 }
 export async function createDelivery(input,user){
  await Promise.all([Delivery.init(),WalletTransaction.init()]);
  await connectDB();if(typeof input.idempotencyKey!=='string'||!/^[-a-f\d]{36}$/i.test(input.idempotencyKey))fail('Invalid idempotency reference',400);const existing=await Delivery.findOne({idempotencyKey:input.idempotencyKey});if(existing){if(!equal(existing.customerId,user.id))fail('Idempotency key belongs to another customer');return existing;}
- const {input:b,settings:s,recipientId,route,quote}=await quoteDelivery(input);
+ const {input:b,settings:s,operations,recipientId,route,quote}=await quoteDelivery(input);
  const orderId=new mongoose.Types.ObjectId();
  const result=await mongoose.connection.transaction(async session=>{
   if(b.package.photoId){const photo=await DeliveryEvidence.findOne({_id:b.package.photoId,ownerId:user.id,kind:'package',deliveryId:null,expiresAt:{$gt:new Date()}}).session(session);if(!photo)fail('Invalid package photo',400);photo.deliveryId=orderId;photo.expiresAt=new Date(Date.now()+s.proof.retentionDays*86400000);await photo.save({session});}
-  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
+  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,operations,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
   await postLedger(user.id,-quote.total,'delivery_payment',order,`delivery:${orderId}:payment`,session);return order;
  });
  await notifySafely(result,result.status,'created');return result;
@@ -157,7 +159,7 @@ export async function acceptDelivery(id,user){
   const order=await Delivery.findOne({_id:id,status:'SEARCHING_COURIER','offer.courierId':user.id,'offer.expiresAt':{$gt:new Date()}}).session(session);if(!order)fail('Delivery offer expired or is unavailable');
   const driver=await Driver.findOneAndUpdate({userId:user.id,isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:order.policy.eligibility.vehicles},...(order.policy.eligibility.requireLicense?{'license.verified':true}:{})},{$set:{currentDeliveryId:id}},{session,returnDocument:'after'});
   if(!driver)fail('Courier is unavailable or already assigned');
-  const account=await User.findById(user.id).select('wallet egpWallet isActive').session(session);if(!account?.isActive||walletAccount(account)?.currency!=='EGP'||walletAccount(account).balance<0)fail('Courier account requires review');
+  const account=await User.findById(user.id).select('wallet egpWallet currencyWallets isActive').session(session);const check=courierReadiness({...driver.toObject(),currentDeliveryId:null},account,{snapshot:order.operations,policy:order.policy,pickup:order.pickup,currency:order.quote.currency});if(!check.eligible)fail(check.reasons.map(r=>r.message).join('; '));
   order.status='COURIER_ASSIGNED';order.courierId=user.id;order.driverProfileId=driver._id;order.vehicle=driver.vehicle.toObject();order.offer=undefined;order.timeline.push({status:order.status,event:'courier_accepted',actorId:user.id,role:user.role});await order.save({session});return order;
  });await notifySafely(result,result.status,result.timeline.at(-1)._id);return result;
 }
@@ -177,6 +179,8 @@ export async function assignDelivery(id,admin,courierId){
  if(!['SEARCHING_COURIER','COURIER_ASSIGNED','COURIER_ARRIVING'].includes(order.status))fail('Reassignment is unsafe after arrival or pickup');
  if(!order.policy.eligibility.available)fail('Delivery courier availability is disabled');
  const driver=await Driver.findOne({userId:courierId,isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:order.policy.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(order.policy.eligibility.requireLicense?{'license.verified':true}:{})});if(!driver)fail('Courier is not eligible or available');
+ const account=await User.findById(courierId).select('isActive wallet egpWallet currencyWallets').lean();
+ const check=courierReadiness(driver,account,{snapshot:order.operations,policy:order.policy,pickup:order.pickup,currency:order.quote.currency});if(!check.eligible)fail(check.reasons.map(r=>r.message).join('; '));
  const updated=await mongoose.connection.transaction(async session=>{
   const current=await Delivery.findOne({_id:id,status:order.status}).session(session);if(!current)fail('Delivery changed');
   if(current.driverProfileId)await Driver.updateOne({_id:current.driverProfileId,currentDeliveryId:id},{$set:{currentDeliveryId:null}},{session});

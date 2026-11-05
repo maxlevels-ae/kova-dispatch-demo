@@ -47,6 +47,7 @@ const groups = [
   {
     name: "Operations",
     items: [
+      {id:"operating-areas",title:"Countries & Service Zones",icon:Route},
       {
         id: "dispatch",
         title: "Bookings & Dispatch",
@@ -156,6 +157,7 @@ export default function SettingsPage() {
     refresh();
   }, [load, refresh]);
   function navigate(id) {
+    if(id==='operating-areas'){window.location.assign('/admin/settings/operating-areas');return;}
     setActive(id);
     setVisited((v) => ({ ...v, [id]: true }));
   }

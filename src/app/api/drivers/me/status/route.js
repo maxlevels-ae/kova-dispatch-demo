@@ -1,10 +1,13 @@
+import {activeOperations,zoneAt} from '@/lib/operating-areas';
+import {validSettingsOrigin} from '@/lib/settings-origin';
 import { walletAccount, walletAccounts } from '@/lib/currency';
 import { getSettings } from '@/lib/settings';
-import { CURRENCY } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
 import Driver from '@/lib/db/models/Driver';
 import User from '@/lib/db/models/User';
+import Ride from '@/lib/db/models/Ride';
+import Delivery from '@/lib/db/models/Delivery';
 import { requireAuth } from '@/lib/auth/helpers';
 import { updateDriverCell, removeDriverFromIndex } from '@/lib/services/h3-redis';
 import { emitToAdmin } from '@/lib/realtime/emit';
@@ -26,6 +29,7 @@ const statusSchema = z.object({
 export async function POST(request) {
   const { session, error } = await requireAuth(['driver']);
   if (error) return error;
+  if(!validSettingsOrigin(request))return Response.json({error:'Invalid request origin'},{status:403});
 
   try {
     const body = await request.json();
@@ -43,7 +47,17 @@ export async function POST(request) {
     }
 
     if (online) {
-      const { fleet } = await getSettings();
+      const { fleet:baseFleet } = await getSettings();
+      const assignment=driver.currentRideId?await Ride.findById(driver.currentRideId).select('operations fare.currency').lean():driver.currentDeliveryId?await Delivery.findById(driver.currentDeliveryId).select('operations fare.currency').lean():null;
+      const operations=assignment?.operations||await activeOperations(),currency=assignment?.fare?.currency||operations.country.currency;
+      const fleet=assignment&&!assignment.operations?baseFleet:operations.country.code==='EG'&&!assignment?baseFleet:{...baseFleet,enabledCategories:operations.config.vehicles,requiredDocuments:operations.config.documents,maxDebtEGP:0};
+      if(!driver.currentRideId&&!driver.currentDeliveryId){
+       const allowed=(driver.services?.rides!==false&&operations.config.taxi&&zoneAt(operations,location,'taxi'))||(driver.services?.deliveries&&operations.config.delivery&&zoneAt(operations,location,'delivery'));
+       if(!allowed)return Response.json({error:'This location is outside the active service zone.'},{status:409});
+       if(!operations.config.vehicles.includes(driver.vehicle?.type))return Response.json({error:'Vehicle category is unavailable in this country'},{status:409});
+       if(operations.config.requireLicense&&(!driver.license?.verified||(driver.license.expiry&&driver.license.expiry<=new Date())))return Response.json({error:'A verified, unexpired driving license is required'},{status:409});
+       driver.operatingCountry=operations.country.code;
+      }
       const MAX_DRIVER_DEBT = -fleet.maxDebtEGP;
       if (!fleet.enabledCategories.includes(driver.vehicle.type) || fleet.requiredDocuments.some(type => !driver.documents.some(d => d.type === type && d.verified))) return Response.json({ error: 'Vehicle category or verified documents do not meet fleet policy' }, { status: 403 });
       if (!driver.isApproved) {
@@ -67,9 +81,9 @@ export async function POST(request) {
 
       // Defensive: a driver carrying an outstanding balance must settle up
       // before driving again.
-      const user = await User.findById(session.user.id).select('wallet egpWallet').lean();
-      if (walletAccount(user)?.currency !== CURRENCY) return Response.json({ error: 'Wallet requires currency review before accepting EGP rides.', code: 'CURRENCY_REVIEW' }, { status: 409 });
-      const balance = walletAccount(user)?.balance ?? 0;
+      const user = await User.findById(session.user.id).select('wallet egpWallet currencyWallets').lean();
+      if (walletAccount(user,currency)?.currency !== currency) return Response.json({ error: 'Wallet requires currency review before accepting new requests.', code: 'CURRENCY_REVIEW' }, { status: 409 });
+      const balance = walletAccount(user,currency)?.balance ?? 0;
       if (balance < MAX_DRIVER_DEBT) {
         return Response.json(
           {

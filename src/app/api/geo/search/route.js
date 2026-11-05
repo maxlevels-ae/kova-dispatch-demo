@@ -1,4 +1,4 @@
-import { getSettings } from '@/lib/settings';
+import {activeOperations,zoneAt} from '@/lib/operating-areas';
 import { requireAuth } from '@/lib/auth/helpers';
 
 const PHOTON_BASE = process.env.PHOTON_URL || 'https://photon.komoot.io';
@@ -30,6 +30,7 @@ export async function GET(request) {
     const lng = parseFloat(searchParams.get('lng'));
     const reverse = searchParams.get('reverse') === '1';
 
+    const operations=await activeOperations();
     let url;
     if (reverse) {
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -40,8 +41,7 @@ export async function GET(request) {
       if (q.trim().length < 2) {
         return Response.json({ results: [] });
       }
-      const { maps } = await getSettings();
-      const query = Number.isFinite(lat) && Number.isFinite(lng) ? q.trim() : `${q.trim()}, ${maps.city}, ${maps.country}`;
+      const query = `${q.trim()}, ${operations.country.name}`;
       url = `${PHOTON_BASE}/api/?q=${encodeURIComponent(query)}&limit=6`;
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         // Bias hard toward the user's area — nearby streets should beat
@@ -63,7 +63,7 @@ export async function GET(request) {
     }
 
     const data = await res.json();
-    const results = (data.features || []).map(formatFeature);
+    const results = (data.features || []).map(formatFeature).filter(p=>zoneAt(operations,p,'taxi')||zoneAt(operations,p,'delivery'));
     return Response.json({ results });
   } catch (err) {
     console.warn('Geo search error:', err.message);

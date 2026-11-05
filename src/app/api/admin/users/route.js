@@ -63,7 +63,7 @@ export async function GET(request) {
         .skip((page - 1) * limit)
         .limit(limit)
         .select(
-          "name username role rating wallet egpWallet isActive createdAt lastLoginAt",
+          "name username role rating wallet egpWallet currencyWallets isActive createdAt lastLoginAt",
         )
         .lean(),
       User.countDocuments(query),

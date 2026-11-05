@@ -200,7 +200,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -309,6 +309,14 @@ try {
           rideId: unknownRide,
         });
         await processed;
+        let persisted;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          persisted = await Driver.findById(driver._id).lean();
+          if (persisted.location.coordinates[1] === 30 && Date.now() - new Date(persisted.lastLocationUpdate).getTime() < 30000) break;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        assert.equal(persisted.location.coordinates[1], 30, 'Socket GPS must reach MongoDB for dispatch readiness');
+        assert.ok(Date.now() - new Date(persisted.lastLocationUpdate).getTime() < 30000, 'GPS persistence must preserve the real sample timestamp');
         await new Promise((resolve) => setTimeout(resolve, 100));
         assert.equal(
           leaked,
@@ -1057,7 +1065,8 @@ try {
         page.on("pageerror", (e) => errors.push(e.message));
         await page.goto(base + "/admin/settings");
         const nav = page.getByRole("navigation", { name: "Settings sections" });
-        await expect(nav.getByRole("button")).toHaveCount(10);
+        await expect(nav.getByRole("button")).toHaveCount(11);
+        await expect(nav.getByRole("button",{name:"Countries & Service Zones",exact:true})).toBeVisible();
         await nav.getByRole("button", { name: "Bookings & Dispatch" }).click();
         await page
           .getByLabel("Driver search radius (km)", { exact: true })
@@ -1229,7 +1238,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) await check(
+  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1246,11 +1255,11 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
     const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
     const {notificationChecks}=await import('./ride-notifications.mjs');
     await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
     const {deliveryChecks}=await import('./delivery-integration.mjs');
@@ -1260,6 +1269,8 @@ try {
   }
   if(process.argv.includes('--notifications-only')){const {notificationChecks}=await import('./ride-notifications.mjs');await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});}
   if(process.argv.includes('--delivery-only')){const {deliveryChecks}=await import('./delivery-integration.mjs');await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
+  if(process.argv.includes('--account-management-only')){const {accountsChecks}=await import('./accounts-integration.mjs');await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});}
+  if(process.argv.includes('--areas-only')||!process.argv.some(v=>v.endsWith('-only'))){const {operatingChecks}=await import('./operating-integration.mjs');await operatingChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check});}
   console.log(
     `${passed} database/API integration checks passed; only disposable database ${dbName} was written.`,
   );

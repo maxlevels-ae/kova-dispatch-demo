@@ -1,3 +1,4 @@
+import {currencyDigits} from './countries';
 import {z} from 'zod';
 import {egyptLocations} from './map-config';
 export const deliveryCities=Object.assign({},...Object.values(egyptLocations));
@@ -27,7 +28,7 @@ export const deliveryDefaults={
  notifications:{newDelivery:true,assigned:true,arrived:true,collected:true,inTransit:true,completed:true,failed:true,recipient:true},
  proof:{pickupOTP:true,deliveryOTP:true,photoRequired:false,expiryMinutes:120,maxAttempts:5,retentionDays:90},
 };
-export const deliveryPoint=z.object({lat:z.number().min(22).max(32),lng:z.number().min(24).max(37),address:z.string().trim().min(3).max(300)});
+export const deliveryPoint=z.object({lat:z.number().min(-90).max(90),lng:z.number().min(-180).max(180),address:z.string().trim().min(3).max(300)});
 const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().regex(/^\+?[\d ()-]{7,20}$/),instructions:z.string().max(500).default('')});
 export const deliveryBookingSchema=z.object({
  pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
@@ -35,9 +36,10 @@ export const deliveryBookingSchema=z.object({
  acknowledged:z.literal(true),idempotencyKey:z.uuid(),
 }).strict();
 export function deliveryPrice(settings,route,size,waitingMinutes=0){
- const p=settings.pricing;const distance=Math.round(route.distanceMeters/1000*p.perKm*100)/100;
- const waiting=Math.round(Math.max(0,waitingMinutes-p.waitingFreeMinutes)*p.waitingPerMinute*100)/100;
- const total=Math.round((Math.max(p.minimum,p.base+distance+p.vehicleSurcharge+p[size])+waiting)*100)/100;
- const commission=Math.round(total*p.commission)/100;
- return {currency:'EGP',base:p.base,distance,vehicle:p.vehicleSurcharge,size:p[size],waiting,total,commission,earnings:Math.round((total-commission)*100)/100};
+ const currency=settings.currency||'EGP',factor=10**currencyDigits[currency],round=n=>Math.round(n*factor)/factor;
+ const p=settings.pricing;const distance=round(route.distanceMeters/1000*p.perKm);
+ const waiting=round(Math.max(0,waitingMinutes-p.waitingFreeMinutes)*p.waitingPerMinute);
+ const total=round(Math.max(p.minimum,p.base+distance+p.vehicleSurcharge+p[size])+waiting);
+ const commission=round(total*p.commission/100);
+ return {currency,base:p.base,distance,vehicle:p.vehicleSurcharge,size:p[size],waiting,total,commission,earnings:round(total-commission)};
 }

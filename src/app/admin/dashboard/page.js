@@ -164,7 +164,7 @@ export default function AdminDashboard() {
     },
     {
       label: "Gross bookings today",
-      value: money(data.revenueToday),
+      value: money(data.revenueToday,data.currency),
       icon: DollarSign,
       tone: "var(--success)",
     },
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className="page-title">Overview</h1>
           <p className="tiny muted">
-            Financial summaries in EGP. Historical amounts retain their recorded
+            Financial summaries in {data.currency}. Historical amounts retain their recorded
             currency in ride history.
           </p>
           <p className="page-sub">Platform health in real time</p>
@@ -314,7 +314,7 @@ export default function AdminDashboard() {
             Last 7 days
           </h3>
           <span className="tiny muted">
-            {money(week.driverEarnings)} to drivers · {money(week.platformFees)}{" "}
+            {money(week.driverEarnings,data.currency)} to drivers · {money(week.platformFees,data.currency)}{" "}
             platform fees · {week.trips} trips
           </span>
         </div>
@@ -325,7 +325,7 @@ export default function AdminDashboard() {
           {weekBars.map((bar) => (
             <div key={bar.key} className="flex-col items-center gap-2 flex-1">
               <div
-                title={`${bar.label}: ${money(bar.revenue)}`}
+                title={`${bar.label}: ${money(bar.revenue,data.currency)}`}
                 style={{
                   width: "100%",
                   maxWidth: 56,
@@ -358,7 +358,7 @@ export default function AdminDashboard() {
         </div>
         <div className="card card-pad stat">
           <span className="stat-label">Platform fees today</span>
-          <span className="stat-value">{money(data.platformFeesToday)}</span>
+          <span className="stat-value">{money(data.platformFeesToday,data.currency)}</span>
         </div>
         <div className="card card-pad stat">
           <span className="stat-label">Completed this week</span>

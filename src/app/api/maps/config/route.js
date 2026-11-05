@@ -1,15 +1,19 @@
+import {activeOperations,enabledZones} from '@/lib/operating-areas';
 import { requireAuth } from "@/lib/auth/helpers";
 import { getSettings } from "@/lib/settings";
-import { cityCenter, cartoConfigured } from "@/lib/map-config";
+import { cartoConfigured } from "@/lib/map-config";
 export async function GET() {
   const { error } = await requireAuth();
   if (error) return error;
   try {
     const { maps } = await getSettings();
+    const operations=await activeOperations();
     return Response.json(
       {
         settings: maps,
-        center: cityCenter(maps),
+        center: operations.config.center,
+        country:operations.country,
+        zones: [...new Map([...enabledZones(operations.config,'taxi'),...enabledZones(operations.config,'delivery')].map(z=>[z.id,z])).values()],
         providers: [
           {
             id: "openfreemap",

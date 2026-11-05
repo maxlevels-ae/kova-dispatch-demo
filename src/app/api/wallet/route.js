@@ -1,3 +1,4 @@
+import {activeOperations} from '@/lib/operating-areas';
 import { demoLegacyRecord } from '@/lib/demo-wallet-initialization';
 import { walletAccount, walletAccounts } from '@/lib/currency';
 import mongoose from 'mongoose';
@@ -28,7 +29,7 @@ export async function GET(request) {
     const limit = Math.min(100, parseInt(searchParams.get('limit') || '30', 10));
 
     const [user, transactions] = await Promise.all([
-      User.findById(session.user.id).select('wallet egpWallet').lean(),
+      User.findById(session.user.id).select('wallet egpWallet currencyWallets').lean(),
       WalletTransaction.find({ userId: session.user.id })
         .sort({ createdAt: -1 })
         .limit(limit)
@@ -36,7 +37,7 @@ export async function GET(request) {
     ]);
 
     return Response.json({
-      wallet: walletAccount(user) || { balance: 0, currency: null },
+      wallet: walletAccount(user,(await activeOperations()).country.currency) || { balance: 0, currency: null },
       accounts: walletAccounts(user),
       legacyRecord: await demoLegacyRecord(session.user.id),
       transactions,

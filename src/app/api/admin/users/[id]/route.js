@@ -17,7 +17,7 @@ export async function GET(request, { params }) {
   try {
     const user = await User.findById(id)
       .select(
-        "name username email phone avatar role isActive createdAt lastLoginAt wallet egpWallet rating",
+        "name username email phone avatar role isActive createdAt lastLoginAt wallet egpWallet currencyWallets rating",
       )
       .lean();
     if (!user)

@@ -1,4 +1,5 @@
-import { CURRENCY } from '@/lib/currency';
+import {countryDayStart} from '@/lib/country-time';
+import {activeOperations} from '@/lib/operating-areas';
 import connectDB from '@/lib/db/mongodb';
 import Ride from '@/lib/db/models/Ride';
 import User from '@/lib/db/models/User';
@@ -6,26 +7,15 @@ import Driver from '@/lib/db/models/Driver';
 import ContactMessage from '@/lib/db/models/ContactMessage';
 import { requireAuth } from '@/lib/auth/helpers';
 
-function startOfDay() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function daysAgo(n) {
-  const d = startOfDay();
-  d.setDate(d.getDate() - n);
-  return d;
-}
-
 // GET /api/admin/overview — platform KPIs
 export async function GET() {
   const { error } = await requireAuth(['admin']);
   if (error) return error;
 
   try {
+    const {country}=await activeOperations(),CURRENCY=country.currency,timeZone=country.timeZone;
     await connectDB();
-    const today = startOfDay();
+    const today = countryDayStart(timeZone);
 
     const [
       ridesToday,
@@ -65,10 +55,10 @@ export async function GET() {
         .select('status pickup.address dropoff.address fare.total fare.currency vehicleType createdAt')
         .lean(),
       Ride.aggregate([
-        { $match: { status: 'completed', 'fare.currency': CURRENCY, completedAt: { $gte: daysAgo(6) } } },
+        { $match: { status: 'completed', 'fare.currency': CURRENCY, completedAt: { $gte: countryDayStart(timeZone,6) } } },
         {
           $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt' } },
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$completedAt',timezone:timeZone } },
             revenue: { $sum: '$fare.total' },
             platformFees: { $sum: '$fare.platformFee' },
             driverEarnings: { $sum: '$fare.driverEarnings' },
@@ -78,7 +68,7 @@ export async function GET() {
         { $sort: { _id: 1 } },
       ]),
       Ride.aggregate([
-        { $match: { createdAt: { $gte: daysAgo(6) } } },
+        { $match: { createdAt: { $gte: countryDayStart(timeZone,6) } } },
         { $group: { _id: '$status', count: { $sum: 1 } } },
       ]),
       ContactMessage.countDocuments({ status: 'open' }),
@@ -86,7 +76,7 @@ export async function GET() {
 
     return Response.json({
       currency: CURRENCY,
-      financialScope: 'EGP only; historical currencies remain in ride history',
+      financialScope: CURRENCY+' only; historical currencies remain in ride history',
       ridesToday,
       activeRides,
       revenueToday: revenueAgg[0]?.revenue || 0,

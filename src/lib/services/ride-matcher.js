@@ -1,3 +1,4 @@
+import {courierReadiness} from '@/lib/operating-areas';
 import mongoose from 'mongoose';
 import connectDB from '@/lib/db/mongodb';
 import Driver from '@/lib/db/models/Driver';
@@ -25,6 +26,7 @@ export async function findBestDriver({
   vehicleType = 'economy',
   maxRadiusKm = 10,
   excludeDriverIds = [],
+  operations,
 }) {
   await connectDB();
 
@@ -39,7 +41,7 @@ export async function findBestDriver({
   try {
     const maxK = Math.max(1, Math.min(10, Math.ceil(maxRadiusKm / 0.5)));
 
-    const { drivers: candidateIds, k } = await findNearbyDriversH3(
+    const { drivers: candidateIds } = await findNearbyDriversH3(
       pickup.lat,
       pickup.lng,
       {
@@ -52,7 +54,7 @@ export async function findBestDriver({
     if (candidateIds.length > 0) {
       // Phase 2: MongoDB — fetch & score only these candidates
       const objectIds = candidateIds.map((id) => new mongoose.Types.ObjectId(id));
-      const drivers = await Driver.aggregate([
+      const drivers = Driver.aggregate([
         {
           $match: {
             _id: { $in: objectIds },
@@ -105,20 +107,15 @@ export async function findBestDriver({
         },
         { $match: { distance: { $lte: maxRadiusKm * 1000 } } },
         { $sort: { matchScore: -1 } },
-        { $limit: 5 },
-      ]);
-
-      if (drivers.length > 0) {
-        console.log(`[RideMatcher] H3 fast path: found ${drivers.length} candidates at k=${k}`);
-        return drivers[0];
-      }
+      ]).cursor({batchSize:100});
+      for await(const d of drivers)if(!operations||courierReadiness(d,d.user,{snapshot:operations,service:'taxi',pickup,policy:{dispatch:{radiusKm:maxRadiusKm}}}).eligible)return d;
     }
   } catch (err) {
     console.warn('[RideMatcher] H3 fast path failed, falling back to $geoNear:', err.message);
   }
 
   // ─── Fallback: Original $geoNear (MongoDB full scan) ──────────────────────
-  return findBestDriverGeoNear({ pickup, vehicleType, maxRadiusKm, excludeDriverIds });
+  return findBestDriverGeoNear({ pickup, vehicleType, maxRadiusKm, excludeDriverIds, operations });
 }
 
 /**
@@ -130,6 +127,7 @@ async function findBestDriverGeoNear({
   vehicleType = 'economy',
   maxRadiusKm = 10,
   excludeDriverIds = [],
+  operations,
 }) {
   // Try expanding radius: 2km → 5km → maxRadiusKm
   const radiusTiers = [...new Set([2000, 5000, maxRadiusKm * 1000].map(r => Math.min(r, maxRadiusKm * 1000)))];
@@ -138,7 +136,7 @@ async function findBestDriverGeoNear({
   );
 
   for (const radiusMeters of radiusTiers) {
-    const drivers = await Driver.aggregate([
+    const drivers = Driver.aggregate([
       {
         $geoNear: {
           near: {
@@ -186,13 +184,8 @@ async function findBestDriverGeoNear({
       },
       { $match: { distance: { $lte: maxRadiusKm * 1000 } } },
         { $sort: { matchScore: -1 } },
-      { $limit: 5 },
-    ]);
-
-    if (drivers.length > 0) {
-      console.log(`[RideMatcher] $geoNear fallback: found ${drivers.length} at ${radiusMeters}m`);
-      return drivers[0];
-    }
+    ]).cursor({batchSize:100});
+    for await(const d of drivers)if(!operations||courierReadiness(d,d.user,{snapshot:operations,service:'taxi',pickup,policy:{dispatch:{radiusKm:maxRadiusKm}}}).eligible)return d;
   }
 
   return null;

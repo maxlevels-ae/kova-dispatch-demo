@@ -1,3 +1,4 @@
+import {bookingArea} from '@/lib/operating-areas';
 import {isTaxiEnabled} from '@/lib/service-availability';
 import { getSettings } from '@/lib/settings';
 import { z } from 'zod';
@@ -29,18 +30,19 @@ export async function POST(request) {
     }
 
     const { pickup, dropoff } = parsed.data;
+    const operations=await bookingArea('taxi',pickup,dropoff);
     const route = await getRoute(pickup, dropoff);
 
     const estimates = await getAllFareEstimates({
       distanceMeters: route.distanceMeters,
       durationSeconds: route.durationSeconds,
-      pickup,
+      pickup, operations,
     });
 
     const settings = await getSettings();
-    for (const type of Object.keys(estimates)) if (!settings.fleet.enabledCategories.includes(type)) delete estimates[type];
+    for (const type of Object.keys(estimates)) if (!operations.config.vehicles.includes(type)) delete estimates[type];
     return Response.json({
-      bookingPolicy: { scheduledEnabled: settings.dispatch.scheduledEnabled, maxScheduleDays: settings.dispatch.maxScheduleDays },
+      bookingPolicy: { scheduledEnabled: operations.config.dispatch.scheduledEnabled, maxScheduleDays: operations.config.dispatch.maxScheduleDays },
       route: {
         distanceMeters: route.distanceMeters,
         durationSeconds: route.durationSeconds,
@@ -50,6 +52,7 @@ export async function POST(request) {
       estimates,
     });
   } catch (err) {
+    if(err.status)return Response.json({error:err.message},{status:err.status});
     console.error('Estimate error:', err);
     return Response.json({ error: 'Failed to estimate fare' }, { status: 500 });
   }

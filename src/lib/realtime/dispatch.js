@@ -84,7 +84,9 @@ export async function startDispatch(rideId, { manual = false } = {}) {
 }
 
 async function runCascade(rideId, manual) {
-  const { dispatch } = await getSettings();
+  const { dispatch:currentDispatch } = await getSettings();
+  const initial=await Ride.findById(rideId).lean();
+  const dispatch=initial?.operations?.taxiDispatch||currentDispatch;
   const OFFER_TIMEOUT_MS = dispatch.acceptanceSeconds * 1000;
   const OFFER_TTL_SECONDS = dispatch.acceptanceSeconds + 9;
   const MAX_OFFERS = dispatch.maxAttempts;
@@ -116,7 +118,7 @@ async function runCascade(rideId, manual) {
       pickup,
       vehicleType: ride.vehicleType,
       maxRadiusKm: dispatch.searchRadiusKm,
-      excludeDriverIds: excludeIds,
+      excludeDriverIds: excludeIds, operations:ride.operations,
     });
 
     if (!candidate) {

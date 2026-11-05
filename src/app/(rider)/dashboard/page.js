@@ -255,7 +255,7 @@ export default function RiderDashboard() {
 
   return (
     <div className="ride-page">
-      {phase==='idle'&&<ServiceChoices services={services}/>}
+      {phase==='idle'&&<><ServiceChoices services={services}/>{services?.outsideArea&&<div className="card card-pad" role="status">{tr('Service is not available in this area.')}</div>}</>}
       <div className="map-fill">
         <MapView center={center} zoom={13} {...mapProps} />
       </div>
@@ -358,7 +358,7 @@ export default function RiderDashboard() {
                   disabled={booking || insufficientWallet}
                 >
                   {booking ? <span className="spinner" /> : (
-                    <>{tr("Book")}{' '}{tr(VEHICLE_LABELS[vehicleType])} · {tr(money(selectedFare?.total || 0))}</>
+                    <>{tr("Book")}{' '}{tr(VEHICLE_LABELS[vehicleType])} · {tr(money(selectedFare?.total || 0,selectedFare?.currency))}</>
                   )}
                 </button>
               </>
@@ -505,7 +505,7 @@ export default function RiderDashboard() {
             </div>
 
             {ride.status === 'arrived' && (
-              <p className="tiny muted mt-3 text-center">{tr("Cancelling now includes a")}{' '}{tr(money(ride.fare?.currency === 'EGP' ? LATE_CANCEL_FEE : LEGACY_USD_CANCEL_FEE, ride.fare?.currency ?? null))}{' '}{tr("late-cancel fee")}</p>
+              <p className="tiny muted mt-3 text-center">{tr("Cancelling now includes a")}{' '}{tr(money(ride.fare?.quotedCancellationFee??(ride.fare?.currency === 'EGP' ? LATE_CANCEL_FEE : LEGACY_USD_CANCEL_FEE), ride.fare?.currency ?? null))}{' '}{tr("late-cancel fee")}</p>
             )}
           </div>
         )}

@@ -54,9 +54,9 @@ export default function EarningsPage() {
 
   return (
     <div className="content-pad" style={{ maxWidth: 860 }}>
-      <h1 className="page-title">Earnings</h1><p className="tiny muted">Financial summaries in EGP. Historical amounts retain their recorded currency in ride history.</p>
+      <h1 className="page-title">Earnings</h1><p className="tiny muted">Financial summaries in {data.currency}. Historical amounts retain their recorded currency in ride history.</p>
       <p className="page-sub mb-6">Your money at a glance</p>
-      <section className="card card-pad mb-4"><h2>Delivery earnings</h2><p>Today: {money(data.delivery?.today||0,'EGP')} · Lifetime: {money(data.delivery?.total||0,'EGP')} · {data.delivery?.orders||0} delivered orders</p><Link href="/driver/deliveries">View delivery history →</Link><p className="tiny muted">Taxi earnings are reported separately below.</p></section>
+      <section className="card card-pad mb-4"><h2>Delivery earnings</h2><p>Today: {money(data.delivery?.today||0,data.currency)} · Lifetime: {money(data.delivery?.total||0,data.currency)} · {data.delivery?.orders||0} delivered orders</p><Link href="/driver/deliveries">View delivery history →</Link><p className="tiny muted">Taxi earnings are reported separately below.</p></section>
 
       <PayoutCard />
 
@@ -70,7 +70,7 @@ export default function EarningsPage() {
               Outstanding balance: {money(Math.abs(data.wallet.balance), data.wallet.currency ?? null)}
             </div>
             <div className="tiny muted mt-1">
-              Top up to clear it — driving is paused below EGP 25 owed.
+              Settle the outstanding balance before accepting new requests.
             </div>
           </div>
           <Link href="/driver/wallet" className="btn btn-primary btn-sm">Settle up</Link>
@@ -80,12 +80,12 @@ export default function EarningsPage() {
       <div className="grid-3">
         <div className="card card-pad stat">
           <span className="stat-label">Today</span>
-          <span className="stat-value">{money(data.today.earnings)}</span>
+          <span className="stat-value">{money(data.today.earnings,data.currency)}</span>
           <span className="tiny muted">{data.today.trips} trip{data.today.trips === 1 ? '' : 's'}</span>
         </div>
         <div className="card card-pad stat">
           <span className="stat-label">This week</span>
-          <span className="stat-value">{money(data.week.total)}</span>
+          <span className="stat-value">{money(data.week.total,data.currency)}</span>
           <span className="tiny muted">{data.week.trips} trip{data.week.trips === 1 ? '' : 's'}</span>
         </div>
         <div className="card card-pad stat">
@@ -102,7 +102,7 @@ export default function EarningsPage() {
           {weekBars.map((bar) => (
             <div key={bar.label} className="flex-col items-center gap-2 flex-1">
               <div
-                title={money(bar.earnings)}
+                title={money(bar.earnings,data.currency)}
                 style={{
                   width: '100%',
                   maxWidth: 44,

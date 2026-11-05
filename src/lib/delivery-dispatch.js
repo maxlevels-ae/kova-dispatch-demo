@@ -1,3 +1,4 @@
+import {courierReadiness} from '@/lib/operating-areas';
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import Delivery from '@/lib/db/models/Delivery';
@@ -17,14 +18,14 @@ export async function dispatchDeliveries(){
    if(order.offer?.id){await Delivery.updateOne({_id:order._id,status:order.status,'offer.id':order.offer.id},{$unset:{offer:1},$push:{timeline:{status:order.status,event:'offer_expired',at:new Date(),actorId:order.offer.courierId,role:'system'}}});}
    if(order.manualHold)continue;
    const s=order.policy;
-   const candidates=s.eligibility.available&&order.attempts<s.dispatch.maxAttempts?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[order.pickup.lng,order.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{_id:{$nin:order.attempted},isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}},{$limit:10}]):[];
+   const candidates=s.eligibility.available&&order.attempts<s.dispatch.maxAttempts?Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[order.pickup.lng,order.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{_id:{$nin:order.attempted},isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}}]).cursor({batchSize:100}):[];
    let driver;
-   for(const c of candidates){const u=await User.findById(c.userId).select('isActive wallet egpWallet').lean();if(u?.isActive&&walletAccount(u)?.currency==='EGP'&&walletAccount(u).balance>=0){driver=c;break;}}
+   for await(const c of candidates){const u=await User.findById(c.userId).select('isActive wallet egpWallet currencyWallets').lean();if(courierReadiness(c,u,{snapshot:order.operations,policy:s,pickup:order.pickup,currency:order.quote.currency}).eligible){driver=c;break;}}
    if(!driver){
     const closed=await mongoose.connection.transaction(async session=>{
      const current=await Delivery.findOne({_id:order._id,status:'SEARCHING_COURIER'}).session(session);if(!current)return null;
-     const updated=await User.findByIdAndUpdate(current.customerId,walletDelta(current.quote.total,'EGP'),{session,returnDocument:'after',updatePipeline:true});
-     await WalletTransaction.create([{userId:current.customerId,type:'refund',amount:current.quote.total,currency:'EGP',balanceAfter:walletAccount(updated).balance,deliveryId:current._id,ref:`delivery:${current._id}:refund`,note:'No courier — delivery refund'}],{session});
+     const updated=await User.findByIdAndUpdate(current.customerId,walletDelta(current.quote.total,current.quote.currency),{session,returnDocument:'after',updatePipeline:true});
+     await WalletTransaction.create([{userId:current.customerId,type:'refund',amount:current.quote.total,currency:current.quote.currency,balanceAfter:walletAccount(updated,current.quote.currency).balance,deliveryId:current._id,ref:`delivery:${current._id}:refund`,note:'No courier — delivery refund'}],{session});
      current.status='NO_COURIER';current.offer=undefined;current.settlement={status:'refunded',at:new Date()};current.timeline.push({status:current.status,event:'no_eligible_courier',role:'system'});await current.save({session});return current;
     });if(closed)await deliveryNotify(closed,closed.status,closed.timeline.at(-1)._id);continue;
    }

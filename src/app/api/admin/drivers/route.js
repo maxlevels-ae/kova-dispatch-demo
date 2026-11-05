@@ -1,7 +1,7 @@
 import AdminAudit from "@/lib/db/models/AdminAudit";
 import { validSettingsOrigin } from "@/lib/settings-origin";
 import { getSettings } from "@/lib/settings";
-import { CURRENCY } from "@/lib/currency";
+import {activeOperations} from '@/lib/operating-areas';
 import { z } from "zod";
 import mongoose from "mongoose";
 import connectDB from "@/lib/db/mongodb";
@@ -15,6 +15,7 @@ export async function GET(request) {
   if (error) return error;
 
   try {
+    const CURRENCY=(await activeOperations()).country.currency;
     await connectDB();
 
     const { searchParams } = request.nextUrl;

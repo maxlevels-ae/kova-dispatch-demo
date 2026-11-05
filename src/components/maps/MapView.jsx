@@ -42,6 +42,9 @@ export default function MapView({
   pickup,
   dropoff,
   routeGeometry,
+  zones: suppliedZones,
+  onZoneClick,
+  fitZones = false,
   drivers = [],
   driverPosition,
   userPosition,
@@ -79,6 +82,28 @@ export default function MapView({
   // that arrives before the style finishes loading still gets drawn.
   const routeGeomRef = useRef(null);
   const onClickRef = useRef(onClick);
+  const zones = suppliedZones || config.zones;
+  useEffect(() => {
+    const map=mapRef.current;
+    if(!map||!zones)return;
+    let appliedSource;
+    if(fitZones&&zones.length){const bounds=new LngLatBounds();for(const z of zones){const points=z.geometry.type==='Polygon'?z.geometry.coordinates.flat():z.geometry.coordinates.flat(2);for(const p of points)bounds.extend(p);}if(!bounds.isEmpty())map.fitBounds(bounds,{padding:35,maxZoom:13,duration:400});}
+    const draw=()=>{
+      if(!map.isStyleLoaded())return;
+      if(appliedSource&&map.getSource('operating-zones')===appliedSource)return;
+      const data={type:'FeatureCollection',features:zones.map(z=>({type:'Feature',id:z.id,properties:{id:z.id,name:z.name,active:!!z.active},geometry:z.geometry}))};
+      if(map.getSource('operating-zones'))map.getSource('operating-zones').setData(data);
+      else{
+        map.addSource('operating-zones',{type:'geojson',data});
+        map.addLayer({id:'operating-zones-fill',type:'fill',source:'operating-zones',paint:{'fill-color':['case',['get','active'],'#62616b','#a8a6a0'],'fill-opacity':0.12}});
+        map.addLayer({id:'operating-zones-line',type:'line',source:'operating-zones',paint:{'line-color':['case',['get','active'],'#29282c','#99968d'],'line-width':2}});
+      }
+      appliedSource=map.getSource('operating-zones');
+    };
+    const select=e=>{if(onZoneClick&&map.getLayer('operating-zones-fill')){const f=map.queryRenderedFeatures(e.point,{layers:['operating-zones-fill']})[0];if(f)onZoneClick(f.properties.id);}};
+    draw();map.on('idle',draw);map.on('click',select);
+    return()=>{map.off('idle',draw);map.off('click',select);};
+  },[zones,onZoneClick,mapState,fitZones]);
   useEffect(() => {
     onClickRef.current = onClick;
   }, [onClick]);
