@@ -100,6 +100,7 @@ const STATUS_BADGE = {
   arrived: ['badge-gold', 'Driver arrived'],
   in_progress: ['badge-info', 'In progress'],
   completed: ['badge-success', 'Completed'],
+  ended_early: ['badge-neutral', 'Ended early'],
   cancelled: ['badge-danger', 'Cancelled'],
   no_drivers: ['badge-warning', 'No drivers'],
 };

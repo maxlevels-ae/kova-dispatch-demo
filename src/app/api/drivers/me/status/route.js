@@ -19,6 +19,7 @@ const statusSchema = z.object({
   online: z.boolean(),
   location: z
     .object({
+      accuracy: z.number().nonnegative().max(100000).optional(),
       lat: z.number().min(-90).max(90),
       lng: z.number().min(-180).max(180),
     })
@@ -97,6 +98,7 @@ export async function POST(request) {
       driver.isOnline = true;
       driver.location = { type: 'Point', coordinates: [location.lng, location.lat] };
       driver.lastLocationUpdate = new Date();
+      driver.locationAccuracy = location.accuracy ?? null;
 
       // Seed the H3 spatial index immediately
       const { h3Cell } = await updateDriverCell(String(driver._id), location.lat, location.lng);

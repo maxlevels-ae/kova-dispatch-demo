@@ -41,8 +41,8 @@ export default function useDriverState({ onEvent } = {}) {
     const remaining=Date.parse(expiresAt)-Date.now();if(remaining<=0){setOffer(null);return;}
     if(notifications?.preferences.driverSound&&!notifications?.preferences.muted&&notifications?.policy.driverSound!==false)playAlert({key:'offer:'+offer.offerId,offer:true,expiresAt});
     const timer=setTimeout(()=>{stopAlert();closeOfferNotification(offer.rideId);setOffer(null);},remaining);
-    return()=>{clearTimeout(timer);stopAlert();};
-  },[offer,notifications?.preferences.driverSound,notifications?.preferences.muted,notifications?.policy.driverSound]);
+    return()=>{clearTimeout(timer);stopAlert('offer:'+offer.offerId);};
+  },[offer,notifications?.preferences.driverSound,notifications?.preferences.muted,notifications?.policy.driverSound,notifications?.audioReady]);
   useEffect(()=>{
     if(!socket)return;
     let live=true;
@@ -92,6 +92,7 @@ export default function useDriverState({ onEvent } = {}) {
           lng: pos.coords.longitude,
           heading: pos.coords.heading,
           speed: pos.coords.speed,
+          accuracy: pos.coords.accuracy,
         };
         setPosition(point);
 
@@ -188,7 +189,7 @@ export default function useDriverState({ onEvent } = {}) {
       }
       if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
       navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy:pos.coords.accuracy }),
         (err) =>
           reject(
             new Error(
@@ -237,7 +238,7 @@ export default function useDriverState({ onEvent } = {}) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to go offline');
       socketRef.current?.emit('driver:offline');
-      setOnline(false);
+      stopAlert();setOffer(null);setOnline(false);
     } finally {
       setBusy(false);
     }
@@ -250,7 +251,7 @@ export default function useDriverState({ onEvent } = {}) {
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `Failed to ${action}`);
+    if (!res.ok) throw Object.assign(new Error(data.error || `Failed to ${action}`),{evidence:data.evidence});
     return data;
   }, []);
 
@@ -258,7 +259,7 @@ export default function useDriverState({ onEvent } = {}) {
     if (!offer) return;
     stopAlert();
     closeOfferNotification(offer.rideId);
-    const data = await act(offer.rideId, 'accept');
+    let data;try{data = await act(offer.rideId, 'accept');}catch(error){setOffer(current=>current?.offerId===offer.offerId?{...current}:current);throw error;}
     setOffer(null);
     setRide(data.ride);
     socketRef.current?.emit('ride:subscribe', { rideId: data.ride.id });
@@ -285,6 +286,7 @@ export default function useDriverState({ onEvent } = {}) {
     setRide((r) => ({ ...r, status: data.ride.status }));
   }, [act]);
 
+  const endEarly=useCallback(async body=>{const data=await act(rideRef.current.id,'early-end',body);setRide(null);return data.ride;},[act]);
   const complete = useCallback(async () => {
     const data = await act(rideRef.current.id, 'complete');
     setRide(null);
@@ -312,7 +314,7 @@ export default function useDriverState({ onEvent } = {}) {
     decline,
     arrive,
     start,
-    complete,
+    complete, endEarly,
     cancelTrip,
   };
 }

@@ -1,3 +1,4 @@
+import {rideSafetySchema,rideSafetyDefaults} from './ride-safety-policy';
 import { mapDefaults, egyptLocations } from "./map-config.js";
 import { z } from "zod";
 const number = (min, max) => z.number().finite().min(min).max(max);
@@ -17,6 +18,7 @@ export const events = [
 ];
 export const defaults = {
   dispatch: {
+    safety: rideSafetyDefaults,
     assignmentMode: "automatic",
     fallback: "no_drivers",
     scheduledEnabled: false,
@@ -61,6 +63,7 @@ export const defaults = {
 export const schemas = {
   dispatch: z
     .object({
+      safety: rideSafetySchema.default(rideSafetyDefaults),
       assignmentMode: z.enum(["automatic", "manual"]),
       fallback: z.enum(["no_drivers", "manual"]),
       scheduledEnabled: z.boolean(),

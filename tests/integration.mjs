@@ -1,3 +1,4 @@
+import {journeyFixture} from './ride-safety-fixture.mjs';
 import { spawn } from "node:child_process";
 import {createWriteStream} from 'node:fs';
 import { randomBytes } from "node:crypto";
@@ -138,7 +139,7 @@ async function putBranding(cookie, body) {
 let users;
 let driver;
 async function makeRide(currency = "EGP", status = "in_progress") {
-  return Ride.create({
+  const fixture=await Ride.create({
     riderId: users.rider._id,
     driverId: users.driver._id,
     driverProfileId: driver._id,
@@ -154,6 +155,8 @@ async function makeRide(currency = "EGP", status = "in_progress") {
     fare: { currency, total: 10.01, platformFee: 0.8, driverEarnings: 9.21 },
     startedAt: new Date(Date.now() - 600000),
   });
+  if(status==="in_progress")await journeyFixture(fixture._id);
+  return fixture;
 }
 try {
   await connectDB();
@@ -200,7 +203,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
+  if (!process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only')) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -493,7 +496,7 @@ try {
       );
       assert.equal(
         results.filter((r) => r.status === "fulfilled").length,
-        1,
+        2,
         results
           .filter((r) => r.status === "rejected")
           .map((r) => r.reason.message)
@@ -1238,7 +1241,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) await check(
+  if (!process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only')) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1255,11 +1258,11 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only')) {
     const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
-  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only')) {
+  if (!process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only')) {
     const {notificationChecks}=await import('./ride-notifications.mjs');
     await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
     const {deliveryChecks}=await import('./delivery-integration.mjs');
@@ -1271,6 +1274,7 @@ try {
   if(process.argv.includes('--delivery-only')){const {deliveryChecks}=await import('./delivery-integration.mjs');await deliveryChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--account-management-only')){const {accountsChecks}=await import('./accounts-integration.mjs');await accountsChecks({request,cookies,User,Driver,WalletTransaction,check,password,base,completeRide,Ride});}
   if(process.argv.includes('--areas-only')||!process.argv.some(v=>v.endsWith('-only'))){const {operatingChecks}=await import('./operating-integration.mjs');await operatingChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,password,check});}
+  if(process.argv.includes('--safety-only')||!process.argv.some(v=>v.endsWith('-only'))){const {safetyChecks}=await import('./ride-safety-integration.mjs');await safetyChecks({base,request,cookies,User,Driver,Ride,WalletTransaction,check});}
   console.log(
     `${passed} database/API integration checks passed; only disposable database ${dbName} was written.`,
   );

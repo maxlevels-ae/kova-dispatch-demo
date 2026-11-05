@@ -4,6 +4,9 @@ import { CURRENCY } from '@/lib/currency';
 const rideSchema = new mongoose.Schema(
   {
     operations: mongoose.Schema.Types.Mixed,
+    safety: mongoose.Schema.Types.Mixed,
+    earlyEnd: mongoose.Schema.Types.Mixed,
+    endedAt: Date,
     scheduledAt: Date,
     riderId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -29,6 +32,7 @@ const rideSchema = new mongoose.Schema(
         'arrived',
         'in_progress',
         'completed',
+        'ended_early',
         'cancelled',
         'no_drivers',
       ],

@@ -4,12 +4,14 @@ import {useSession} from 'next-auth/react';
 import {useSocket} from './SocketProvider';
 import {useToast} from '@/components/ui/Toast';
 import {preferenceDefaults,safeNotificationLink} from '@/lib/notification-policy';
-import {playAlert,stopAlert,unlockAudio} from '@/lib/notification-audio';
+import {playAlert,stopAlert,unlockAudio,audioStatus,subscribeAudio} from '@/lib/notification-audio';
 import {browserNotificationPermission} from '@/lib/browser-notification-permission';
 const Context=createContext(null);
 export function NotificationProvider({children}){
  const {data:session}=useSession();const {socket}=useSocket();const toast=useToast();
  const [items,setItems]=useState([]),[unread,setUnread]=useState(0),[preferences,setPreferences]=useState(preferenceDefaults),[policy,setPolicy]=useState({}),[error,setError]=useState(''),[audioReady,setAudioReady]=useState(false),[permission,setPermission]=useState('default');
+ const [soundStatus,setSoundStatus]=useState(audioStatus);
+ useEffect(()=>subscribeAudio(s=>{setSoundStatus(s);setAudioReady(s.ready);}),[]);
  const seen=useRef(new Set()),state=useRef({preferences,policy});
  useEffect(()=>{state.current={preferences,policy};},[preferences,policy]);
  const role=session?.user?.role;
@@ -58,7 +60,8 @@ export function NotificationProvider({children}){
   if(result==='denied'){setError('Notifications are blocked. Allow notifications in your browser site settings; visible ride alerts still work.');return;}
   if(result==='granted'&&'serviceWorker' in navigator){await navigator.serviceWorker.register('/notifications-sw.js');await navigator.serviceWorker.ready;}
  };
- const testSound=async offer=>{setAudioReady(await unlockAudio());if(!await playAlert({key:'preview',offer,expiresAt:new Date(Date.now()+3000).toISOString()}))throw Error('Sound is blocked by the browser. Try enabling notifications first.');};
- return <Context.Provider value={{items,unread,preferences,policy,error,permission,audioReady,refresh,save,markRead,enable,testSound}}>{children}</Context.Provider>;
+ const enableSound=async()=>{const allowed=await unlockAudio();await save({driverSound:true,muted:false});if(!allowed)throw Error(audioStatus().error);};
+ const testSound=async offer=>{if(!await playAlert({key:'preview',offer,expiresAt:new Date(Date.now()+3000).toISOString()}))throw Error('Sound is blocked by the browser. Try enabling notifications first.');};
+ return <Context.Provider value={{items,unread,preferences,policy,error,permission,audioReady,soundStatus,enableSound,refresh,save,markRead,enable,testSound}}>{children}</Context.Provider>;
 }
 export const useNotifications=()=>useContext(Context);

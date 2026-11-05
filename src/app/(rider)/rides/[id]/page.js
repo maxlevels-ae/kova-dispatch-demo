@@ -1,6 +1,7 @@
 'use client';
 import {t as tr} from '@/lib/i18n';
 import {useI18n} from '@/context/LanguageProvider';
+import EarlyEndPanel from '@/components/ride/EarlyEndPanel';
 import AssignedVehicleCard from '@/components/ride/AssignedVehicleCard';
 
 import { useEffect, useState } from 'react';
@@ -32,6 +33,8 @@ export default function RideDetailPage() {
     return () => { ignore = true; };
   }, [id]);
 
+  useEffect(()=>{if(data?.ride?.status!=='ended_early'||data.ride.earlyEnd?.reviewStatus==='resolved')return;let live=true;const timer=setInterval(async()=>{try{const response=await fetch('/api/rides/'+id);if(response.ok&&live)setData(await response.json());}catch{}},15000);return()=>{live=false;clearInterval(timer);};},[id,data?.ride?.status,data?.ride?.earlyEnd?.reviewStatus]);
+
   if (notFound) {
     return (
       <div className="content-pad">
@@ -45,7 +48,7 @@ export default function RideDetailPage() {
   const { ride } = data;
 
   return (
-    <div className="content-pad" style={{ maxWidth: 760 }}>
+    <div className="content-pad" style={{ maxWidth: 760 }}><EarlyEndPanel ride={ride} onUpdate={ride=>setData(d=>({...d,ride}))}/>
       <button className="btn btn-ghost btn-sm mb-4" onClick={() => router.back()}>
         <ArrowLeft size={16} />{tr("Back")}</button>
 

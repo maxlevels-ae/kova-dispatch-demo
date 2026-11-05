@@ -1,3 +1,4 @@
+import {validSettingsOrigin} from '@/lib/settings-origin';
 import { walletAccount, walletAccounts } from '@/lib/currency';
 import { z } from 'zod';
 import connectDB from '@/lib/db/mongodb';
@@ -63,6 +64,7 @@ export async function GET() {
 
 // PATCH /api/users/me
 export async function PATCH(request) {
+  if(!validSettingsOrigin(request))return Response.json({error:'Invalid request origin'},{status:403});
   const { session, error } = await requireAuth();
   if (error) return error;
 

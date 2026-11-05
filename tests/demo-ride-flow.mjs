@@ -72,6 +72,8 @@ export async function runDemoRide({
   driver,
   onProgress = () => {},
 }) {
+  if(!base.startsWith('http://localhost:3188'))throw Error('Synthetic demo journey is restricted to the disposable local server');
+  const {pickupFixture,journeyFixture}=await import('./ride-safety-fixture.mjs');
   const beforeRider = await rider.json("/api/wallet"),
     beforeDriver = await driver.json("/api/wallet");
   assert.equal(beforeRider.wallet.currency, "EGP");
@@ -106,6 +108,7 @@ export async function runDemoRide({
     });
     const pickup = {
         lat: 30.0444,
+        accuracy:5,
         lng: 31.2357,
         address: "DEMO QA pickup — Cairo Tahrir Square",
       },
@@ -147,10 +150,13 @@ export async function runDemoRide({
     onProgress({ stage: "assigned", rideId: ride.id });
     await driver.json(`/api/rides/${ride.id}/accept`, {});
     onProgress({ stage: "accepted", rideId: ride.id });
+    await pickupFixture(ride.id);
     await driver.json(`/api/rides/${ride.id}/arrive`, {});
     await driver.json(`/api/rides/${ride.id}/start`, { pin: ride.pin });
     onProgress({ stage: "in_progress", rideId: ride.id });
-    socket.emit("driver:location", dropoff);
+    clearInterval(heartbeat);
+    socket.disconnect();
+    await journeyFixture(ride.id);
     const completed = (await driver.json(`/api/rides/${ride.id}/complete`, {}))
       .ride;
     assert.equal(completed.status, "completed");
@@ -204,7 +210,7 @@ export async function runDemoRide({
     clearTimeout(timer);
     clearInterval(heartbeat);
     try {
-      await driver.json("/api/drivers/me/status", { online: false });
+      await driver.json("/api/drivers/me/status", { online: false }).catch(error=>console.log("Demo cleanup:",error.message));
     } finally {
       socket.disconnect();
     }

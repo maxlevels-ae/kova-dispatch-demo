@@ -68,6 +68,7 @@ const driverSchema = new mongoose.Schema(
         default: [0, 0],
       },
     },
+    locationAccuracy: Number,
     lastLocationUpdate: {
       type: Date,
     },

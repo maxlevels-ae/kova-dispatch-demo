@@ -58,6 +58,7 @@ export default function EarningsPage() {
       <p className="page-sub mb-6">Your money at a glance</p>
       <section className="card card-pad mb-4"><h2>Delivery earnings</h2><p>Today: {money(data.delivery?.today||0,data.currency)} · Lifetime: {money(data.delivery?.total||0,data.currency)} · {data.delivery?.orders||0} delivered orders</p><Link href="/driver/deliveries">View delivery history →</Link><p className="tiny muted">Taxi earnings are reported separately below.</p></section>
 
+      <section className="card card-pad mb-4"><h2>Reviewed early endings</h2><p>Today: {money(data.earlyEnding?.today||0,data.currency)} · Lifetime: {money(data.earlyEnding?.total||0,data.currency)} · {data.earlyEnding?.trips||0} reviewed trips</p><Link href="/driver/trips">View trip decisions →</Link><p className="tiny muted">Pending reviews are excluded. Completed destination trips are reported separately below.</p></section>
       <PayoutCard />
 
       {data.wallet?.balance < 0 && (

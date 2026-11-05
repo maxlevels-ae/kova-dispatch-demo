@@ -351,6 +351,7 @@ export default function RiderDashboard() {
                     <Link href="/wallet" style={{ fontWeight: 700, textDecoration: 'underline' }}>{tr("add funds")}</Link>{tr(' ')}{' '}{tr("to book this ride.")}</p>
                 )}
 
+                <p className="small muted">{tr(estimate.bookingPolicy?.earlyChargePolicy==='verified_service_review'?'Early endings: only verified service may be charged after your confirmation and administrator review. No automatic penalty.':'Early endings: no automatic charge or penalty; administrator review is required.')}</p>
                 {estimate.bookingPolicy?.scheduledEnabled && <label className="field mt-4">{tr("Schedule pickup (your local time; optional)")}<input className="input" type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} /><span className="tiny muted">{tr("Up to")}{' '}{tr(estimate.bookingPolicy.maxScheduleDays)}{' '}{tr("days ahead. Leave empty to ride now.")}</span></label>}
                 <button
                   className="btn btn-primary btn-lg btn-full mt-4"

@@ -40,11 +40,13 @@ export default function useRiderRide({ onEvent } = {}) {
     let live=true;
     const sync=async()=>{try{
       const current=rideRef.current;const res=await fetch(current?.id?'/api/rides/'+current.id:'/api/rides/active');if(!res.ok||!live)return;const {ride:active}=await res.json();
+      if(active?.status==='ended_early'){window.location.assign('/rides/'+active.id);return;}
       if(active?.status==='completed'){setCompletedRide(active);setRide(null);setDriverPosition(null);}
       else if(active&&['cancelled','no_drivers'].includes(active.status)){setRide(null);setDriverPosition(null);}
       else {setRide(active||null);setDriverPosition(active?.driver?.location||null);}
     }catch{}};
-    const visible=()=>{if(!document.hidden)sync();};socket.on('connect',sync);socket.on('notification:new',sync);document.addEventListener('visibilitychange',visible);const timer=setInterval(visible,10000);if(isConnected)sync();return()=>{live=false;clearInterval(timer);socket.off('connect',sync);socket.off('notification:new',sync);document.removeEventListener('visibilitychange',visible);};
+    const early=data=>window.location.assign('/rides/'+data.rideId);socket.on('ride:ended-early',early);
+    const visible=()=>{if(!document.hidden)sync();};socket.on('connect',sync);socket.on('notification:new',sync);document.addEventListener('visibilitychange',visible);const timer=setInterval(visible,10000);if(isConnected)sync();return()=>{live=false;clearInterval(timer);socket.off('ride:ended-early',early);socket.off('connect',sync);socket.off('notification:new',sync);document.removeEventListener('visibilitychange',visible);};
   },[socket,isConnected]);
 
   // ── Resume active ride from the server ──

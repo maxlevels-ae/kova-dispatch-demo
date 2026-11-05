@@ -1,4 +1,5 @@
 'use client';
+import {earlyReasons} from '@/lib/ride-safety-policy';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -11,15 +12,18 @@ import ChatSheet from '@/components/ride/ChatSheet';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/components/ui/Toast';
 import { money } from '@/components/ui/bits';
+import {useNotifications} from '@/context/NotificationProvider';
 import useDriverState from '@/hooks/useDriverState';
 import { formatDistance, formatDuration, roadDistanceMeters, etaMinutes as etaFor } from '@/lib/utils/geo';
 
 export default function DriverDashboard() {
   const toast = useToast();
+  const notifications=useNotifications();
   const [chatOpen, setChatOpen] = useState(false);
   const [pinValue, setPinValue] = useState('');
   const [pinOpen, setPinOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [completionWarning,setCompletionWarning]=useState(null),[earlyOpen,setEarlyOpen]=useState(false),[earlyReceipt,setEarlyReceipt]=useState(null),[earlyForm,setEarlyForm]=useState({reason:'',requestedBy:'unknown',explanation:''});
   const [receipt, setReceipt] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [countdown, setCountdown] = useState(0);
@@ -42,7 +46,7 @@ export default function DriverDashboard() {
 
   const {
     loading, profile, online, position, offer, ride, busy, isConnected,
-    goOnline, goOffline, accept, decline, arrive, start, complete, cancelTrip,
+    goOnline, goOffline, accept, decline, arrive, start, complete, endEarly, cancelTrip,
   } = useDriverState({ onEvent });
 
   // Offer countdown
@@ -120,7 +124,7 @@ export default function DriverDashboard() {
       const finished = await complete();
       setReceipt(finished);
     } catch (err) {
-      toast(err.message, 'error', 4000);
+      if(err.evidence)setCompletionWarning({error:err.message,...err.evidence});else toast(err.message,'error',5000);
     } finally {
       setActionBusy(false);
     }
@@ -160,6 +164,11 @@ export default function DriverDashboard() {
       </div>
 
       <div className="ride-panel">
+        <section className="card card-pad mb-3" aria-label="Incoming sound">
+          <strong role="status">{notifications?.soundStatus.ready?'Sound Ready':notifications?.soundStatus.blocked?'Sound Blocked':'Enable incoming sound'}</strong>
+          <div className="flex gap-2 mt-2" style={{flexWrap:'wrap'}}><button className="btn btn-secondary btn-sm" onClick={()=>notifications.enableSound().catch(e=>toast(e.message,'error'))}>Enable Sound</button><button className="btn btn-secondary btn-sm" onClick={()=>notifications.testSound(true).catch(e=>toast(e.message,'error'))}>Test Incoming Booking Sound</button></div>
+          <p className="tiny muted mt-2">{notifications?.soundStatus.error||'Enable sound on this device. Browser autoplay, silent mode and background limits still apply.'}</p>
+        </section>
         {/* ── Online toggle / status card ── */}
         {!ride && (
           <div className="card card-pad animate-in">
@@ -281,9 +290,9 @@ export default function DriverDashboard() {
               </button>
             )}
             {ride.status === 'in_progress' && (
-              <button className="btn btn-success btn-lg btn-full" onClick={handleComplete} disabled={actionBusy}>
+              <><button className="btn btn-success btn-lg btn-full" onClick={handleComplete} disabled={actionBusy}>
                 {actionBusy ? <span className="spinner" /> : <><CheckCircle2 size={18} /> Complete trip</>}
-              </button>
+              </button><button className="btn btn-secondary btn-full mt-2" disabled={actionBusy} onClick={()=>setEarlyOpen(true)}>End Trip Early / Emergency</button></>
             )}
 
             <div className="flex gap-2 mt-3">
@@ -400,6 +409,9 @@ export default function DriverDashboard() {
         </div>
       </Modal>
 
+      <Modal open={Boolean(completionWarning)} onClose={()=>setCompletionWarning(null)} title="Trip completion needs verification"><p role="alert">{completionWarning?.error}</p>{completionWarning?.error==='You have not reached the destination yet.'&&<p lang="ar" dir="rtl">أنت لسه ما وصلت للوجهة.</p>}{completionWarning?.distanceToDestination!=null&&<p>Distance to destination: {completionWarning.distanceToDestination} m</p>}<div className="flex wrap gap-2"><button className="btn btn-primary" onClick={()=>setCompletionWarning(null)}>Continue Trip</button><button className="btn btn-secondary" onClick={()=>{setCompletionWarning(null);setEarlyOpen(true);}}>End Trip Early</button><button className="btn btn-secondary" onClick={()=>{setCompletionWarning(null);setEarlyForm({reason:'safety_emergency',requestedBy:'driver',explanation:''});setEarlyOpen(true);}}>Report a Problem / Emergency</button></div></Modal>
+      <Modal open={earlyOpen} onClose={()=>setEarlyOpen(false)} title="End trip early"><p>This ends the active journey and releases the driver. No automatic charge or cancellation penalty is posted. GPS or rider confirmation is not required to exit safely.</p><label className="delivery-field">Reason<select className="input" value={earlyForm.reason} onChange={e=>setEarlyForm(f=>({...f,reason:e.target.value}))}><option value="" disabled>Choose a reason</option>{earlyReasons.map((v,i)=><option key={v} value={v}>{['Rider requested early drop-off','Rider changed destination','Vehicle breakdown','Driver unable to continue','Safety or emergency','Wrong destination','Other'][i]}</option>)}</select></label><label className="delivery-field">Requesting party<select className="input" value={earlyForm.requestedBy} onChange={e=>setEarlyForm(f=>({...f,requestedBy:e.target.value}))}>{[['rider','Rider'],['driver','Driver'],['both','Both'],['unknown','Not confirmed']].map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></label><label className="delivery-field">Explanation<textarea className="input" maxLength={1000} value={earlyForm.explanation} onChange={e=>setEarlyForm(f=>({...f,explanation:e.target.value}))}/></label><button className="btn btn-primary" disabled={actionBusy||!earlyForm.reason||(earlyForm.reason==='other'&&earlyForm.explanation.trim().length<10)} onClick={async()=>{if(actionBusy)return;setActionBusy(true);try{setEarlyReceipt(await endEarly(earlyForm));setEarlyOpen(false);}catch(e){toast(e.message,'error');}finally{setActionBusy(false);}}}>End trip and request review</button></Modal>
+      <Modal open={Boolean(earlyReceipt)} onClose={()=>setEarlyReceipt(null)} title="Trip ended early">{earlyReceipt&&<><p>No normal destination completion was recorded.</p><p>Review pending · Proposed fare: {money(earlyReceipt.earlyEnd.proposedFare,earlyReceipt.fare.currency)}</p><Link href={'/driver/trips/'+earlyReceipt.id}>View trip details</Link></>}</Modal>
       {/* ── Completion receipt ── */}
       <Modal open={Boolean(receipt)} onClose={() => setReceipt(null)} title="Trip complete 🎉">
         {receipt && (

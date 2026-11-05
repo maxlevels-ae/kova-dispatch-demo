@@ -12,6 +12,8 @@ export async function register() {
   startNotificationWorker();
   startDispatchSweeper();
   startLocationFlusher();
+  const {default:connectDB}=await import('@/lib/db/mongodb');
+  if(process.env.MONGODB_URI){const db=await connectDB();await db.connection.collection('ridegpssamples').createIndex({expiresAt:1},{expireAfterSeconds:0});await db.connection.collection('ridegpssamples').createIndex({rideId:1,at:1});}
   const {startDeliveryWorker}=await import('@/lib/delivery-dispatch');
   startDeliveryWorker();
 

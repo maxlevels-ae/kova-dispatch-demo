@@ -42,7 +42,7 @@ export async function POST(request) {
     const settings = await getSettings();
     for (const type of Object.keys(estimates)) if (!operations.config.vehicles.includes(type)) delete estimates[type];
     return Response.json({
-      bookingPolicy: { scheduledEnabled: operations.config.dispatch.scheduledEnabled, maxScheduleDays: operations.config.dispatch.maxScheduleDays },
+      bookingPolicy: { earlyChargePolicy:settings.dispatch.safety.earlyChargePolicy, scheduledEnabled: operations.config.dispatch.scheduledEnabled, maxScheduleDays: operations.config.dispatch.maxScheduleDays },
       route: {
         distanceMeters: route.distanceMeters,
         durationSeconds: route.durationSeconds,

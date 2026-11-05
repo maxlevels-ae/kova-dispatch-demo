@@ -15,7 +15,7 @@
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
     "sim:driver": "node scripts/simulate-driver.js",
-    "test": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs --test tests/regression.test.mjs tests/settings.test.mjs tests/notifications.test.mjs tests/delivery.test.mjs tests/operating-areas.test.mjs",
+    "test": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs --test tests/regression.test.mjs tests/settings.test.mjs tests/notifications.test.mjs tests/delivery.test.mjs tests/operating-areas.test.mjs tests/ride-safety.test.mjs",
     "audit:currency": "node scripts/financial-inventory.mjs",
     "test:http": "node tests/http-smoke.mjs",
     "test:integration": "node --experimental-default-type=module --experimental-loader ./tests/loader.mjs tests/integration.mjs",

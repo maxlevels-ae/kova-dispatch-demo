@@ -71,7 +71,7 @@ async function getRedis() {
 }
 
 /** Update driver's position: H3 index + location hash. Redis-only (fast path). */
-async function updateDriverLocation(profileId, lat, lng, heading) {
+async function updateDriverLocation(profileId, lat, lng, heading, accuracy) {
   const redis = await getRedis();
   if (!redis) return null;
 
@@ -95,6 +95,7 @@ async function updateDriverLocation(profileId, lat, lng, heading) {
       lat: String(lat),
       lng: String(lng),
       heading: String(heading ?? ""),
+      accuracy: Number.isFinite(accuracy) && accuracy > 0 ? String(accuracy) : "",
       ts: String(Date.now()),
       h3: newCell || "",
       flushed: "0",
@@ -245,7 +246,7 @@ app.prepare().then(() => {
     // High-frequency GPS pings → Redis + relays. Mongo writes happen
     // in the location flusher, not here.
     socket.on("driver:location", async (data = {}) => {
-      const { lat, lng, heading, speed, rideId } = data;
+      const { lat, lng, heading, speed, rideId, accuracy } = data;
       if (
         !Number.isFinite(lat) ||
         !Number.isFinite(lng) ||
@@ -271,7 +272,15 @@ app.prepare().then(() => {
             { projection: { vehicle: 1, currentRideId: 1,currentDeliveryId:1 } },
           );
         if (!user || !driver) return;
-        await updateDriverLocation(socket.profileId, lat, lng, heading);
+        await updateDriverLocation(socket.profileId, lat, lng, heading, accuracy);
+        if(driver.currentRideId&&(!socket.lastRideSampleAt||Date.now()-socket.lastRideSampleAt>=2000)){
+          socket.lastRideSampleAt=Date.now();
+          const db=await socketDB(),at=new Date();
+          const trip=await db.collection('rides').findOne({_id:driver.currentRideId,driverId:new ObjectId(socket.userId),status:{$in:['accepted','arrived','in_progress']}},{projection:{_id:1}});
+          if(trip){
+            await db.collection('ridegpssamples').insertOne({rideId:trip._id,driverId:new ObjectId(socket.userId),at,lat,lng,accuracy:Number.isFinite(accuracy)&&accuracy>0?accuracy:null,expiresAt:new Date(+at+30*86400000)});
+          }
+        }
         const payload = {
           driverProfileId: socket.profileId,
           location: { lat, lng },

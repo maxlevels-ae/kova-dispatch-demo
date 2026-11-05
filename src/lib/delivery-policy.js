@@ -31,8 +31,8 @@ export const deliveryDefaults={
 export const deliveryPoint=z.object({lat:z.number().min(-90).max(90),lng:z.number().min(-180).max(180),address:z.string().trim().min(3).max(300)});
 const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().regex(/^\+?[\d ()-]{7,20}$/),instructions:z.string().max(500).default('')});
 export const deliveryBookingSchema=z.object({
- pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
- package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive(),length:z.number().positive(),width:z.number().positive(),height:z.number().positive(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),
+ alternatePickupContact:z.boolean().default(false),pickupContact:contact.optional(),pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
+ package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive().optional(),length:z.number().positive().optional(),width:z.number().positive().optional(),height:z.number().positive().optional(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),
  acknowledged:z.literal(true),idempotencyKey:z.uuid(),
 }).strict();
 export function deliveryPrice(settings,route,size,waitingMinutes=0){
@@ -43,3 +43,6 @@ export function deliveryPrice(settings,route,size,waitingMinutes=0){
  const commission=round(total*p.commission/100);
  return {currency,base:p.base,distance,vehicle:p.vehicleSurcharge,size:p[size],waiting,total,commission,earnings:round(total-commission)};
 }
+
+export const packageBounds={small:{weight:2,length:30,width:20,height:15},medium:{weight:5,length:40,width:30,height:30},large:{weight:10,length:60,width:40,height:40}};
+export function selectedPackageBounds(size,settings){const preset=packageBounds[size];if(!preset)return null;return Object.fromEntries(Object.entries(preset).map(([key,value])=>[key,Math.min(value,settings['max'+key[0].toUpperCase()+key.slice(1)])]));}

@@ -15,7 +15,7 @@ import redis from '@/lib/db/redis';
 import {walletAccount,walletDelta,minorUnits} from '@/lib/currency';
 import {getRoute} from '@/lib/services/routing';
 import {getDeliverySettings} from '@/lib/delivery-settings';
-import {deliveryBookingSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '@/lib/delivery-policy';
+import {deliveryBookingSchema,selectedPackageBounds,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '@/lib/delivery-policy';
 import {emitToUser,emitToAdmin} from '@/lib/realtime/emit';
 import {deliverNotifications} from '@/lib/notifications';
 export class DeliveryError extends Error{constructor(message,status=409){super(message);this.status=status;}}
@@ -69,12 +69,19 @@ export async function deliveryNotify(order,event,eventId,exclude){
  emitToAdmin('delivery:update',{id:String(order._id),status:order.status});
 }
 async function notifySafely(order,event,id,exclude){try{await deliveryNotify(order,event,id,exclude);}catch(error){console.error('Delivery notification pending',error.name);}}
-export async function quoteDelivery(input){
- const parsed=deliveryBookingSchema.safeParse(input);if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
+export async function quoteDelivery(input,user){
+ await connectDB();if(!user?.id)fail('Authentication required',401);
+ const senderAccount=await User.findOne({_id:user.id,isActive:true,role:'rider'}).select('name phone').lean();
+ if(!senderAccount?.name||!senderAccount.phone)fail('Complete your name and phone in your profile before sending a package.',400);
+ const sender=input.alternatePickupContact?{...input.pickupContact,instructions:input.sender?.instructions||''}:{name:senderAccount.name,phone:senderAccount.phone,instructions:input.sender?.instructions||''};
+ const parsed=deliveryBookingSchema.safeParse({...input,sender});if(!parsed.success)fail(parsed.error.issues[0]?.message||'Invalid delivery',400);
  const b=parsed.data,{settings:s}=await getDeliverySettings();if(!s.general.enabled)fail('Delivery service is currently disabled');
  const operations=await bookingArea('delivery',b.pickup,b.dropoff);
  if(!validCountryPhone(b.sender.phone,operations.country.code)||!validCountryPhone(b.recipient.phone,operations.country.code))fail('Use a valid local mobile number with country prefix '+operations.country.dialCode,400);
  Object.assign(s,deliveryOperationsPolicy(s,operations));
+ const bounds=selectedPackageBounds(b.package.size,s.packages);for(const [key,value] of Object.entries(bounds))if(b.package[key]===undefined)b.package[key]=value;
+ if(Object.entries(bounds).some(([key,max])=>b.package[key]>max))fail('Package exceeds the selected size limits. Choose a larger package size.',400);
+ b.senderAccount={id:String(senderAccount._id),name:senderAccount.name,phone:senderAccount.phone};
  if(!s.packages.categories.includes(b.package.category)||b.package.weight>s.packages.maxWeight||b.package.length>s.packages.maxLength||b.package.width>s.packages.maxWidth||b.package.height>s.packages.maxHeight)fail('Package exceeds configured category, weight or dimensions',400);
  const recipient=b.recipient.username?await User.findOne({username:b.recipient.username.toLowerCase(),role:'rider',isActive:true}).select('_id phone').lean():null;
  if(b.recipient.username&&(!recipient||recipient.phone?.replace(/\D/g,'')!==b.recipient.phone.replace(/\D/g,'')))fail('Registered recipient account and phone do not match.',400);
@@ -85,11 +92,11 @@ export async function quoteDelivery(input){
 export async function createDelivery(input,user){
  await Promise.all([Delivery.init(),WalletTransaction.init()]);
  await connectDB();if(typeof input.idempotencyKey!=='string'||!/^[-a-f\d]{36}$/i.test(input.idempotencyKey))fail('Invalid idempotency reference',400);const existing=await Delivery.findOne({idempotencyKey:input.idempotencyKey});if(existing){if(!equal(existing.customerId,user.id))fail('Idempotency key belongs to another customer');return existing;}
- const {input:b,settings:s,operations,recipientId,route,quote}=await quoteDelivery(input);
+ const {input:b,settings:s,operations,recipientId,route,quote}=await quoteDelivery(input,user);
  const orderId=new mongoose.Types.ObjectId();
  const result=await mongoose.connection.transaction(async session=>{
   if(b.package.photoId){const photo=await DeliveryEvidence.findOne({_id:b.package.photoId,ownerId:user.id,kind:'package',deliveryId:null,expiresAt:{$gt:new Date()}}).session(session);if(!photo)fail('Invalid package photo',400);photo.deliveryId=orderId;photo.expiresAt=new Date(Date.now()+s.proof.retentionDays*86400000);await photo.save({session});}
-  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,operations,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
+  const [order]=await Delivery.create([{_id:orderId,customerId:user.id,recipientId,recipientType:recipientId?'registered':'guest',verificationMethod:recipientId?'account_otp':'private_link',idempotencyKey:b.idempotencyKey,pickup:b.pickup,dropoff:b.dropoff,sender:b.sender,senderAccount:b.senderAccount,alternatePickupContact:b.alternatePickupContact,recipient:b.recipient,package:b.package,region:b.region,route,quote,fare:quote,policy:s,operations,status:'SEARCHING_COURIER',manualHold:s.dispatch.mode==='manual',pickupCode:generateCode(s.proof.expiryMinutes),deliveryCode:generateCode(s.proof.expiryMinutes),timeline:[{status:'CREATED',event:'created',actorId:user.id,role:user.role,note:recipientId?'Registered recipient; account OTP':'Guest recipient; private link confirmation (phone ownership not verified)'},{status:'SEARCHING_COURIER',event:'dispatch_requested',actorId:user.id,role:user.role}]}],{session});
   await postLedger(user.id,-quote.total,'delivery_payment',order,`delivery:${orderId}:payment`,session);return order;
  });
  await notifySafely(result,result.status,'created');return result;

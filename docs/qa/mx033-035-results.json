@@ -1,0 +1,59 @@
+{
+  "tasks": [
+    "MX-033",
+    "MX-034",
+    "MX-035"
+  ],
+  "verifiedAt": "2026-11-05T01:39:48.352179+00:00",
+  "unitTests": 49,
+  "httpChecks": 21,
+  "integrationSuites": {
+    "demo": 7,
+    "notifications": 11,
+    "delivery": 20,
+    "account-management": 9,
+    "areas": 21,
+    "safety": 11
+  },
+  "coreAndMapRegression": "Passed in the combined integration run; outdated GPS fixtures were corrected and affected suites rerun separately.",
+  "lint": {
+    "errors": 0,
+    "warnings": 43
+  },
+  "productionBuild": "passed",
+  "productionDependencyAudit": {
+    "vulnerabilities": 0
+  },
+  "incomingSound": {
+    "asset": "public/sounds/new-ride.mp3",
+    "gitBlob": "eb3242331306e8a4fdf6fbd57f29d44b5a7364de",
+    "taxiBrowserEvidence": {
+      "currentTime": 2.368593,
+      "loop": true,
+      "paused": false,
+      "error": null
+    },
+    "deliveryBrowserEvidence": {
+      "currentTime": 2.724485,
+      "loop": true,
+      "paused": false,
+      "error": null
+    }
+  },
+  "scope": "Integration databases were disposable localhost replica sets. GPS travel was simulated only locally. Browser decoding/playback is verified, not human audible-device playback or a physical journey.",
+  "screenshots": [
+    "incoming-sound-mobile.png",
+    "stationary-completion-blocked.png",
+    "early-end-driver-reasons.png",
+    "early-end-admin-390.png",
+    "early-end-rider-390.png",
+    "delivery-booking-360.png",
+    "delivery-booking-ar-390.png"
+  ],
+  "limitations": [
+    "Browser GPS reports are not independent proof of physical travel.",
+    "Physical mobile-device sound and closed-browser delivery were not verified.",
+    "Pre-upgrade in-progress trips without recorded start/progress evidence require the controlled early-end review.",
+    "Early-ending charges default to zero. Positive reviewed charges require the saved verified-service policy, observed post-start travel, rider confirmation and explicit administrator settlement."
+  ]
+}

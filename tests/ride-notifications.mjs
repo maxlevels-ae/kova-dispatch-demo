@@ -1,3 +1,4 @@
+import {pickupFixture,journeyFixture} from './ride-safety-fixture.mjs';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import bcrypt from 'bcryptjs';
@@ -19,7 +20,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
  try{
   const pages={};const contexts={};const jsErrors=[];
   for(const [role,session] of [['rider',r],['driver',d]]){
-   const c=await browser.newContext({viewport:{width:1280,height:900},permissions:['notifications','geolocation'],geolocation:{latitude:30.0444,longitude:31.2357}});contexts[role]=c;
+   const c=await browser.newContext({viewport:{width:1280,height:900},permissions:['notifications','geolocation'],geolocation:{latitude:30.0444,longitude:31.2357,accuracy:5}});contexts[role]=c;
    await c.grantPermissions(['notifications','geolocation'],{origin:base});
    await c.addCookies(session.cookies().split('; ').map(pair=>({name:pair.split('=')[0],value:pair.slice(pair.indexOf('=')+1),url:base})));
    await c.addInitScript(()=>{window.qaAudio=[];window.qaPlayed=[];const NativeAudio=window.Audio;window.Audio=new Proxy(NativeAudio,{construct(target,args){const audio=new target(...args);audio.addEventListener('timeupdate',()=>{if(audio.currentTime>0)window.qaPlayed.push({src:audio.src,time:audio.currentTime,volume:audio.volume});});window.qaAudio.push(audio);return audio;}});});
@@ -28,7 +29,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    const summary=page.getByLabel('Notifications',{exact:true});await expect(summary).toBeVisible({timeout:30000});await summary.click();
    await page.getByRole('button',{name:'Enable notifications',exact:true}).click();await page.getByRole('button',{name:'Test sound',exact:true}).click();
    await expect.poll(()=>page.evaluate(()=>qaPlayed.some(a=>a.src.includes('all-notify.mp3')&&a.time>0&&a.volume>0)),{timeout:10000}).toBe(true).catch(async e=>{console.log('AUDIO DIAGNOSTICS',role,await page.evaluate(()=>({played:qaPlayed,players:qaAudio.map(a=>({src:a.src,time:a.currentTime,paused:a.paused,volume:a.volume,ready:a.readyState,error:a.error?.message}))})),await page.locator('.notification-panel').innerText());throw e;});
-   await expect(page.getByText(/VAPID is not configured/).first()).toBeVisible();await page.keyboard.press('Escape');
+   await expect(page.getByText(/VAPID is not configured/).first()).toBeVisible();await page.getByRole('button',{name:'Close notifications',exact:true}).click();
   }
   await check('real Chromium sound playback, granted notification permission, and explicit disabled push status',async()=>{
    assert.equal(await pages.driver.evaluate(async()=>(await navigator.permissions.query({name:'notifications'})).state),'granted');
@@ -42,7 +43,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    const result=await d.json(url,{image:'data:image/png;base64,'+bytes.toString('base64')});assert.ok(result.imageUrl.startsWith('/api/vehicle-photos/'));
    const photo=await d.request(result.imageUrl);assert.equal(photo.status,200);assert.equal((await sharp(Buffer.from(await photo.arrayBuffer())).metadata()).format,'webp');
   });
-  await pages.driver.getByRole('button',{name:'Go online',exact:true}).click();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible();
+  await pages.driver.setViewportSize({width:390,height:844});await pages.driver.getByRole('region',{name:'Incoming sound'}).getByRole('button',{name:'Enable Sound',exact:true}).click();await expect(pages.driver.getByRole('region',{name:'Incoming sound'}).getByText('Sound Ready',{exact:true})).toBeVisible();await pages.driver.screenshot({path:'docs/qa/incoming-sound-mobile.png',fullPage:true});await pages.driver.setViewportSize({width:1280,height:900});await pages.driver.getByRole('button',{name:'Go online',exact:true}).click();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible();
   // Wait for the actual socket GPS sample to enter dispatch's index.
   await new Promise(resolve=>setTimeout(resolve,1500));
   const booked=await r.json('/api/rides',{pickup:{lat:30.0444,lng:31.2357,address:'QA notification pickup'},dropoff:{lat:30.05,lng:31.24,address:'QA notification destination'},vehicleType:'economy'});rideId=booked.ride.id;
@@ -52,6 +53,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    expect.poll(()=>pages.driver.evaluate(()=>qaAudio.some(a=>a.src.includes('new-ride.mp3')&&!a.paused&&a.loop&&a.currentTime>0)),{timeout:5000}).toBe(true),
    expect.poll(()=>pages.driver.evaluate(async()=>{const reg=await navigator.serviceWorker.ready;return(await reg.getNotifications()).some(n=>n.body==='New ride request');}),{timeout:10000}).toBe(true).catch(async e=>{console.log('NOTIFICATION DIAGNOSTICS',JSON.stringify(await d.json('/api/notifications')));console.log('BROWSER ERRORS',jsErrors,await pages.driver.evaluate(async()=>({permission:Notification.permission,worker:Boolean((await navigator.serviceWorker.getRegistration())?.active)}))); throw e;})
    ]);
+   console.log('TAXI AUDIO EVIDENCE',await pages.driver.evaluate(()=>qaAudio.filter(a=>a.src.includes('new-ride.mp3')).map(a=>({src:a.src,currentTime:a.currentTime,paused:a.paused,loop:a.loop,error:a.error?.message||null}))));
    // Accept within the real offer deadline; screenshot capture can stall on
    // animated map frames and must not consume the driver's acceptance window.
    const acceptRequests=[];pages.driver.on('request',request=>{if(request.url().includes('/accept'))acceptRequests.push(request.url());});
@@ -65,7 +67,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
   await check('acceptance inbox, vehicle details, arrival, bidirectional chat and duplicate protection',async()=>{
    await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toContainText('QA-NOTIFY');
    assert.ok((await r.json('/api/notifications')).notifications.some(n=>n.event==='driver_accepted'&&n.rideId===rideId));
-   await pages.driver.getByRole('button',{name:'I’ve arrived',exact:true}).click();
+   await pickupFixture(rideId);await pages.driver.getByRole('button',{name:'I’ve arrived',exact:true}).click();
    await expect.poll(async()=> (await r.json('/api/notifications')).notifications.some(n=>n.event==='driver_arrived'&&n.rideId===rideId)).toBe(true);
    const clientId=randomUUID();const sent=await r.json(`/api/rides/${rideId}/messages`,{text:'Hello driver, I am at pickup.',clientId});const replay=await r.json(`/api/rides/${rideId}/messages`,{text:'Hello driver, I am at pickup.',clientId});assert.equal(String(sent.message._id),String(replay.message._id));
    await d.json(`/api/rides/${rideId}/messages`,{text:'I can see you. Welcome!',clientId:randomUUID()});
@@ -79,7 +81,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('Reconnect message',{timeout:30000});
    await expect(pages.rider.getByRole('dialog',{name:'Chat'}).getByText('Reconnect message',{exact:false})).toHaveCount(1);
   });
-  const active=await r.json(`/api/rides/${rideId}`);await d.json(`/api/rides/${rideId}/start`,{pin:active.ride.pin});await d.json(`/api/rides/${rideId}/complete`,{});
+  await pickupFixture(rideId);const active=await r.json(`/api/rides/${rideId}`);await d.json(`/api/rides/${rideId}/start`,{pin:active.ride.pin});await contexts.driver.setOffline(true);await journeyFixture(rideId);await d.json(`/api/rides/${rideId}/complete`,{});await contexts.driver.setOffline(false);
   await check('complete trip investigation is admin-only, audited and contains recorded events, messages, vehicle and settlement',async()=>{
    assert.equal((await r.request('/api/admin/rides/'+rideId)).status,403);assert.equal((await d.request('/api/admin/rides/'+rideId)).status,403);assert.equal((await request('/api/admin/rides/'+rideId)).status,401);
    const response=await request('/api/admin/rides/'+rideId,cookies.admin);assert.equal(response.status,200);const data=await response.json();assert.equal(data.ride.status,'completed');assert.equal(data.driver.vehicle.plate,'QA-NOTIFY');assert.equal(data.ride.messages.length,3);assert.ok(data.events.some(e=>e.event==='offer_sent'));assert.ok(data.ledger.length>=2);assert.ok(!JSON.stringify(data).includes('password'));assert.equal(data.ride.pin,undefined);
@@ -96,14 +98,14 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
   await check('decline, expiry and rider cancellation stop the offer ring and expired offers cannot be accepted',async()=>{
    await pages.driver.bringToFront();
    const reloadAt=Date.now();await pages.driver.reload();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RELOAD DIAGNOSTICS',await pages.driver.locator('body').innerText(),await d.json('/api/drivers/me'));throw e;});
-   await pages.driver.getByLabel('Notifications',{exact:true}).click();await pages.driver.getByRole('button',{name:'Enable notifications',exact:true}).click();await expect(pages.driver.getByText(/Sound: ready/)).toBeVisible();await pages.driver.keyboard.press('Escape');
+   await pages.driver.getByLabel('Notifications',{exact:true}).click();await pages.driver.getByRole('button',{name:'Enable notifications',exact:true}).click();await expect(pages.driver.locator('.notification-panel').getByText(/Sound Ready/)).toBeVisible();await pages.driver.getByRole('button',{name:'Close notifications',exact:true}).click();
    await expect.poll(async()=>new Date((await Driver.findOne({userId:driver._id}).lean()).lastLocationUpdate).getTime(),{timeout:40000}).toBeGreaterThanOrEqual(reloadAt);
    for(const action of ['decline','expire','cancel']){
     // Refresh the disposable browser's stationary GPS fixture. Chromium's
     // static emulated fix otherwise ages out during the long admin checks.
     // The application must transport and persist it; never write DB GPS here.
     await pages.driver.waitForTimeout(4000);const sampleAt=Date.now();
-    await contexts.driver.setGeolocation({latitude:30.0444,longitude:31.2357});
+    await contexts.driver.setGeolocation({latitude:30.0444,longitude:31.2357,accuracy:5});
     await expect.poll(async()=>{const profile=await Driver.findOne({userId:driver._id}).lean();return new Date(profile.lastLocationUpdate).getTime();},{timeout:30000}).toBeGreaterThanOrEqual(sampleAt);
     const result=await r.json('/api/rides',{pickup:{lat:30.0444,lng:31.2357,address:'QA offer lifecycle'},dropoff:{lat:30.05,lng:31.24,address:'QA lifecycle destination'},vehicleType:'economy'});rideId=result.ride.id;
     await expect(pages.driver.getByRole('button',{name:'Accept',exact:true})).toBeVisible({timeout:30000}).catch(async e=>{console.log('OFFER LIFECYCLE DIAGNOSTICS',action,await r.json('/api/rides/'+rideId),await d.json('/api/drivers/me'));throw e;});

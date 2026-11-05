@@ -1,3 +1,4 @@
+import {pickupEvidence,tripEvidence,rejectUnsafe,RideSafetyError} from '@/lib/ride-safety';
 import {currencyDigits} from '@/lib/countries';
 import {bookingArea,courierReadiness} from '@/lib/operating-areas';
 import {isTaxiEnabled} from '@/lib/service-availability';
@@ -80,6 +81,7 @@ export function serializeRide(ride, { driver, driverUser } = {}) {
     id: String(r._id),
     country:r.operations?.country, zones:r.operations?{pickup:r.operations.pickupZone,dropoff:r.operations.dropoffZone}:undefined,
     scheduledAt: r.scheduledAt,
+    safety: r.safety, earlyEnd: r.earlyEnd, endedAt:r.endedAt,
     status: r.status,
     pickup: { address: r.pickup.address, ...coordsToLatLng(r.pickup.location) },
     dropoff: { address: r.dropoff.address, ...coordsToLatLng(r.dropoff.location) },
@@ -188,7 +190,7 @@ export async function createRide({ riderId, pickup, dropoff, vehicleType, schedu
   const pin = String(crypto.randomInt(1000, 10000));
 
   const ride = await Ride.create({
-    operations, riderId,
+    operations, riderId, safety:{policy:settings.dispatch.safety},
     status: 'searching',
     scheduledAt: scheduledDate || undefined,
     dispatch: { manualHold: settings.dispatch.assignmentMode === 'manual' },
@@ -353,12 +355,15 @@ async function transition({ rideId, driverUserId, from, to, extra = {}, note, db
 
 export async function driverArrived({ rideId, driverUserId }) {
   await connectDB();
+  const current=await Ride.findOne({_id:rideId,driverId:driverUserId,status:'accepted'}).lean();
+  if(!current)throw new RideError('Ride is not awaiting pickup arrival',409);
+  const evidence=await pickupEvidence(current);if(!evidence.valid)await rejectUnsafe(current,evidence,'pickup_rejected');
   const ride = await transition({
     rideId,
     driverUserId,
     from: 'accepted',
     to: 'arrived',
-    extra: { 'pickup.arrivedAt': new Date() },
+    extra: { 'pickup.arrivedAt': new Date(), 'safety.arrival':evidence.lastFix,'safety.policy':evidence.policy },
   });
 
   emitToRide(rideId, 'ride:driver-arrived', { rideId: String(ride._id) });
@@ -371,7 +376,7 @@ export async function startRide({ rideId, driverUserId, pin }) {
   await connectDB();
 
   const current = await Ride.findOne({ _id: rideId, driverId: driverUserId })
-    .select('pin status')
+    .select('pin status pickup driverId driverProfileId safety')
     .lean();
   if (!current) throw new RideError('Ride not found', 404);
   if (current.status !== 'arrived') {
@@ -381,12 +386,13 @@ export async function startRide({ rideId, driverUserId, pin }) {
     throw new RideError('Incorrect PIN — ask the rider for their 4-digit code', 400);
   }
 
+  const evidence=await pickupEvidence(current);if(!evidence.valid)await rejectUnsafe(current,evidence,'start_rejected');
   const ride = await transition({
     rideId,
     driverUserId,
     from: 'arrived',
     to: 'in_progress',
-    extra: { startedAt: new Date() },
+    extra: { startedAt: new Date(), 'safety.start':evidence.lastFix,'safety.policy':evidence.policy },
   });
 
   emitToRide(rideId, 'ride:started', {
@@ -404,6 +410,9 @@ export async function completeRide({ rideId, driverUserId }) {
   const { ride, shortfall } = await mongoose.connection.transaction(async dbSession => {
     const current = await Ride.findOne({ _id: rideId, driverId: driverUserId }).session(dbSession).lean();
     if (!current) throw new RideError('Ride not found', 404);
+    if(current.status==='completed')return {ride:current,shortfall:false};
+    if(current.status!=='in_progress')throw new RideError('Trip is not in progress',409);
+    const evidence=await tripEvidence(current,dbSession);if(!evidence.valid)throw new RideSafetyError(evidence.error,evidence);
     const wallets = await User.find({ _id: { $in: [current.riderId, current.driverId] } }).select('wallet egpWallet currencyWallets').session(dbSession).lean();
     if (wallets.length !== 2 || wallets.some(u => !sameCurrency(walletAccount(u, current.fare?.currency)?.currency, current.fare?.currency))) throw new RideError('Settlement requires currency review. Balances are unchanged.', 409);
     const ride = await transition({
@@ -412,7 +421,7 @@ export async function completeRide({ rideId, driverUserId }) {
       from: 'in_progress',
       dbSession,
       to: 'completed',
-      extra: { completedAt: new Date() },
+      extra: { completedAt: new Date(), 'safety.end':evidence.lastFix,'safety.progress':evidence,'route.actualDistanceMeters':evidence.verifiedDistanceMeters },
     });
 
     // Actual trip duration (distance stays the quoted route)
@@ -492,7 +501,7 @@ export async function completeRide({ rideId, driverUserId }) {
     );
 
     return { ride, shortfall };
-  });
+  }).catch(async error=>{if(error instanceof RideSafetyError){const current=await Ride.findOne({_id:rideId,driverId:driverUserId}).lean();if(current)await rejectUnsafe(current,error.evidence,'completion_rejected');}throw error;});
 
   emitToRide(rideId, 'ride:completed', {
     rideId: String(ride._id),

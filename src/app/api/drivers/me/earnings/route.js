@@ -79,7 +79,9 @@ export async function GET(request) {
       { $group: { _id: null, total: { $sum: '$fare.driverEarnings' } } },
     ]);
     const deliveryEarnings=await Delivery.aggregate([{$match:{courierId:driverObjectId,status:'DELIVERED','fare.currency':CURRENCY}},{$group:{_id:null,total:{$sum:'$fare.earnings'},orders:{$sum:1},today:{$sum:{$cond:[{$gte:['$deliveredAt',today]},'$fare.earnings',0]}}}}]);
+    const earlyEnding=await Ride.aggregate([{$match:{driverId:driverObjectId,status:'ended_early','fare.currency':CURRENCY,'earlyEnd.reviewStatus':'resolved'}},{$group:{_id:null,total:{$sum:'$earlyEnd.decision.driverEarnings'},trips:{$sum:1},today:{$sum:{$cond:[{$gte:['$earlyEnd.decision.at',today]},'$earlyEnd.decision.driverEarnings',0]}}}}]);
     return Response.json({
+      earlyEnding:earlyEnding[0]||{total:0,trips:0,today:0},
       delivery:deliveryEarnings[0]||{total:0,orders:0,today:0},
       currency: CURRENCY,
       financialScope: CURRENCY+' only; historical currencies remain in trip history',

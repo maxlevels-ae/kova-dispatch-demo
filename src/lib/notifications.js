@@ -17,10 +17,14 @@ const eventMap = {
   arrived: "driver_arrived",
   in_progress: "trip_started",
   completed: "trip_completed",
+  ended_early: "trip_ended_early",
+  early_end_reviewed:"early_end_reviewed",
+  early_end_confirmed:"early_end_response",
+  early_end_disputed:"early_end_response",
   cancelled: "trip_cancelled",
   no_drivers: "operational_alert",
 };
-const operationalText={driver_accepted:'Your driver accepted the booking',driver_arrived:'Your driver has arrived at pickup',trip_started:'Your trip has started',trip_completed:'Your trip is complete',trip_cancelled:'The trip was cancelled',operational_alert:'No driver is currently available',driver_cancelled:'Your driver cancelled. Looking for another driver.'};
+const operationalText={early_end_reviewed:'The early-trip fare review is complete. View the recorded decision.',early_end_response:'A response to the early trip ending has been recorded.',trip_ended_early:'Your trip ended early. Review the reason and proposed fare.',driver_accepted:'Your driver accepted the booking',driver_arrived:'Your driver has arrived at pickup',trip_started:'Your trip has started',trip_completed:'Your trip is complete',trip_cancelled:'The trip was cancelled',operational_alert:'No driver is currently available',driver_cancelled:'Your driver cancelled. Looking for another driver.'};
 export async function notifyRideParticipants(ride){
  try{await syncNotifications(ride.riderId);if(ride.driverId)await syncNotifications(ride.driverId);}catch{await recordOperationalError('notifications','RIDE_RECONCILE_FAILED');}
 }

@@ -49,6 +49,7 @@ async function flushLocations() {
               coordinates: [lng, lat],
             },
             lastLocationUpdate: new Date(ts),
+            locationAccuracy: data.accuracy && Number.isFinite(Number(data.accuracy)) ? Number(data.accuracy) : null,
             ...(data.h3 ? { h3Cell: data.h3 } : {}),
           } },
         },

@@ -1,3 +1,4 @@
+import {journeyFixture} from './ride-safety-fixture.mjs';
 import { cityCenter } from '../src/lib/map-config.js';
 import { createRide, cancelRide } from '../src/lib/services/ride-service.js';
 import { getSettings } from '../src/lib/settings.js';
@@ -278,6 +279,7 @@ export async function accountsChecks({
         payment: { method: "wallet", status: "pending" },
         pin: "1234",
       });
+      await journeyFixture(ride._id);
       await completeRide({ rideId: ride._id, driverUserId: driverId });
       const r = await User.findById(riderId),
         d = await User.findById(driverId);

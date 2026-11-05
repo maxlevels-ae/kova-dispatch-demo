@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Circle, MapPin, Car } from 'lucide-react';
 import { RideStatusBadge, Empty, Loading, money } from '@/components/ui/bits';
@@ -55,6 +56,8 @@ export default function DriverTripsPage() {
                 <span className="truncate">{ride.dropoff?.address}</span>
               </div>
             </div>
+            {ride.status==='ended_early'&&<p className="small mt-3">{ride.earlyEnd?.decision?'Reviewed earnings: '+money(ride.earlyEnd.decision.driverEarnings,ride.fare?.currency):'Early ending awaiting review'}</p>}
+            <Link className="small" href={'/driver/trips/'+ride._id}>View trip details</Link>
             {ride.status === 'completed' && (
               <div className="flex items-center justify-between mt-3" style={{ borderTop: '1px solid var(--ink-100)', paddingTop: 10 }}>
                 <span className="tiny muted">You earned</span>

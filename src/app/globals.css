@@ -1063,3 +1063,15 @@ textarea.input { padding: 12px 16px; resize: vertical; min-height: 80px; }
 .delivery-booking-map>.delivery-route-preview:empty{display:none}
 
 @media(max-width:900px){.delivery-booking-map:has(.delivery-route-preview [role="alert"]){height:460px}}
+
+.early-end-panel {min-width:0;overflow-wrap:anywhere;}
+.early-end-panel .input {max-width:100%;}
+.early-end-panel .btn {white-space:normal;max-width:100%;}
+
+.trip-investigation {min-width:0;overflow-wrap:anywhere;}
+.trip-investigation pre {white-space:pre-wrap;overflow-wrap:anywhere;}
+
+.delivery-booking-grid > * {min-width:0;}
+.delivery-booking .btn {max-width:100%;white-space:normal;}
+.delivery-booking .delivery-summary {overflow-wrap:anywhere;}
+@media(max-width:900px){.delivery-booking-grid{grid-template-columns:minmax(0,1fr);}}
