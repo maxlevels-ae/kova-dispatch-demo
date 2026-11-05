@@ -1,5 +1,6 @@
 import {pickupFixture,journeyFixture} from './ride-safety-fixture.mjs';
 import assert from 'node:assert/strict';
+import {mkdirSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import sharp from 'sharp';
@@ -7,6 +8,7 @@ import {chromium,expect as baseExpect} from '@playwright/test';
 const expect=baseExpect.configure({timeout:30000});
 import {demoLogin} from './demo-ride-flow.mjs';
 export async function notificationChecks({base,request,cookies,User,Driver,Ride,password,check}){
+ mkdirSync('docs/qa/mx036',{recursive:true});
  const suffix=Date.now();const hash=await bcrypt.hash(password,10);
  const rider=await User.create({name:'Notification QA Rider',username:'notify_r_'+suffix,email:`notify_r_${suffix}@example.test`,passwordHash:hash,role:'rider',wallet:{balance:2000,currency:'EGP'}});
  const driver=await User.create({name:'Notification QA Driver',username:'notify_d_'+suffix,email:`notify_d_${suffix}@example.test`,passwordHash:hash,role:'driver',wallet:{balance:0,currency:'EGP'}});
@@ -26,18 +28,12 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await c.addInitScript(()=>{window.qaAudio=[];window.qaPlayed=[];const NativeAudio=window.Audio;window.Audio=new Proxy(NativeAudio,{construct(target,args){const audio=new target(...args);audio.addEventListener('timeupdate',()=>{if(audio.currentTime>0)window.qaPlayed.push({src:audio.src,time:audio.currentTime,volume:audio.volume});});window.qaAudio.push(audio);return audio;}});});
    const page=await c.newPage();pages[role]=page;page.on('pageerror',e=>jsErrors.push(e.message));
    await page.goto(base+(role==='driver'?'/driver/dashboard':'/dashboard'),{waitUntil:'domcontentloaded'});
-   const summary=page.getByLabel('Notifications',{exact:true});await expect(summary).toBeVisible({timeout:30000});await summary.click();
+   if(role==='rider'){await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByRole('button',{name:/^Notifications(?: \(\d+\))?$/}).click();}const summary=page.getByLabel('Notifications',{exact:true}).filter({has:page.locator('svg')});if(role==='driver'){await expect(summary).toBeVisible({timeout:30000});await summary.click();}
    await page.getByRole('button',{name:'Enable notifications',exact:true}).click();
-   if(role==='driver'){
-   await page.getByRole('button',{name:'Test sound',exact:true}).click();
-   await expect.poll(()=>page.evaluate(()=>qaPlayed.some(a=>a.src.includes('all-notify.mp3')&&a.time>0&&a.volume>0)),{timeout:10000}).toBe(true).catch(async e=>{console.log('AUDIO DIAGNOSTICS',role,await page.evaluate(()=>({played:qaPlayed,players:qaAudio.map(a=>({src:a.src,time:a.currentTime,paused:a.paused,volume:a.volume,ready:a.readyState,error:a.error?.message}))})),await page.locator('.notification-panel').innerText());throw e;});
-   }else{
-    await expect(page.getByRole('button',{name:'Test sound',exact:true})).toHaveCount(0);
-    await expect(page.getByRole('button',{name:'Test Incoming Booking Sound',exact:true})).toHaveCount(0);
-   }
-   await expect(page.getByText(/VAPID is not configured/).first()).toBeVisible();await page.getByRole('button',{name:'Close notifications',exact:true}).click();
+   await expect(page.getByRole('button',{name:/^Enable Sound$|^Test sound$|^Test Incoming Booking Sound$/})).toHaveCount(0);
+   await expect(page.getByText(/VAPID is not configured/).first()).toBeVisible();if(role==='driver')await page.getByRole('button',{name:'Close notifications',exact:true}).click();else await page.getByRole('dialog',{name:'Notifications',exact:true}).getByRole('button',{name:'Close',exact:true}).click();
   }
-  await check('real Chromium sound playback, granted notification permission, and explicit disabled push status',async()=>{
+  await check('granted Chromium notification permission and explicit disabled push status',async()=>{
    assert.equal(await pages.driver.evaluate(async()=>(await navigator.permissions.query({name:'notifications'})).state),'granted');
    assert.equal((await d.json('/api/notifications/push')).enabled,false);
   });
@@ -49,7 +45,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    const result=await d.json(url,{image:'data:image/png;base64,'+bytes.toString('base64')});assert.ok(result.imageUrl.startsWith('/api/vehicle-photos/'));
    const photo=await d.request(result.imageUrl);assert.equal(photo.status,200);assert.equal((await sharp(Buffer.from(await photo.arrayBuffer())).metadata()).format,'webp');
   });
-  await pages.driver.setViewportSize({width:390,height:844});await pages.driver.getByRole('region',{name:'Incoming sound'}).getByRole('button',{name:'Enable Sound',exact:true}).click();await expect(pages.driver.getByRole('region',{name:'Incoming sound'}).getByText('Sound Ready',{exact:true})).toBeVisible();await pages.driver.screenshot({path:'docs/qa/incoming-sound-mobile.png',fullPage:true});await pages.driver.setViewportSize({width:1280,height:900});await pages.driver.getByRole('button',{name:'Go online',exact:true}).click();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible();
+  await pages.driver.setViewportSize({width:390,height:844});await expect(pages.driver.getByRole('region',{name:'Incoming sound'})).toHaveCount(0);await pages.driver.screenshot({path:'docs/qa/incoming-sound-mobile.png',fullPage:true});await pages.driver.setViewportSize({width:1280,height:900});await pages.driver.getByRole('button',{name:'Go online',exact:true}).click();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible();
   // Wait for the actual socket GPS sample to enter dispatch's index.
   await new Promise(resolve=>setTimeout(resolve,1500));
   const booked=await r.json('/api/rides',{pickup:{lat:30.0444,lng:31.2357,address:'QA notification pickup'},dropoff:{lat:30.05,lng:31.24,address:'QA notification destination'},vehicleType:'economy'});rideId=booked.ride.id;
@@ -70,6 +66,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await expect(pages.driver.getByText('Head to pickup',{exact:true})).toBeVisible({timeout:15000}).catch(async e=>{console.log('ACCEPT DIAGNOSTIC',await pages.driver.locator('body').innerText());console.log('RIDE STATUS',(await r.json('/api/rides/'+rideId)).ride.status);throw e;});
   });
   await pages.rider.bringToFront();await pages.rider.reload();await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RIDER DIAGNOSTIC',await pages.rider.locator('body').innerText(),jsErrors);console.log('ACTIVE RIDE',JSON.stringify(await r.json('/api/rides/active')));await pages.rider.screenshot({path:'.cache/notification-rider-failure.png'});throw e;});
+  await pages.rider.setViewportSize({width:390,height:844});await expect(pages.rider.locator('.map-frame')).toHaveAttribute('data-map-state','ready',{timeout:60000});await expect(pages.rider.locator('.toast')).toHaveCount(0);await pages.rider.screenshot({path:'docs/qa/mx036/arriving-390x844.png',animations:'disabled'});
   await check('acceptance inbox, vehicle details, arrival, bidirectional chat and duplicate protection',async()=>{
    await expect(pages.rider.getByRole('region',{name:'Assigned vehicle'})).toContainText('QA-NOTIFY');
    assert.ok((await r.json('/api/notifications')).notifications.some(n=>n.event==='driver_accepted'&&n.rideId===rideId));
@@ -79,7 +76,7 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await d.json(`/api/rides/${rideId}/messages`,{text:'I can see you. Welcome!',clientId:randomUUID()});
    for(const session of [r,d]){const inbox=await session.json('/api/notifications');assert.equal(inbox.notifications.filter(n=>n.rideId===rideId&&n.event==='ride_message').length,1);}
    const before=await r.json('/api/notifications');await r.json('/api/notifications');assert.equal((await r.json('/api/notifications')).notifications.length,before.notifications.length);
-   await pages.rider.getByRole('button',{name:/^Chat/}).click();await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('I can see you. Welcome!',{timeout:30000});
+   await pages.rider.getByRole('button',{name:'Message',exact:true}).click();await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('I can see you. Welcome!',{timeout:30000});
    await pages.rider.screenshot({path:'docs/qa/ride-notification-chat.png',fullPage:true});
   });
   await check('reconnection resynchronizes messages and status without duplicate entries',async()=>{
@@ -87,7 +84,9 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    await expect(pages.rider.getByRole('dialog',{name:'Chat'})).toContainText('Reconnect message',{timeout:30000});
    await expect(pages.rider.getByRole('dialog',{name:'Chat'}).getByText('Reconnect message',{exact:false})).toHaveCount(1);
   });
-  await pickupFixture(rideId);const active=await r.json(`/api/rides/${rideId}`);await d.json(`/api/rides/${rideId}/start`,{pin:active.ride.pin});await contexts.driver.setOffline(true);await journeyFixture(rideId);await d.json(`/api/rides/${rideId}/complete`,{});await contexts.driver.setOffline(false);
+  await pages.rider.getByRole('button',{name:'Close chat',exact:true}).click();
+  await pickupFixture(rideId);const active=await r.json(`/api/rides/${rideId}`);await d.json(`/api/rides/${rideId}/start`,{pin:active.ride.pin});await expect(pages.rider.locator('[data-rider-view=drive]')).toBeVisible();await expect(pages.rider.locator('.toast')).toHaveCount(0);await pages.rider.screenshot({path:'docs/qa/mx036/trip-390x844.png',animations:'disabled'});await pages.rider.getByRole('button',{name:'SOS',exact:true}).click();await pages.rider.screenshot({path:'docs/qa/mx036/sos-390x844.png',animations:'disabled'});await pages.rider.getByRole('button',{name:"I'm safe, close",exact:true}).click();await contexts.driver.setOffline(true);await journeyFixture(rideId);await d.json(`/api/rides/${rideId}/complete`,{});await contexts.driver.setOffline(false);
+  await expect(pages.rider.locator('[data-rider-view=rate]')).toBeVisible();await expect(pages.rider.locator('.toast')).toHaveCount(0);await pages.rider.screenshot({path:'docs/qa/mx036/rate-390x844.png',animations:'disabled'});await pages.rider.getByRole('button',{name:'Rating 5',exact:true}).click();await pages.rider.getByRole('button',{name:'Done',exact:true}).click();await expect(pages.rider.locator('[data-rider-view=home]')).toBeVisible();assert.equal((await Ride.findById(rideId).lean()).rating.byRider,5);
   await check('complete trip investigation is admin-only, audited and contains recorded events, messages, vehicle and settlement',async()=>{
    assert.equal((await r.request('/api/admin/rides/'+rideId)).status,403);assert.equal((await d.request('/api/admin/rides/'+rideId)).status,403);assert.equal((await request('/api/admin/rides/'+rideId)).status,401);
    const response=await request('/api/admin/rides/'+rideId,cookies.admin);assert.equal(response.status,200);const data=await response.json();assert.equal(data.ride.status,'completed');assert.equal(data.driver.vehicle.plate,'QA-NOTIFY');assert.equal(data.ride.messages.length,3);assert.ok(data.events.some(e=>e.event==='offer_sent'));assert.ok(data.ledger.length>=2);assert.ok(!JSON.stringify(data).includes('password'));assert.equal(data.ride.pin,undefined);
@@ -99,12 +98,12 @@ export async function notificationChecks({base,request,cookies,User,Driver,Ride,
    assert.equal((await r.request('/api/notifications',{method:'PUT',headers:{'content-type':'application/json',origin:'https://evil.test'},body:JSON.stringify({muted:true})})).status,403);
    const response=await r.request('/api/notifications',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({muted:true})});assert.equal(response.status,200);assert.equal((await r.json('/api/notifications')).preferences.muted,true);
    const denied=await browser.newContext();await denied.addCookies(r.cookies().split('; ').map(pair=>({name:pair.split('=')[0],value:pair.slice(pair.indexOf('=')+1),url:base})));
-   const page=await denied.newPage();const cdp=await denied.newCDPSession(page);const {targetInfo}=await cdp.send('Target.getTargetInfo');await cdp.send('Browser.setPermission',{permission:{name:'notifications'},setting:'denied',origin:base,browserContextId:targetInfo.browserContextId});await page.goto(base+'/dashboard');await page.getByLabel('Notifications',{exact:true}).click();await expect(page.getByText(/Browser notifications are blocked/)).toBeVisible();await denied.close();
+   const page=await denied.newPage();const cdp=await denied.newCDPSession(page);const {targetInfo}=await cdp.send('Target.getTargetInfo');await cdp.send('Browser.setPermission',{permission:{name:'notifications'},setting:'denied',origin:base,browserContextId:targetInfo.browserContextId});await page.goto(base+'/dashboard');await page.getByRole('button',{name:'Account',exact:true}).click();await page.getByRole('button',{name:/^Notifications(?: \(\d+\))?$/}).click();await expect(page.getByText(/Browser notifications are blocked/)).toBeVisible();await denied.close();
   });
   await check('decline, expiry and rider cancellation stop the offer ring and expired offers cannot be accepted',async()=>{
    await pages.driver.bringToFront();
    const reloadAt=Date.now();await pages.driver.reload();await expect(pages.driver.getByRole('button',{name:'Go offline',exact:true})).toBeVisible({timeout:30000}).catch(async e=>{console.log('RELOAD DIAGNOSTICS',await pages.driver.locator('body').innerText(),await d.json('/api/drivers/me'));throw e;});
-   await pages.driver.getByLabel('Notifications',{exact:true}).click();await pages.driver.getByRole('button',{name:'Enable notifications',exact:true}).click();await expect(pages.driver.locator('.notification-panel').getByText(/Sound Ready/)).toBeVisible();await pages.driver.getByRole('button',{name:'Close notifications',exact:true}).click();
+   await pages.driver.getByLabel('Notifications',{exact:true}).click();await pages.driver.getByRole('button',{name:'Enable notifications',exact:true}).click();await expect(pages.driver.getByRole('button',{name:/^Enable Sound$|^Test sound$/})).toHaveCount(0);await pages.driver.getByRole('button',{name:'Close notifications',exact:true}).click();
    await expect.poll(async()=>new Date((await Driver.findOne({userId:driver._id}).lean()).lastLocationUpdate).getTime(),{timeout:40000}).toBeGreaterThanOrEqual(reloadAt);
    for(const action of ['decline','expire','cancel']){
     // Refresh the disposable browser's stationary GPS fixture. Chromium's

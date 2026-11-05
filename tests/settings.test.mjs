@@ -230,3 +230,16 @@ test("map catalogue validates dependent cities, backward-compatible defaults and
         true,
       );
 });
+
+import {emptyRiderContent,riderContentSchema,visibleRiderContent,contentImages} from '../src/lib/rider-content-policy.js';
+test('rider content validates bilingual published items and forbids arbitrary image URLs',()=>{
+ const draft=emptyRiderContent();assert.ok(riderContentSchema.safeParse(draft).success);
+ const hero={id:'00000000-0000-4000-8000-000000000001',active:true,archived:false,image:'/api/rider-content/media/123456789012345678901234',headlineEn:'Ride',headlineAr:'رحلة',subtitleEn:'',subtitleAr:'',action:'ride'};
+ assert.ok(riderContentSchema.safeParse({...draft,heroes:[hero]}).success);
+ for(const patch of [{image:'https://evil.test/track'},{headlineAr:''},{action:'javascript:alert(1)'}])assert.equal(riderContentSchema.safeParse({...draft,heroes:[{...hero,...patch}]}).success,false);
+ assert.equal(riderContentSchema.safeParse({...draft,heroes:[hero,hero]}).success,false);
+});
+test('customer content excludes archived/inactive items and deduplicates media references',()=>{
+ const value={...emptyRiderContent(),loginImage:'/api/rider-content/media/123456789012345678901234',heroes:[{active:true,archived:false,image:'/api/rider-content/media/123456789012345678901234'},{active:false,archived:false},{active:true,archived:true}]};
+ assert.equal(visibleRiderContent(value).heroes.length,1);assert.equal(contentImages(value).length,1);
+});

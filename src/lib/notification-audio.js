@@ -1,5 +1,5 @@
 // Fixed-source players: unlocking the incoming asset must not swap sources later.
-let incoming, message, activeKey=null, desired=null, timer, generation=0;
+let incoming, message, activeKey=null, desired=null, timer, generation=0, unlockInFlight=null;
 let status={ready:false,blocked:false,error:''};
 const listeners=new Set();
 export function audioStatus(){return status;}
@@ -17,6 +17,9 @@ export function stopAlert(key){
 }
 function expires(offer,expiresAt){return offer&&(!Number.isFinite(Date.parse(expiresAt))||Date.parse(expiresAt)<=Date.now());}
 export async function playAlert({key='preview',offer=false,expiresAt}={}){
+ // A message received during a cold Go Online click must not pause the real
+ // incoming player before its first permitted play() promise resolves.
+ if(!offer&&unlockInFlight)await unlockInFlight.catch(()=>{});
  if(!players()||expires(offer,expiresAt))return false;
  if(activeKey===key&&!(offer?incoming:message).paused)return true;
  if(desired?.offer&&(!offer||key==='preview'&&desired.key!=='preview'))return true;
@@ -25,7 +28,7 @@ export async function playAlert({key='preview',offer=false,expiresAt}={}){
  if(offer)timer=setTimeout(()=>stopAlert(key),Date.parse(expiresAt)-Date.now());
  player.onended=()=>{if(!player.loop&&generation===version){activeKey=null;desired=null;}};
  try{await player.play();if(generation!==version){if(activeKey===null)player.pause();return false;}if(offer)report({ready:true,blocked:false,error:''});return true;}
- catch(error){if(generation!==version)return false;player.pause();if(offer)report({ready:false,blocked:true,error:error.name==='NotAllowedError'?'Sound is blocked. Tap Enable Sound and check your browser or device sound settings.':'Incoming sound could not play. Check your connection and device audio settings.'});return false;}
+ catch(error){if(generation!==version)return false;player.pause();if(offer)report({ready:false,blocked:true,error:error.name==='NotAllowedError'?'Sound is blocked. Tap Retry ride alerts and check your browser or device sound settings.':'Incoming sound could not play. Check your connection and device audio settings.'});return false;}
 }
 export async function unlockAudio(){
  if(!players())return false;
@@ -33,6 +36,8 @@ export async function unlockAudio(){
  stopAlert();const version=generation;incoming.loop=false;
  // Called synchronously from the click handler, with audible volume and the
  // exact incoming asset. A muted play is not treated as an audio unlock.
- try{const attempt=incoming.play();await attempt;if(version===generation){incoming.pause();incoming.currentTime=0;}report({ready:true,blocked:false,error:''});return true;}
- catch(error){report({ready:false,blocked:true,error:error.name==='NotAllowedError'?'Sound is blocked. Tap Enable Sound and check your browser or device sound settings.':'Incoming sound could not play. Check your connection and device audio settings.'});return false;}
+ let attempt;
+ try{attempt=incoming.play();unlockInFlight=attempt;await attempt;if(version===generation){incoming.pause();incoming.currentTime=0;}report({ready:true,blocked:false,error:''});return true;}
+ catch(error){report({ready:false,blocked:true,error:error.name==='NotAllowedError'?'Sound is blocked. Tap Retry ride alerts and check your browser or device sound settings.':'Incoming sound could not play. Check your connection and device audio settings.'});return false;}
+ finally{if(unlockInFlight===attempt)unlockInFlight=null;}
 }

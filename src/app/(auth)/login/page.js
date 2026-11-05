@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signIn, getSession } from 'next-auth/react';
@@ -16,6 +16,8 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [background,setBackground]=useState('');
+  useEffect(()=>{let active=true;fetch('/api/rider-content/login',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(active&&/^\/api\/rider-content\/media\/[a-f0-9]{24}$/.test(d.image))setBackground(d.image);}).catch(()=>{});return()=>{active=false;};},[]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,7 +48,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="auth-page">
+    <div className="auth-page" style={background?{backgroundImage:`linear-gradient(#0003,#0003),url("${background}")`,backgroundSize:'cover',backgroundPosition:'center'}:undefined}>
       <div className="auth-card animate-in">
         <div className="flex justify-center mb-6">
           <Link href="/" aria-label="Maxride home">

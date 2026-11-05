@@ -1,19 +1,20 @@
 'use client';
 import {t as tr,customerLocale} from '@/lib/i18n';
 import {useI18n} from '@/context/LanguageProvider';
-import {useRef,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import Link from 'next/link';
 import {Bell,X} from 'lucide-react';
 import {useNotifications} from '@/context/NotificationProvider';
 import NotificationControls from './NotificationControls';
 import {safeNotificationLink} from '@/lib/notification-policy';
-export default function NotificationInbox(){
+export default function NotificationInbox({initiallyOpen=false,prototype=false}){
   useI18n();
  const n=useNotifications(),ref=useRef(null);const [error,setError]=useState('');
+ useEffect(()=>{if(initiallyOpen&&ref.current)ref.current.open=true;},[initiallyOpen]);
  if(!n)return null;
  const close=()=>{ref.current.open=false;ref.current.querySelector('summary').focus();};
  return <details ref={ref} className="notification-inbox" onKeyDown={e=>{if(e.key==='Escape')close();}}>
-  <summary className="btn btn-ghost notification-trigger" aria-label={tr("Notifications")} onClick={()=>n.refresh()}><Bell size={18}/><span>{tr("Notifications")}</span>{n.unread>0&&<span className="badge badge-neutral" aria-label={tr("Unread notifications")}>{tr(n.unread)}</span>}</summary>
+  <summary className="btn btn-ghost notification-trigger" aria-label={tr("Notifications")} onClick={()=>n.refresh()}>{prototype?<img src="/rider-assets/icons/bell.svg" width="24" height="24" alt=""/>:<Bell size={18}/>}<span>{tr("Notifications")}</span>{n.unread>0&&<span className="badge badge-neutral" aria-label={tr("Unread notifications")}>{tr(n.unread)}</span>}</summary>
   <div className="notification-panel card" role="region" aria-label={tr("Notification inbox")}>
    <div className="flex justify-between items-center mb-3"><strong>{tr("Notifications")}</strong><button className="btn btn-ghost btn-icon" aria-label={tr("Close notifications")} onClick={close}><X size={16}/></button></div>
    <NotificationControls/>

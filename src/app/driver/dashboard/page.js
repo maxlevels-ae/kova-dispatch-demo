@@ -164,11 +164,7 @@ export default function DriverDashboard() {
       </div>
 
       <div className="ride-panel">
-        <section className="card card-pad mb-3" aria-label="Incoming sound">
-          <strong role="status">{notifications?.soundStatus.ready?'Sound Ready':notifications?.soundStatus.blocked?'Sound Blocked':'Enable incoming sound'}</strong>
-          <div className="flex gap-2 mt-2" style={{flexWrap:'wrap'}}><button className="btn btn-secondary btn-sm" onClick={()=>notifications.enableSound().catch(e=>toast(e.message,'error'))}>Enable Sound</button><button className="btn btn-secondary btn-sm" onClick={()=>notifications.testSound(true).catch(e=>toast(e.message,'error'))}>Test Incoming Booking Sound</button></div>
-          <p className="tiny muted mt-2">{notifications?.soundStatus.error||'Enable sound on this device. Browser autoplay, silent mode and background limits still apply.'}</p>
-        </section>
+        {online&&notifications?.soundStatus.blocked&&<div role="status" className="card card-pad mb-3"><p className="small">{notifications.soundStatus.error}</p><button className="btn btn-secondary btn-sm" onClick={()=>notifications.enableSound().catch(e=>toast(e.message,'error'))}>Retry ride alerts</button></div>}
         {/* ── Online toggle / status card ── */}
         {!ride && (
           <div className="card card-pad animate-in">

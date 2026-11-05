@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     ".cache/**",
+    "design/reference/**",
+    "Maxride client redesign mobile app prototype/**",
     "playwright-report/**",
     "test-results/**",
     "out/**",

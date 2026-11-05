@@ -1,0 +1,9 @@
+{
+  "source": "design/reference/prototype/Maxride App.dc.html",
+  "sha256": "aeb9c6f9b00f02146dc26435a06be106a22366a66640ac9c3af61f67f50f0736",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "note": "Unmodified prototype reference. Fake status bar/bezel, map imagery, account/marketing/financial data are excluded from production parity comparisons."
+}

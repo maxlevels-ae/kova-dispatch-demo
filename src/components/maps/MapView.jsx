@@ -24,6 +24,12 @@ function el(className, html) {
   return div;
 }
 
+function prototypeMarker(name){
+ const allowed=['pickup_pin','dropoff_pin','economy_top','comfort_top','premium_top','xl_top'];
+ const div=el('reference-map-marker'),img=document.createElement('img');
+ img.src='/rider-assets/m/'+(allowed.includes(name)?name:'economy_top')+'.svg';img.alt='';img.style.cssText='display:block;width:36px;height:44px;object-fit:contain';div.appendChild(img);return div;
+}
+
 const CAR_SVG =
   '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>';
 
@@ -34,6 +40,8 @@ const SQUARE_SVG =
   '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
 
 export default function MapView({
+  prototypeMarkers = false,
+  vehicleType = 'economy',
   publicMap = false,
   center: requestedCenter,
   zoom: requestedZoom,
@@ -49,6 +57,7 @@ export default function MapView({
   driverPosition,
   userPosition,
   fit = false,
+  fitBottom = 80,
   onClick,
   className = "",
   style,
@@ -235,11 +244,11 @@ export default function MapView({
   }
 
   useEffect(() => {
-    syncMarker("pickup", pickup, () => el("marker-pin pickup", PIN_SVG));
+    syncMarker("pickup", pickup, () => prototypeMarkers ? prototypeMarker('pickup_pin') : el("marker-pin pickup", PIN_SVG));
   }, [pickup?.lat, pickup?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    syncMarker("dropoff", dropoff, () => el("marker-pin dropoff", SQUARE_SVG));
+    syncMarker("dropoff", dropoff, () => prototypeMarkers ? prototypeMarker('dropoff_pin') : el("marker-pin dropoff", SQUARE_SVG));
   }, [dropoff?.lat, dropoff?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -266,7 +275,7 @@ export default function MapView({
     const target = [driverPosition.lng, driverPosition.lat];
 
     if (!markers.driver) {
-      markers.driver = new Marker({ element: el("marker-driver", CAR_SVG) })
+      markers.driver = new Marker({ element: prototypeMarkers ? prototypeMarker(vehicleType+'_top') : el("marker-driver", CAR_SVG) })
         .setLngLat(target)
         .addTo(map);
       return;
@@ -301,7 +310,7 @@ export default function MapView({
       const target = [d.location.lng, d.location.lat];
       let marker = dots.get(d.id);
       if (!marker) {
-        const element = el("marker-driver", CAR_SVG);
+        const element = prototypeMarkers ? prototypeMarker((d.vehicle?.type||d.vehicleType||'economy')+'_top') : el("marker-driver", CAR_SVG);
         element.setAttribute("role", "button");
         element.tabIndex = 0;
         marker = new Marker({ element }).setLngLat(target).addTo(map);
@@ -413,14 +422,14 @@ export default function MapView({
       new LngLatBounds(points[0], points[0]),
     );
     map.fitBounds(bounds, {
-      padding: { top: 80, bottom: 80, left: 60, right: 60 },
+      padding: { top: 80, bottom: fitBottom, left: prototypeMarkers ? 40 : 60, right: prototypeMarkers ? 40 : 60 },
       duration: 700,
       maxZoom: 16,
     });
     // driverPosition is intentionally not a dep — refitting on every GPS
     // ping would make the camera jitter. It's included in bounds whenever
     // a route/endpoint change triggers a refit.
-  }, [fit, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fit, fitBottom, pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng, routeGeometry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Recenter when no fit target ──
   useEffect(() => {

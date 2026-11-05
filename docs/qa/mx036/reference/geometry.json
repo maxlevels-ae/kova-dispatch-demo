@@ -1,0 +1,29 @@
+{
+  "where": {
+    "x": 20,
+    "y": 158,
+    "width": 350,
+    "height": 71,
+    "fontSize": "20px",
+    "borderRadius": "18px",
+    "background": "rgb(255, 255, 255)"
+  },
+  "car": {
+    "x": 20,
+    "y": 343,
+    "width": 169,
+    "height": 157.765625,
+    "fontSize": "13.3333px",
+    "borderRadius": "20px",
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  "delivery": {
+    "x": 201,
+    "y": 343,
+    "width": 169,
+    "height": 157.765625,
+    "fontSize": "13.3333px",
+    "borderRadius": "20px",
+    "background": "rgba(0, 0, 0, 0)"
+  }
+}

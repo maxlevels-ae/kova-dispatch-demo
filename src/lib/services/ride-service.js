@@ -104,6 +104,7 @@ export function serializeRide(ride, { driver, driverUser } = {}) {
           profileId: String(driver._id),
           name: driverUser?.name || '',
           avatar: driverUser?.avatar || '',
+          phone: ['accepted','arrived','in_progress'].includes(r.status) ? driverUser?.phone || '' : '',
           rating: driver.stats?.averageRating ?? 5,
           totalTrips: driver.stats?.totalTrips ?? 0,
           vehicle: r.assignedVehicle?.plate ? r.assignedVehicle : driver.vehicle,

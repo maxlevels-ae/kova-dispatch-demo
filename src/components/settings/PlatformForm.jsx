@@ -4,7 +4,7 @@ import {
   SettingsSaveConfirmation,
 } from "./SettingsFeedback";
 import MapsFields from "./MapsFields";
-import NotificationControls from '@/components/NotificationControls';
+
 import { useRef, useState } from "react";
 import { categories, events, schemas } from "@/lib/settings-schema";
 import {
@@ -337,7 +337,7 @@ export default function PlatformForm({
             <SettingsToggle label="Driver new booking sound" checked={value.driverSound} onChange={v=>change('driverSound',v)} disabled={busy}/>
             <SettingsToggle label="Rider trip sound" checked={value.riderSound} onChange={v=>change('riderSound',v)} disabled={busy}/>
             <SettingsToggle label="Message sounds" checked={value.messageSound} onChange={v=>change('messageSound',v)} disabled={busy}/>
-            <NotificationControls/>
+
           </SettingsSection>
           <SettingsSection
             title="Delivery channels"

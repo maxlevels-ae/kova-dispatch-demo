@@ -327,7 +327,7 @@ export async function mapBrowserChecks({
       );
       const p = await c.newPage();
       await p.goto(base + path);
-      await headerInbox(p, role);
+      if(role==='rider'){await p.goto(base+'/rides',{waitUntil:'domcontentloaded'});await headerInbox(p,role);await p.goto(base+path,{waitUntil:'domcontentloaded'});}else await headerInbox(p,role);
       await expect(p.locator(".map-frame")).toHaveAttribute(
         "data-map-state",
         "ready",
@@ -354,7 +354,7 @@ export async function mapBrowserChecks({
 }
 
 async function headerInbox(page, role) {
-  const trigger=page.locator('.app-header').getByLabel('Notifications',{exact:true});
+  const trigger=page.locator(role==='rider'?'.reference-subpage>header':'.app-header').getByLabel('Notifications',{exact:true});
   await expect(trigger).toBeVisible({timeout:30000});
   await expect(page.locator('.notification-inbox')).toHaveCount(1);
   await trigger.focus();

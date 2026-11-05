@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/pricing', label: 'Pricing', icon: DollarSign },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/content/rider-home', label: 'Rider content', icon: LayoutDashboard },
   { href: '/admin/support', label: 'Support', icon: Inbox },
 ];
 

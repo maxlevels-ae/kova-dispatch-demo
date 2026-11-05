@@ -1,0 +1,48 @@
+
+.rider-app{--accent:#111;--gold-600:#111;--gold-700:#111;--ink-950:#111;--bg:#faf8f5;background:#e9e6e0;color:#111;min-height:100dvh;font-family:var(--font-sans),'DM Sans',Tahoma,Arial,sans-serif;line-height:normal}
+.rider-reference{position:relative;width:100%;height:100dvh;min-height:600px;background:#faf8f5;color:#111;overflow:hidden;isolation:isolate;font-family:var(--font-sans),'DM Sans',Tahoma,Arial,sans-serif;line-height:normal}
+.rider-reference *{box-sizing:content-box}.rider-reference button,.rider-reference input,.rider-reference textarea,.rider-reference select,.rider-reference .reference-map *{box-sizing:border-box}
+.rider-reference button,.rider-reference input,.rider-reference textarea,.rider-reference select{font-family:inherit;letter-spacing:normal;line-height:normal;color:inherit}
+.rider-reference button{cursor:pointer;min-height:0;touch-action:manipulation}
+.rider-reference button:disabled{cursor:not-allowed;opacity:.45}
+.rider-reference button:focus-visible,.rider-reference a:focus-visible{outline:2px solid #111;outline-offset:3px}
+.rider-reference img{max-width:100%}
+.rider-reference [data-prototype-state="isOptions"],.rider-reference [data-prototype-state="isDrive"]{max-height:80dvh;overflow:auto}
+.rider-reference [data-prototype-state="isSearch"]{overflow:auto;padding-bottom:30px!important}
+.rider-reference .reference-avatar{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.reference-map{position:absolute;inset:0;z-index:0}.reference-map .map-frame{height:100%;min-height:100%;border:0;border-radius:0}
+.rider-reference .reference-search .place-search{width:100%}.rider-reference .reference-search .input-wrap{border:0;border-radius:0;background:transparent;box-shadow:none}
+.rider-reference .reference-search input{padding:0;border:0;min-height:20px;background:none;font-size:16px;outline:0;box-shadow:none;width:100%}
+.rider-reference .reference-search .input-wrap>svg{display:none}
+.reference-error{position:absolute;inset-inline:20px;top:12px;z-index:15;padding:10px 12px;border-radius:12px;background:#f3e1c9;font-size:13px;display:flex;align-items:center;gap:8px;box-shadow:0 2px 10px #0001}
+.reference-error button{margin-inline-start:auto;background:none;border:0;padding:4px}
+.reference-modal{position:absolute;inset:0;background:#0006;z-index:20;display:flex;align-items:flex-end}
+.reference-modal-content{box-sizing:border-box;width:100%;max-height:88%;overflow:auto;background:#faf8f5;border-radius:28px 28px 0 0;padding:18px 20px 30px}
+.reference-modal-content h2{font-size:20px;font-weight:700}.reference-modal-content p{font-size:14px;color:#777;margin:10px 0}
+.reference-modal-content .input{border-radius:10px;background:#fff;border:1px solid #d6d1c8}
+.reference-primary{width:100%;height:56px;border:0;border-radius:14px;background:#111;color:#fff!important;font-size:17px;font-weight:700;margin-top:16px}
+.reference-back{border:0;background:transparent;padding:6px;display:inline-flex;align-items:center;gap:14px;font-size:22px;font-weight:700}
+.reference-back img{width:24px}.reference-nav{position:fixed;inset-inline:14px;bottom:16px;height:70px;background:#fff;border-radius:24px;box-shadow:0 4px 20px #3c28141f;display:flex;justify-content:space-around;align-items:center;z-index:25}
+.reference-nav a{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:500;color:#777;text-decoration:none}.reference-nav img{width:24px}.reference-nav a[aria-current=page]{font-weight:700;color:#111}
+.reference-subpage{max-width:900px;margin:auto;padding:32px 20px 110px;min-height:100dvh;background:#faf8f5}.reference-subpage>header{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.rider-app .btn-primary{background:#111;color:white;border-color:#111;box-shadow:none}.rider-app .card{border-color:#ece8e1;border-radius:18px}.rider-app .delivery-shell{padding:0}.rider-app .page-header{margin-top:20px}
+.rider-app .notification-panel{max-height:70dvh;overflow:auto}.rider-app .notification-inbox .notification-trigger{border-radius:50%;padding:8px}
+.rider-app .notification-inbox .notification-trigger>span:not(.badge){display:none}
+.rider-app .reference-modal .notification-inbox .notification-panel{position:relative;inset:auto;width:100%;box-shadow:none;border:0;padding:0}.rider-app .reference-modal .notification-inbox>summary{display:none}
+.reference-aux{margin-top:18px;border-top:1px solid #ece8e1;padding-top:14px}.reference-aux button{border:0;background:#ece8e1;border-radius:14px;padding:12px 16px;font-weight:700}
+.reference-figure{width:390px;height:844px;max-width:100%;position:relative;overflow:hidden}.reference-figure .rider-reference{height:844px;min-height:844px}
+@media(min-width:600px){.rider-reference{max-width:480px;margin-inline:auto}.reference-nav{max-width:452px;margin-inline:auto}.rider-app:has(.rider-reference){background:#e9e6e0}}
+@media(max-width:370px){.rider-reference [data-prototype-state="isOptions"] button>img{width:78px!important}.rider-reference [data-prototype-state="isDrive"] [role=region]{max-width:100%}}
+@media(prefers-reduced-motion:reduce){.rider-reference *{transition:none!important;animation:none!important}}
+
+.reference-plan-tools{position:absolute;top:245px;inset-inline:20px;display:flex;gap:8px;flex-wrap:wrap;font-size:13px}.reference-plan-tools button{border:0;border-radius:20px;padding:8px 12px;background:#ece8e1}.reference-plan-tools p{width:100%}.reference-route-summary{position:absolute;top:122px;inset-inline:20px;background:#faf8f5;padding:8px 12px;border-radius:12px;font-size:12px}.reference-place-estimate{position:absolute;bottom:100px;inset-inline:20px;background:#faf8f5;font-size:12px;padding:6px 0}
+
+.rider-reference>[data-prototype-state="isMap"],.rider-reference>[data-prototype-state="isOptions"]{position:absolute;inset:0;z-index:1;max-height:none;overflow:visible;pointer-events:none}.rider-reference>[data-prototype-state="isMap"]>*,.rider-reference>[data-prototype-state="isOptions"]>*,.rider-reference>[data-prototype-state="isDrive"]>*{pointer-events:auto}
+
+[dir=rtl] .rider-app img[src$="/back.svg"],[dir=rtl] .rider-app img[src$="/forward.svg"]{transform:scaleX(-1)}
+
+.rider-reference>[data-prototype-state="isDrive"]{z-index:1;max-height:calc(100dvh - 120px);overflow:auto}.reference-map .maplibregl-ctrl-bottom-right,.reference-map .maplibregl-ctrl-bottom-left{bottom:var(--rider-sheet-height,0px)}
+
+.reference-modal-content *{box-sizing:border-box}
+
+.rider-content-editor .flex{flex-wrap:wrap}.rider-content-editor .field,.rider-content-editor section,.rider-content-editor fieldset{min-width:0}.rider-content-editor .input{min-width:0;max-width:100%}.rider-content-editor .flex>select{flex:1 1 120px;width:auto}.rider-content-editor .settings-savebar{flex-wrap:wrap}

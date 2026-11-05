@@ -12,3 +12,9 @@ Dockerfile
 !.env.example
 npm-debug.log*
 *.tsbuildinfo
+
+.cache
+design
+Maxride client redesign mobile app prototype
+tests
+docs

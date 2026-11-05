@@ -1,0 +1,59 @@
+{
+  "metrics": {
+    "search": {
+      "pixels": 24850,
+      "differentPixelsAbove24": 78,
+      "percentage": 0.31388329979879276,
+      "meanChannelDifference": 0.6168879946344735
+    },
+    "rideTile": {
+      "pixels": 26533,
+      "differentPixelsAbove24": 208,
+      "percentage": 0.7839294463498285,
+      "meanChannelDifference": 2.2299275116521566
+    },
+    "navigation": {
+      "pixels": 25340,
+      "differentPixelsAbove24": 350,
+      "percentage": 1.3812154696132597,
+      "meanChannelDifference": 1.2749539594843462
+    }
+  },
+  "geometry": {
+    "where": {
+      "x": 20,
+      "y": 158,
+      "width": 350,
+      "height": 71,
+      "fontSize": "20px",
+      "borderRadius": "18px",
+      "background": "rgb(255, 255, 255)"
+    },
+    "car": {
+      "x": 20,
+      "y": 343,
+      "width": 169,
+      "height": 157.765625,
+      "fontSize": "16px",
+      "borderRadius": "20px",
+      "background": "rgba(0, 0, 0, 0)"
+    },
+    "delivery": {
+      "x": 201,
+      "y": 343,
+      "width": 169,
+      "height": 157.765625,
+      "fontSize": "16px",
+      "borderRadius": "20px",
+      "background": "rgba(0, 0, 0, 0)"
+    }
+  },
+  "exclusions": [
+    "Prototype-only phone bezel and fake status bar",
+    "Actual account, country and published CMS content",
+    "Real MapLibre tiles, routing, positions and vehicle data",
+    "Wallet-only payments; unverified prototype Visa/COD options deliberately unavailable",
+    "Backend-backed states, timestamps, PIN and fares"
+  ],
+  "scope": "Pixel thresholds cover invariant Home regions. All other original states have reference and actual screenshots for visual inspection; no whole-application 100% pixel-parity claim."
+}
