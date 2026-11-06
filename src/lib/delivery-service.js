@@ -91,9 +91,9 @@ export async function quoteDelivery(input,user){
  if(b.recipient.username&&(!registeredRecipient||mobileContact(registeredRecipient.phone,registeredRecipient.phoneCountry).phone!==b.recipient.phone))fail('Registered recipient account and phone do not match.',400);
  const route=await getRoute(b.pickup,b.dropoff);
  if(b.vehicleType&&!s.eligibility.vehicles.includes(b.vehicleType))fail('This vehicle category is not enabled for Delivery',400);
- const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)}}}}]):[];
+ const nearby=s.eligibility.available?await Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[b.pickup.lng,b.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'vehicle.type':{$in:s.eligibility.vehicles}}}}]):[];
  const accounts=await User.find({_id:{$in:nearby.map(d=>d.userId)}}).select('isActive wallet egpWallet currencyWallets').lean(),byId=new Map(accounts.map(u=>[String(u._id),u]));
- const eligible=nearby.filter(driver=>courierReadiness(driver,byId.get(String(driver.userId)),{snapshot:operations,policy:s,pickup:b.pickup,currency:s.currency}).eligible);
+ const eligible=nearby.filter(driver=>byId.get(String(driver.userId))?.isActive);
  const vehicles=await Promise.all(s.eligibility.vehicles.map(async type=>{const candidates=eligible.filter(d=>d.vehicle.type===type),driver=candidates[0],pickupRoute=driver?await getRoute({lat:driver.location.coordinates[1],lng:driver.location.coordinates[0]},b.pickup):null;return {type,quote:deliveryPrice(s,route,b.package.size,0,type),available:candidates.length>0,availableCount:candidates.length,pickupETA:pickupRoute?Math.max(1,Math.ceil(pickupRoute.durationSeconds/60)):null,pickupEstimateSource:pickupRoute?.source||null,deliveryMinutes:Math.ceil(route.durationSeconds/60),packageLimits:bounds};}));
  const selected=vehicles.find(v=>v.type===b.vehicleType)||vehicles[0];if(!selected)fail('No supported delivery vehicle category is configured');
  const selectedQuote=b.vehicleType?selected.quote:deliveryPrice(s,route,b.package.size);if(b.vehicleType){s.eligibility={...s.eligibility,vehicles:[b.vehicleType]};s.pricing={...s.pricing,vehicleSurcharge:selectedQuote.vehicle};}
@@ -175,9 +175,8 @@ export async function transitionDelivery(id,user,to,note=''){
 export async function acceptDelivery(id,user){
  await connectDB();const result=await mongoose.connection.transaction(async session=>{
   const order=await Delivery.findOne({_id:id,status:'SEARCHING_COURIER','offer.courierId':user.id,'offer.expiresAt':{$gt:new Date()}}).session(session);if(!order)fail('Delivery offer expired or is unavailable');
-  const driver=await Driver.findOneAndUpdate({userId:user.id,isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:order.policy.eligibility.vehicles},...(order.policy.eligibility.requireLicense?{'license.verified':true}:{})},{$set:{currentDeliveryId:id}},{session,returnDocument:'after'});
+  const driver=await Driver.findOneAndUpdate({userId:user.id,isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'vehicle.type':{$in:order.policy.eligibility.vehicles}},{$set:{currentDeliveryId:id}},{session,returnDocument:'after'});
   if(!driver)fail('Courier is unavailable or already assigned');
-  const account=await User.findById(user.id).select('wallet egpWallet currencyWallets isActive').session(session);const check=courierReadiness({...driver.toObject(),currentDeliveryId:null},account,{snapshot:order.operations,policy:order.policy,pickup:order.pickup,currency:order.quote.currency});if(!check.eligible)fail(check.reasons.map(r=>r.message).join('; '));
   order.status='COURIER_ASSIGNED';order.courierId=user.id;order.driverProfileId=driver._id;order.vehicle=driver.vehicle.toObject();order.offer=undefined;order.timeline.push({status:order.status,event:'courier_accepted',actorId:user.id,role:user.role});await order.save({session});return order;
  });await notifySafely(result,result.status,result.timeline.at(-1)._id);return result;
 }
