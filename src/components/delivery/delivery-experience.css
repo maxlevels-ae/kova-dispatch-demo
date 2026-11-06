@@ -91,3 +91,8 @@
 .delivery-finding-cancel{width:100%;height:52px;border:0;border-radius:14px;background:#ece8e1;color:#111;font-size:16px;font-weight:700}
 .delivery-finding-link{display:block;text-align:center;margin-top:12px;color:#555;font-size:14px;font-weight:600;text-decoration:underline}
 @media(prefers-reduced-motion:reduce){.delivery-finding-bar>i{animation:none;width:100%}}
+.delivery-finding-primary,.delivery-finding-cancel{display:flex;align-items:center;justify-content:center;text-decoration:none;margin-bottom:10px}
+.delivery-finding-primary{width:100%;height:52px;border-radius:14px;background:#111;color:#fff;font-size:16px;font-weight:700}
+.delivery-record-sheet .card{border-radius:18px;box-shadow:none;border:1px solid #ece8e1}
+.delivery-record-sheet .card h2{font-size:16px;margin-bottom:8px}
+.delivery-record-sheet .card p{margin-block:4px}
