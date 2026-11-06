@@ -76,3 +76,10 @@
 .delivery-record-sheet .btn-primary{background:#111;color:#fff}
 .delivery-record-sheet .delivery-code{font-size:30px;letter-spacing:6px}
 @media(min-width:768px){.delivery-record-sheet{inset:0 auto 0 50%;transform:translateX(-50%);width:480px}}
+
+.delivery-cancel-link{display:block;width:100%;margin-top:10px;border:0;background:#ece8e1;border-radius:16px;min-height:48px;font:inherit;font-weight:700;font-size:15px;color:#b3261e}
+.delivery-cancel-modal{position:absolute;inset:0;z-index:30;background:#0006;display:flex;align-items:flex-end}
+.delivery-cancel-modal>form{width:100%;background:#faf8f5;border-radius:28px 28px 0 0;padding:12px 20px 28px}
+.delivery-cancel-modal h2{font-size:20px;margin-bottom:8px}
+.delivery-cancel-reason{display:flex;gap:10px;align-items:center;padding:12px 2px;border-bottom:1px solid #ece8e1;font-size:15px}
+.delivery-cancel-modal .btn{flex:1;min-height:48px;border-radius:16px}

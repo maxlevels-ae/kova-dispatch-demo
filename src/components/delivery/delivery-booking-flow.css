@@ -26,3 +26,17 @@
 @media(prefers-reduced-motion:no-preference){.delivery-flow-sheet{animation:delivery-sheet-in .18s ease-out}@keyframes delivery-sheet-in{from{transform:translateY(16px);opacity:.6}to{transform:translateY(0);opacity:1}}}
 .delivery-flow-actions{position:sticky;bottom:-28px;background:#faf8f5;padding-block:12px 28px;margin-bottom:-28px;z-index:1}
 .delivery-flow-actions .reference-primary:disabled{opacity:.45;cursor:not-allowed}
+
+/* Vehicle screen mirrors the Taxi "Choose a ride" surface: list, payment row, single primary action. */
+.delivery-dest{font-weight:400;color:#777;font-size:14px}
+.delivery-vehicle-option .delivery-limit{display:inline;margin-inline-start:8px;font-weight:500;font-size:12px}
+.delivery-vehicle-option.unavailable{opacity:.55}
+.delivery-pay-row{display:flex;align-items:center;gap:10px;margin:8px 2px 12px;font-size:14px;font-weight:500}.delivery-pay-row img{width:22px}
+.delivery-pay-row button{margin-inline-start:auto;border:0;background:#ece8e1;border-radius:16px;padding:6px 14px;font:inherit;font-size:13px;font-weight:700}
+.delivery-pay-modal{position:absolute;inset:0;z-index:20;background:#0006;display:flex;align-items:flex-end}
+.delivery-pay-modal>div{width:100%;background:#faf8f5;border-radius:28px 28px 0 0;padding:18px 20px 30px}
+.delivery-pay-option{width:100%;display:flex;align-items:center;gap:14px;background:none;border:0;border-bottom:1px solid #ece8e1;padding:14px 2px;text-align:start;font:inherit;font-size:16px;font-weight:500}
+.delivery-pay-option>span:nth-child(2){flex:1}.delivery-pay-icon{width:38px;height:38px;border-radius:50%;background:#ece8e1;display:flex;align-items:center;justify-content:center}.delivery-pay-icon img{width:19px}
+.delivery-pay-option i{width:22px;height:22px;border-radius:50%;border:2px solid #111}.delivery-pay-option i.on{background:#111;box-shadow:inset 0 0 0 4px #faf8f5}
+.delivery-pay-modal .reference-primary{margin-top:14px;width:100%}
+.delivery-booking-v2.stage-2 .delivery-flow-sheet{max-height:75%}
