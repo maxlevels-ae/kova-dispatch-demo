@@ -10,7 +10,8 @@ import useRiderRide from '@/hooks/useRiderRide';
 import useGeolocation from '@/hooks/useGeolocation';
 import useServiceAvailability from '@/hooks/useServiceAvailability';
 import {useMapSettings} from '@/components/maps/useMapSettings';
-import MapView from '@/components/maps/MapView';
+import dynamic from 'next/dynamic';
+const MapView=dynamic(()=>import('@/components/maps/MapView'),{ssr:false});
 import PlaceSearch from '@/components/maps/PlaceSearch';
 import ChatSheet from '@/components/ride/ChatSheet';
 import NotificationInbox from '@/components/NotificationInbox';
@@ -39,13 +40,13 @@ export default function RiderExperience(){
  const refreshProfile=useCallback(async()=>{const [p,w]=await Promise.all([json('/api/users/me'),json('/api/wallet')]);setProfile(p.user);setWallet(w.wallet);},[]);
  useEffect(()=>{refreshProfile().catch(e=>setError(e.message));},[refreshProfile,country]);
  useEffect(()=>{const next=params.get('view')||'home';setScreen(supportedViews.includes(next)?next:'home');setPlace(params.get('place'));},[params]);
- useEffect(()=>{let live=true;const load=()=>json('/api/rider-content').then(d=>{if(live)setContent(d);}).catch(e=>{if(live)setError(e.message);});load();const timer=setInterval(load,30000);window.addEventListener('focus',load);window.addEventListener('maxride:content-saved',load);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',load);window.removeEventListener('maxride:content-saved',load);};},[country]);
+ useEffect(()=>{let live=true;const load=()=>json('/api/rider-content').then(d=>{if(live)setContent(d);}).catch(e=>{if(live)setError(e.message);});load();const timer=setInterval(()=>{if(!document.hidden)load();},60000);window.addEventListener('focus',load);window.addEventListener('maxride:content-saved',load);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',load);window.removeEventListener('maxride:content-saved',load);};},[country]);
  useEffect(()=>{if(ride?.id)setJourneyVisible(true);},[ride?.id]);
  const home=content?.country===country?content.content:null;
  useEffect(()=>{setHero(0);setEstimate(null);},[country]);
  useEffect(()=>{if(screen!=='home'||!home?.heroes.length)return;const timer=setInterval(()=>setHero(i=>(i+1)%home.heroes.length),4000);return()=>clearInterval(timer);},[screen,home]);
  useEffect(()=>{if(!geo)return;let live=true;(async()=>{const available=await json(`/api/services?lat=${geo.lat}&lng=${geo.lng}`);if(!live)return;setGeoAllowed(!available.outsideArea);if(available.outsideArea||pickup)return;const d=await json(`/api/geo/search?reverse=1&lat=${geo.lat}&lng=${geo.lng}`);if(live){const p={lat:geo.lat,lng:geo.lng,address:d.results?.[0]?.address||t('Current location')};setPickup(p);setPickupText(p.address);}})().catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[geo?.lat,geo?.lng]); // eslint-disable-line react-hooks/exhaustive-deps
- useEffect(()=>{const origin=pickup||(geoAllowed&&Number.isFinite(geo?.lat)?geo:null);if(phase!=='idle'||!origin){setNearby([]);return;}let live=true;const load=()=>json(`/api/drivers/nearby?lat=${origin.lat}&lng=${origin.lng}`).then(d=>{if(live){setNearby(d.drivers||[]);setNearbyKey(origin.lat+','+origin.lng);}}).catch(()=>{});load();const timer=setInterval(load,10000);return()=>{live=false;clearInterval(timer);};},[phase,pickup?.lat,pickup?.lng,geoAllowed,geo?.lat,geo?.lng]);
+ useEffect(()=>{const origin=pickup||(geoAllowed&&Number.isFinite(geo?.lat)?geo:null);if(phase!=='idle'||!origin){setNearby([]);return;}let live=true;const load=()=>json(`/api/drivers/nearby?lat=${origin.lat}&lng=${origin.lng}`).then(d=>{if(live){setNearby(d.drivers||[]);setNearbyKey(origin.lat+','+origin.lng);}}).catch(()=>{});load();const timer=setInterval(()=>{if(!document.hidden)load();},10000);return()=>{live=false;clearInterval(timer);};},[phase,pickup?.lat,pickup?.lng,geoAllowed,geo?.lat,geo?.lng]);
  useEffect(()=>{setEstimate(null);if(!pickup||!dropoff)return;let live=true;setQuoting(true);json('/api/rides/estimate',{pickup:{lat:pickup.lat,lng:pickup.lng},dropoff:{lat:dropoff.lat,lng:dropoff.lng}}).then(d=>{if(live){setEstimate(d);setVehicle(current=>d.estimates[current]?current:Object.keys(d.estimates)[0]);setError('');}}).catch(e=>{if(live)setError(e.message);}).finally(()=>{if(live)setQuoting(false);});return()=>{live=false;};},[pickup?.lat,pickup?.lng,dropoff?.lat,dropoff?.lng,country]);
  useEffect(()=>{setPlaceRoute(null);setPlaceError('');const destination=home?.destinations.find(d=>d.id===place);if(!pickup||!destination)return;let live=true;json('/api/rides/estimate',{pickup:{lat:pickup.lat,lng:pickup.lng},dropoff:{lat:destination.lat,lng:destination.lng}}).then(d=>{if(live)setPlaceRoute(d.route);}).catch(e=>{if(live)setPlaceError(e.message);});return()=>{live=false;};},[place,pickup?.lat,pickup?.lng,home]);
  async function run(fn){if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message||'Request failed');}finally{lock.current=false;setBusy(false);}}

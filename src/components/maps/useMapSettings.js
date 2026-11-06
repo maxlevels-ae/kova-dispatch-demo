@@ -25,7 +25,7 @@ export function useMapSettings(enabled=true) {
     const visible = () => {
       if (document.visibilityState === "visible") load();
     };
-    const timer=setInterval(load,15000);
+    const timer=setInterval(()=>{if(document.visibilityState==='visible')load();},60000);
     window.addEventListener("storage",load);
     window.addEventListener("focus",load);
     window.addEventListener("maxride:maps-saved", load);
