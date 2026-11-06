@@ -58,3 +58,21 @@
 @media(min-width:768px){.delivery-booking-grid>form,.delivery-live-sheet{inset:auto 0 0;max-width:none;width:100%;max-height:60%}}
 
 .delivery-customer-tracking .maplibregl-ctrl-bottom-right,.delivery-customer-tracking .maplibregl-ctrl-bottom-left{bottom:var(--delivery-sheet-height,45%)}
+
+/* Customer details open as a Taxi-style full-height sheet over the live map instead of an unstyled page below it. */
+.delivery-record-sheet{position:fixed;inset:0;z-index:60;overflow:auto;background:#faf8f5;padding:0 16px 40px;max-width:480px;margin-inline:auto;overscroll-behavior:contain}
+.delivery-record-sheet .delivery-sheet-top{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:12px;padding:16px 0 12px;background:#faf8f5;font-size:17px}
+.delivery-record-sheet .delivery-back{box-shadow:0 2px 10px #0002}
+.delivery-record-sheet header{margin-block:8px 16px!important}
+.delivery-record-sheet header h1{font-size:22px}
+.delivery-record-sheet .delivery-detail-grid{display:flex!important;flex-direction:column;gap:14px}
+.delivery-record-sheet .delivery-detail-grid>*,.delivery-record-sheet aside{display:flex;flex-direction:column;gap:14px;min-width:0}
+.delivery-record-sheet .card{border:1px solid #e5e0d8;box-shadow:none;margin:0!important}
+.delivery-record-sheet .card h2{font-size:17px;margin-bottom:8px}
+.delivery-record-sheet .card p{overflow-wrap:anywhere}
+.delivery-record-sheet form.flex{align-items:stretch}
+.delivery-record-sheet form.flex .input{flex:1;min-width:0}
+.delivery-record-sheet .btn{white-space:nowrap;min-height:44px;border-radius:16px}
+.delivery-record-sheet .btn-primary{background:#111;color:#fff}
+.delivery-record-sheet .delivery-code{font-size:30px;letter-spacing:6px}
+@media(min-width:768px){.delivery-record-sheet{inset:0 auto 0 50%;transform:translateX(-50%);width:480px}}

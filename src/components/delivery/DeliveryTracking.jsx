@@ -6,7 +6,7 @@ import {t,customerLocale} from '@/lib/i18n';
 import {terminalDeliveryStates} from '@/lib/delivery-policy';
 import './delivery-experience.css';
 export default function DeliveryTracking({order,onDetails}){
- const sheet=useRef(null),[sheetHeight,setSheetHeight]=useState(360);useEffect(()=>{if(!sheet.current)return;const observer=new ResizeObserver(()=>setSheetHeight(Math.ceil(sheet.current.getBoundingClientRect().height)));observer.observe(sheet.current);return()=>observer.disconnect();},[]);
+ const sheet=useRef(null),[sheetHeight,setSheetHeight]=useState(360);useEffect(()=>{if(!sheet.current)return;const observer=new ResizeObserver(()=>{if(sheet.current)setSheetHeight(Math.ceil(sheet.current.getBoundingClientRect().height));});observer.observe(sheet.current);return()=>observer.disconnect();},[]);
  const [tracking,setTracking]=useState(null),[now,setNow]=useState(()=>Date.now()),[error,setError]=useState('');
  useEffect(()=>{let alive=true;const load=async()=>{try{const r=await fetch('/api/deliveries/'+order._id+'/tracking',{cache:'no-store'}),d=await r.json();if(!r.ok)throw Error(d.error);if(alive){setTracking({...d,courierId:order.courierId,status:order.status});setError('');}}catch{if(alive)setError('Location temporarily unavailable');}};load();const timer=setInterval(load,15000),clock=setInterval(()=>setNow(Date.now()),5000);return()=>{alive=false;clearInterval(timer);clearInterval(clock);};},[order._id,order.status,order.courierId]);
  const closed=terminalDeliveryStates.includes(order.status),last=order.courier?.lastLocationAt;
