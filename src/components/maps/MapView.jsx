@@ -325,9 +325,18 @@ export default function MapView({
         cancelAnimationFrame(driverAnimations.current.get(d.id));
         const from = marker.getLngLat();
         const start = performance.now();
+        const dy = target[1] - from.lat, dx = (target[0] - from.lng) * Math.cos((from.lat * Math.PI) / 180);
+        if (Math.hypot(dx, dy) * 111320 > 3) {
+          const img = marker.getElement().querySelector("img");
+          if (img) {
+            img.style.transition = "transform 600ms ease";
+            img.style.transform = "rotate(" + Math.round((Math.atan2(dx, dy) * 180) / Math.PI) + "deg)";
+          }
+        }
+        const span = prototypeMarkers ? 9000 : 800;
         const step = (now) => {
-          const t = Math.min(1, (now - start) / 800);
-          const eased = 1 - (1 - t) ** 3;
+          const t = Math.min(1, (now - start) / span);
+          const eased = prototypeMarkers ? t : 1 - (1 - t) ** 3;
           marker.setLngLat([
             from.lng + (target[0] - from.lng) * eased,
             from.lat + (target[1] - from.lat) * eased,
