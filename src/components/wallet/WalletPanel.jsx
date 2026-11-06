@@ -28,7 +28,7 @@ const TXN_LABEL = {
 };
 
 export default function WalletPanel() {
-  useI18n();
+  const {country}=useI18n();
   const toast = useToast();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,7 +45,7 @@ export default function WalletPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/wallet');
+      const res = await fetch('/api/wallet',{cache:'no-store'});
       if (res.ok) {
         const data = await res.json();
         setWallet(data.wallet);
@@ -60,7 +60,7 @@ export default function WalletPanel() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load();const timer=setInterval(load,30000);window.addEventListener('focus',load);return()=>{clearInterval(timer);window.removeEventListener('focus',load);}; }, [load,country]);
 
   // Returning from Stripe Checkout — verify & credit (idempotent with webhook)
   useEffect(() => {
@@ -136,7 +136,7 @@ export default function WalletPanel() {
         if (!res.ok) {
           toast(data.error || 'Top-up failed', 'error');
         } else {
-          toast(`${money(value)} added to your wallet`, 'success');
+          toast(`${money(value,wallet?.currency)} added to your wallet`, 'success');
           setTopupOpen(false);
           load();
         }
@@ -179,7 +179,8 @@ export default function WalletPanel() {
           <Wallet size={36} style={{ opacity: 0.35 }} />
         </div>
 
-        {accounts.filter(a=>a.currency!==wallet?.currency).map((a,i)=><p key={i} className="card" style={{padding:16}}>{tr("Historical balance:")}{' '}{tr(money(a.balance,a.currency??null))}{' '}{tr(". Kept separately from EGP ride funds.")}</p>)}
+        {wallet&&<p className="small mt-2">{tr('Operating currency')}: <bdi>{wallet.currency}</bdi></p>}
+        {accounts.filter(a=>a.currency!==wallet?.currency).map((a,i)=><p key={i} className="card" style={{padding:16,color:'var(--text)'}}>{tr("Historical balance:")}{' '}<bdi>{money(a.balance,a.currency??null)}</bdi>{' '}{tr('Kept separately. No currency conversion.')}</p>)}
       {owes && (
           <p className="small mt-3" style={{ color: '#fca5a5' }}>{tr("You owe")}{' '}{tr(money(Math.abs(wallet.balance), wallet.currency ?? null))}{' '}{tr("— top up to book rides again.")}</p>
         )}
@@ -240,7 +241,7 @@ export default function WalletPanel() {
                 style={{ padding: '10px 0', justifyContent: 'center' }}
                 onClick={() => setAmount(String(a))}
               >
-                <span className="small" style={{ fontWeight: 700 }}>{tr(money(a))}</span>
+                <span className="small" style={{ fontWeight: 700 }}>{tr(money(a,wallet?.currency))}</span>
               </button>
             ))}
           </div>
@@ -266,9 +267,9 @@ export default function WalletPanel() {
             {processing ? (
               <span className="spinner" />
             ) : stripeEnabled ? (
-              <><CreditCard size={17} />{tr("Pay")}{' '}{tr(money(parseFloat(amount) || 0))}{' '}{tr("by card")}</>
+              <><CreditCard size={17} />{tr("Pay")}{' '}{tr(money(parseFloat(amount) || 0,wallet?.currency))}{' '}{tr("by card")}</>
             ) : (
-              `Add ${money(parseFloat(amount) || 0)}`
+              `Add ${money(parseFloat(amount) || 0,wallet?.currency)}`
             )}
           </button>
         </div>

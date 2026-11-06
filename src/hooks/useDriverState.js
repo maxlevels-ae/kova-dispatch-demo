@@ -106,12 +106,16 @@ export default function useDriverState({ onEvent } = {}) {
         }
       };
     const options={enableHighAccuracy:true,maximumAge:2000,timeout:12000};
-    watchIdRef.current=navigator.geolocation.watchPosition(onPosition,()=>{},options);
+    const onFailure=()=>notify('gps-unavailable');
+    watchIdRef.current=navigator.geolocation.watchPosition(onPosition,onFailure,options);
+    const refreshGPS=()=>{if(!document.hidden)navigator.geolocation.getCurrentPosition(onPosition,onFailure,{...options,maximumAge:0});};
+    refreshGPS();window.addEventListener('focus',refreshGPS);document.addEventListener('visibilitychange',refreshGPS);
     // A stationary online driver still needs a fresh, permission-backed fix.
-    const heartbeat=setInterval(()=>navigator.geolocation.getCurrentPosition(onPosition,()=>{},options),15000);
+    const heartbeat=setInterval(refreshGPS,15000);
 
     return () => {
       clearInterval(heartbeat);
+      window.removeEventListener('focus',refreshGPS);document.removeEventListener('visibilitychange',refreshGPS);
       if (watchIdRef.current != null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
         watchIdRef.current = null;

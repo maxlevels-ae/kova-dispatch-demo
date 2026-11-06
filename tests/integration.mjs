@@ -203,7 +203,7 @@ try {
         assert.equal((await request(dashboard, cookies[role])).status, 200);
       },
     );
-  if (!process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
+  if (!process.argv.includes('--experience-only') && !process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes("--maps-only") && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
   await check(
     "custom server health reports MongoDB, Redis and Socket.IO up",
     async () => {
@@ -1245,7 +1245,7 @@ try {
     },
   );
   }
-  if (!process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) await check(
+  if (!process.argv.includes('--experience-only') && !process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes("--accounts-only") && !process.argv.includes("--demo-only") && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) await check(
     "real basemaps, dependent map settings, save feedback and authorized live driver tracking",
     async () => {
       const { mapBrowserChecks } = await import("./maps-browser.mjs");
@@ -1262,11 +1262,11 @@ try {
       });
     },
   );
-  if (!process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
+  if (!process.argv.includes('--experience-only') && !process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes('--maps-only') && !process.argv.includes('--accounts-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
     const {demoWalletChecks}=await import('./demo-wallet-integration.mjs');
     await demoWalletChecks({request,cookies,User,Driver,Ride,Payment,WalletTransaction,password,base,check});
   }
-  if (!process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
+  if (!process.argv.includes('--experience-only') && !process.argv.includes('--smart-only') && !process.argv.includes('--content-only') && !process.argv.includes('--maps-only') && !process.argv.includes('--demo-only') && !process.argv.includes('--delivery-only') && !process.argv.includes('--notifications-only') && !process.argv.includes('--areas-only') && !process.argv.includes('--account-management-only') && !process.argv.includes('--safety-only') && !process.argv.includes('--audio-only') && !process.argv.includes('--contacts-only')) {
     const {notificationChecks}=await import('./ride-notifications.mjs');
     await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});
     const {deliveryChecks}=await import('./delivery-integration.mjs');
@@ -1276,6 +1276,7 @@ try {
     // The password-rotation regression deliberately expires the old session.
     cookies.admin=await login('admin',password+'new');
   }
+  if(process.argv.includes('--experience-only')){const {experienceChecks}=await import('./experience-integration.mjs');await experienceChecks({base,request,cookies,User,Driver,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--smart-only')){const {smartDeliveryChecks}=await import('./smart-delivery-integration.mjs');await smartDeliveryChecks({base,request,cookies,User,Driver,WalletTransaction,password,check,start,stop});}
   if(process.argv.includes('--content-only')){const {contentChecks}=await import('./rider-content-integration.mjs');await contentChecks({base,request,cookies,User,Driver,Ride,password,check,start,stop});}
   if(process.argv.includes('--notifications-only')){const {notificationChecks}=await import('./ride-notifications.mjs');await notificationChecks({base,request,cookies,User,Driver,Ride,password,check});}

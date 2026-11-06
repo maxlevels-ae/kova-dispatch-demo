@@ -1,0 +1,27 @@
+/* Values follow the original Taxi search/options surfaces. */
+.delivery-booking-v2 .delivery-floating-header{inset:20px 20px auto;z-index:6}
+.delivery-booking-v2 .delivery-mode-switch{flex:1;box-shadow:0 2px 10px #0002}
+.delivery-booking-v2 .delivery-mode-switch button{flex:1;font-family:inherit;font-size:13px;font-weight:700;padding:10px 6px}
+.delivery-addresses{position:absolute;inset:88px 20px auto;background:#faf8f5;border-radius:20px;padding:12px 16px;box-shadow:0 4px 20px #0002;z-index:5}
+.delivery-addresses>div:not(.delivery-location-tools){padding-block:7px;border-bottom:1px solid #e4dfd6}
+.delivery-addresses .input-wrap{border:0;background:transparent;box-shadow:none}.delivery-addresses .input{border:0!important;background:transparent!important;padding-inline:0;min-height:30px!important}
+.delivery-location-tools{display:flex;gap:10px;margin-top:10px}.delivery-location-tools button,.delivery-location-tools select{border:0;background:#ece8e1;border-radius:16px;padding:6px 10px;font:inherit;font-size:12px;min-width:0;max-width:60%;min-height:32px!important}
+.delivery-addresses p{margin:6px 0 0}
+.delivery-flow-sheet{position:absolute;inset:auto 0 0;z-index:7;background:#faf8f5;border-radius:28px 28px 0 0;padding:14px 16px 28px;box-shadow:0 -6px 30px #0002;max-height:70%;overflow:auto;overscroll-behavior:contain}
+.delivery-flow-sheet h2{font-size:18px;font-weight:700;margin:0 4px 12px}.delivery-flow-sheet .delivery-sheet-handle{margin-bottom:12px}
+.delivery-flow-sheet .delivery-field{margin-block:8px}.delivery-flow-sheet .delivery-field>span{font-size:12px}.delivery-flow-sheet .input{min-height:40px!important;border-radius:10px!important;font-size:14px}
+.delivery-flow-sheet .delivery-check{display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-block:10px}.delivery-check input{flex-shrink:0;margin-top:2px}
+.delivery-flow-sheet details{font-size:13px;margin-block:12px}.delivery-flow-sheet summary{cursor:pointer;font-weight:600}
+.delivery-compact-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-width:0}.delivery-compact-grid>*{min-width:0}
+.delivery-package-backdrop{position:absolute;inset:0;background:#0006;z-index:6}
+.delivery-sheet-heading{display:flex;justify-content:space-between;align-items:center}.delivery-sheet-heading button{border:0;background:none;padding:8px}.delivery-sheet-heading img{width:18px}
+.delivery-flow-actions{display:flex;gap:10px;align-items:center;margin-top:12px}.delivery-flow-actions .reference-primary{margin:0;flex:1;height:56px;font-size:17px}.delivery-flow-actions .btn-secondary{border:0;border-radius:14px;background:#ece8e1;color:#111}
+.delivery-vehicle-option{width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:2px solid transparent;border-radius:16px;padding:6px 14px 6px 4px;margin-bottom:6px;text-align:start}
+.delivery-vehicle-option[aria-pressed=true]{background:#fff;border-color:#111}.delivery-vehicle-option>img{width:96px;height:72px;object-fit:contain}.delivery-vehicle-option>span{flex:1;min-width:0}.delivery-vehicle-option strong{font-size:17px}.delivery-vehicle-option small{display:block;color:#666;font-size:12px}.delivery-vehicle-option>bdi{font-size:16px;font-weight:700;white-space:nowrap}
+.delivery-confirm-car{display:flex;align-items:center;gap:16px}.delivery-confirm-car img{width:96px;height:72px;object-fit:contain}.delivery-payment-choice img{width:22px}.delivery-payment-choice label{align-items:center}
+.delivery-booking-v2.stage-0 .maplibregl-ctrl-bottom-right,.delivery-booking-v2.stage-0 .maplibregl-ctrl-bottom-left{bottom:160px}
+.delivery-booking-v2:not(.stage-0) .maplibregl-ctrl-bottom-right,.delivery-booking-v2:not(.stage-0) .maplibregl-ctrl-bottom-left{bottom:70%}
+@media(max-width:370px){.delivery-vehicle-option>img{width:78px}.delivery-vehicle-option>bdi{font-size:14px}.delivery-flow-sheet{padding-inline:12px}}
+@media(prefers-reduced-motion:no-preference){.delivery-flow-sheet{animation:delivery-sheet-in .18s ease-out}@keyframes delivery-sheet-in{from{transform:translateY(16px);opacity:.6}to{transform:translateY(0);opacity:1}}}
+.delivery-flow-actions{position:sticky;bottom:-28px;background:#faf8f5;padding-block:12px 28px;margin-bottom:-28px;z-index:1}
+.delivery-flow-actions .reference-primary:disabled{opacity:.45;cursor:not-allowed}

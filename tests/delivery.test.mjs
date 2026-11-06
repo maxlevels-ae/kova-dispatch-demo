@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {deliveryBookingSchema,deliveryDefaults,deliverySettingsSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '../src/lib/delivery-policy.js';
+import {deliverySearchPending,deliveryBookingSchema,deliveryDefaults,deliverySettingsSchema,deliveryPrice,deliveryTransitions,terminalDeliveryStates} from '../src/lib/delivery-policy.js';
 import {translate} from '../src/lib/i18n.js';
 import {safeNotificationLink} from '../src/lib/notification-policy.js';
 test('delivery policies require recipient verification, valid regions and a single shared assignment',()=>{
@@ -54,4 +54,22 @@ test('cash methods require an explicit consistent country policy and never accep
 });
 test('active-country local phone normalization does not mutate account identity',async()=>{
  const {mobileContact}=await import('../src/lib/contact-phone.js');assert.equal(mobileContact('0793088001','JO').phone,'+962793088001');assert.ok(mobileContact('0793088001','EG').error);assert.equal(mobileContact('+971501234567','JO').phoneCountry,'AE');
+});
+
+test('delivery category surcharges are explicit, currency precise and backward compatible',()=>{
+ const s={...structuredClone(deliveryDefaults),currency:'JOD',pricing:{...deliveryDefaults.pricing,base:1,perKm:.123,minimum:0,vehicleSurcharge:.2,comfortSurcharge:1.234}};
+ const route={distanceMeters:1000};
+ assert.equal(deliveryPrice(s,route,'small',0,'economy').vehicle,.2);
+ const comfort=deliveryPrice(s,route,'small',0,'comfort');assert.equal(comfort.total,2.357);assert.equal(comfort.vehicle,1.234);
+ assert.equal(deliveryPrice(s,route,'small').total,1.323);
+ s.pricing.vehicleSurcharge=comfort.vehicle;assert.equal(deliveryPrice(s,route,'small').total,comfort.total);
+ assert.equal(deliverySettingsSchema.safeParse({...deliveryDefaults,pricing:{...deliveryDefaults.pricing,premiumSurcharge:-1}}).success,false);
+});
+
+test('empty delivery searches retry only within the saved offer budget',()=>{
+ const now=Date.now(),order={createdAt:new Date(now),attempts:0,policy:structuredClone(deliveryDefaults)};
+ assert.equal(deliverySearchPending(order,now+1500),true);
+ assert.equal(deliverySearchPending(order,now+order.policy.dispatch.acceptanceSeconds*order.policy.dispatch.maxAttempts*1000),false);
+ order.attempts=order.policy.dispatch.maxAttempts;assert.equal(deliverySearchPending(order,now),false);
+ order.attempts=0;order.policy.eligibility.available=false;assert.equal(deliverySearchPending(order,now),false);
 });

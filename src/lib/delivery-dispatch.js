@@ -1,3 +1,4 @@
+import {deliverySearchPending} from '@/lib/delivery-policy';
 import {courierReadiness} from '@/lib/operating-areas';
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
@@ -18,10 +19,14 @@ export async function dispatchDeliveries(){
    if(order.offer?.id){await Delivery.updateOne({_id:order._id,status:order.status,'offer.id':order.offer.id},{$unset:{offer:1},$push:{timeline:{status:order.status,event:'offer_expired',at:new Date(),actorId:order.offer.courierId,role:'system'}}});}
    if(order.manualHold)continue;
    const s=order.policy;
-   const candidates=s.eligibility.available&&order.attempts<s.dispatch.maxAttempts?Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[order.pickup.lng,order.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{_id:{$nin:order.attempted},isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}}]).cursor({batchSize:100}):[];
+   const candidates=deliverySearchPending(order)?Driver.aggregate([{$geoNear:{near:{type:'Point',coordinates:[order.pickup.lng,order.pickup.lat]},distanceField:'meters',maxDistance:s.dispatch.radiusKm*1000,spherical:true,query:{_id:{$nin:order.attempted},isOnline:true,isApproved:true,currentRideId:null,currentDeliveryId:null,'services.deliveries':true,'vehicle.type':{$in:s.eligibility.vehicles},lastLocationUpdate:{$gt:new Date(Date.now()-90000)},...(s.eligibility.requireLicense?{'license.verified':true}:{})}}}]).cursor({batchSize:100}):[];
    let driver;
    for await(const c of candidates){const u=await User.findById(c.userId).select('isActive wallet egpWallet currencyWallets').lean();if(courierReadiness(c,u,{snapshot:order.operations,policy:s,pickup:order.pickup,currency:order.quote.currency}).eligible){driver=c;break;}}
    if(!driver){
+    if(deliverySearchPending(order)){
+     await Delivery.updateOne({_id:order._id,status:'SEARCHING_COURIER','timeline.event':{$ne:'courier_search_waiting'}},{$push:{timeline:{status:'SEARCHING_COURIER',event:'courier_search_waiting',role:'system',at:new Date(),note:'Waiting for an eligible courier within the saved dispatch search window'}}});
+     continue;
+    }
     const closed=await mongoose.connection.transaction(async session=>{
      const current=await Delivery.findOne({_id:order._id,status:'SEARCHING_COURIER'}).session(session);if(!current)return null;
      if(current.payment?.method!=='cash'){const updated=await User.findByIdAndUpdate(current.customerId,walletDelta(current.quote.total,current.quote.currency),{session,returnDocument:'after',updatePipeline:true});

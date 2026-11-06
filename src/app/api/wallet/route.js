@@ -36,15 +36,18 @@ export async function GET(request) {
         .lean(),
     ]);
 
+    const country=(await activeOperations()).country;
     return Response.json({
-      wallet: walletAccount(user,(await activeOperations()).country.currency) || { balance: 0, currency: null },
+      operatingCountry:country.code,
+      operatingCurrency:country.currency,
+      wallet: walletAccount(user,country.currency) || { balance: 0, currency: country.currency },
       accounts: walletAccounts(user),
       legacyRecord: await demoLegacyRecord(session.user.id),
       transactions,
-      stripeEnabled: isStripeEnabled(),
-      topupEnabled: process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && walletAccount(user)?.currency === CURRENCY,
+      stripeEnabled: country.currency===CURRENCY && isStripeEnabled(),
+      topupEnabled: country.currency===CURRENCY && process.env.DEMO_WALLET_TOPUPS === 'true' && process.env.NODE_ENV !== 'production' && walletAccount(user)?.currency === CURRENCY,
       limitation: PAYMENT_LIMITATION,
-    });
+    },{headers:{'Cache-Control':'private, no-store'}});
   } catch (err) {
     console.error('Wallet error:', err);
     return Response.json({ error: 'Failed to fetch wallet' }, { status: 500 });

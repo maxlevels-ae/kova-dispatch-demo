@@ -2,7 +2,7 @@
 import {t as tr} from '@/lib/i18n';
 import {useI18n} from '@/context/LanguageProvider';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { MapPin, Loader2, SearchX, WifiOff } from 'lucide-react';
 
@@ -30,8 +30,9 @@ export default function PlaceSearch({
   icon: Icon = MapPin,
   bias,
   autoFocus = false,
+  service = 'taxi',
 }) {
-  useI18n();
+  const {language}=useI18n();const listId=useId();const requestRef=useRef(null);const [focused,setFocused]=useState(false);
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -86,7 +87,7 @@ export default function PlaceSearch({
     if (committedValue && value === committedValue) {
       return undefined;
     }
-    if (!value || value.trim().length < 2) {
+    if (!focused || (value && value.trim().length < 2)) {
       setResults([]);
       setOpen(false);
       setOutcome('idle');
@@ -94,13 +95,15 @@ export default function PlaceSearch({
     }
 
     clearTimeout(timerRef.current);
+    const controller=new AbortController();requestRef.current=controller;
     timerRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        let url = `/api/geo/search?q=${encodeURIComponent(value)}`;
+        let url = `/api/geo/search?q=${encodeURIComponent(value||'')}&lang=${language||'en'}`;
         if (bias) url += `&lat=${bias.lat}&lng=${bias.lng}`;
-        const res = await fetch(url);
+        const res = await fetch(url,{signal:controller.signal});
         const data = await res.json().catch(() => ({}));
+        if(controller.signal.aborted)return;
 
         if (!res.ok) {
           setResults([]);
@@ -112,18 +115,20 @@ export default function PlaceSearch({
         setOpen(true);
         setHighlight(-1);
       } catch {
+        if(controller.signal.aborted)return;
         setResults([]);
         setOutcome('error');
         setOpen(true);
       } finally {
-        setLoading(false);
+        if(!controller.signal.aborted)setLoading(false);
       }
-    }, 320);
+    }, 200);
 
-    return () => clearTimeout(timerRef.current);
-  }, [value, bias?.lat, bias?.lng, committedValue]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {clearTimeout(timerRef.current);controller.abort();};
+  }, [value, bias?.lat, bias?.lng, committedValue,focused,language]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function choose(r) {
+    requestRef.current?.abort();clearTimeout(timerRef.current);setLoading(false);
     selectedRef.current = true;
     onSelect(r);
     setOpen(false);
@@ -154,7 +159,7 @@ export default function PlaceSearch({
     <div
       ref={listRef}
       role="listbox"
-      id="place-search-listbox"
+      id={listId}
       className="card"
       style={{
         position: 'fixed',
@@ -173,6 +178,7 @@ export default function PlaceSearch({
         <button
           key={`${r.lat}-${r.lng}-${i}`}
           role="option"
+          type="button"
           aria-selected={i === highlight}
           onClick={() => choose(r)}
           onMouseEnter={() => setHighlight(i)}
@@ -182,7 +188,7 @@ export default function PlaceSearch({
             alignItems: 'flex-start',
             gap: 10,
             padding: '11px 14px',
-            textAlign: 'left',
+            textAlign: 'start',
             background: i === highlight ? 'var(--ink-100)' : 'transparent',
             transition: 'background 120ms',
             borderBottom: '1px solid var(--ink-100)',
@@ -196,6 +202,7 @@ export default function PlaceSearch({
             <span className="tiny muted truncate" style={{ display: 'block' }}>
               {r.address}
             </span>
+            {r.availability?.[service]===false&&<span className="tiny" style={{display:'block'}}>{tr('Service is not available in this area.')}</span>}
           </span>
         </button>
       ))}
@@ -228,14 +235,14 @@ export default function PlaceSearch({
           className="input"
           value={value}
           onChange={(e) => onChangeText(e.target.value)}
-          onFocus={() => (results.length > 0 || outcome !== 'idle') && setOpen(true)}
+          onFocus={() => {setFocused(true);if(results.length>0||outcome!=='idle')setOpen(true);}}
           onKeyDown={onKeyDown}
           placeholder={placeholder}
           autoFocus={autoFocus}
           autoComplete="off"
           role="combobox"
           aria-expanded={Boolean(showDropdown)}
-          aria-controls="place-search-listbox"
+          aria-controls={listId}
           aria-autocomplete="list"
         />
       </div>

@@ -243,3 +243,17 @@ test('customer content excludes archived/inactive items and deduplicates media r
  const value={...emptyRiderContent(),loginImage:'/api/rider-content/media/123456789012345678901234',heroes:[{active:true,archived:false,image:'/api/rider-content/media/123456789012345678901234'},{active:false,archived:false},{active:true,archived:true}]};
  assert.equal(visibleRiderContent(value).heroes.length,1);assert.equal(contentImages(value).length,1);
 });
+
+test('Jordanian landmark catalog contains twelve stable bilingual inactive drafts with source coordinates',async()=>{
+ const {jordanLandmarkDrafts}=await import('../src/lib/jordan-landmarks.js');
+ assert.equal(jordanLandmarkDrafts.length,12);assert.equal(new Set(jordanLandmarkDrafts.map(x=>x.id)).size,12);
+ assert.ok(riderContentSchema.safeParse({...emptyRiderContent(),destinations:jordanLandmarkDrafts}).success);
+ for(const row of jordanLandmarkDrafts){assert.ok(row.nameEn&&row.nameAr&&row.descriptionEn&&row.descriptionAr&&row.regionEn&&row.cityEn);assert.equal(row.active,false);assert.equal(row.image,'');assert.match(row.sourceUrl,/^https:\/\//);assert.ok(row.lat>29&&row.lat<34&&row.lng>34&&row.lng<40);}
+ assert.equal(visibleRiderContent({...emptyRiderContent(),destinations:jordanLandmarkDrafts}).destinations.length,0);
+});
+
+test('place normalization supports Arabic variants, aliases and stable nearby saved-place ranking',async()=>{
+ const {normalizePlaceName,expandedPlaceQuery,matchesPlace,rankPlaces}=await import('../src/lib/place-search.js');
+ assert.equal(normalizePlaceName('الصُّوَيْفِيَّة'),'الصويفيه');assert.equal(expandedPlaceQuery('الصويفية'),'Sweifieh');assert.equal(expandedPlaceQuery('وادي رم'),'Wadi Rum');assert.ok(matchesPlace('Pet','Petra','البتراء'));
+ const rows=rankPlaces([{name:'remote',lat:32,lng:36},{name:'saved',lat:32.2,lng:36.2,priority:0},{name:'near',lat:31.95,lng:35.91},{name:'duplicate',lat:31.95,lng:35.91},{name:'invalid',lat:91,lng:0}],{lat:31.95,lng:35.91});assert.deepEqual(rows.map(x=>x.name),['saved','near','remote']);
+});

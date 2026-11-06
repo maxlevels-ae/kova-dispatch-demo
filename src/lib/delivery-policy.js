@@ -14,7 +14,7 @@ const money=z.number().finite().min(0).max(10000),names=z.array(z.string().trim(
 export const deliverySettingsSchema=z.object({
  general:z.object({enabled:z.boolean(),name:z.string().trim().min(1).max(60),startHour:z.number().int().min(0).max(23),endHour:z.number().int().min(1).max(24),regions:names.refine(values=>values.every(v=>Object.hasOwn(deliveryCities,v)),'Choose supported Egyptian cities')}),
  packages:z.object({categories:names,maxWeight:z.number().positive().max(100),maxLength:z.number().positive().max(200),maxWidth:z.number().positive().max(200),maxHeight:z.number().positive().max(200),prohibited:names,handling:z.string().max(1000)}),
- pricing:z.object({base:money,perKm:money,minimum:money,vehicleSurcharge:money,small:money,medium:money,large:money,waitingPerMinute:money,waitingFreeMinutes:z.number().int().min(0).max(60),cancellation:money,commission:z.number().min(0).max(50)}),
+ pricing:z.object({base:money,perKm:money,minimum:money,vehicleSurcharge:money,economySurcharge:money.optional(),comfortSurcharge:money.optional(),premiumSurcharge:money.optional(),xlSurcharge:money.optional(),small:money,medium:money,large:money,waitingPerMinute:money,waitingFreeMinutes:z.number().int().min(0).max(60),cancellation:money,commission:z.number().min(0).max(50)}),
  dispatch:z.object({mode:z.enum(['automatic','manual']),radiusKm:z.number().positive().max(50),acceptanceSeconds:z.number().int().min(5).max(25),maxAttempts:z.number().int().min(1).max(20),capacity:z.literal(1)}),
  eligibility:z.object({driverTypes:z.array(z.literal('approved_driver')).length(1),vehicles:z.array(z.enum(['economy','comfort','premium','xl'])).min(1),requireLicense:z.boolean(),available:z.boolean()}),
  notifications:z.object({newDelivery:z.boolean(),assigned:z.boolean(),arrived:z.boolean(),collected:z.boolean(),inTransit:z.boolean(),completed:z.boolean(),failed:z.boolean(),recipient:z.boolean()}),
@@ -33,18 +33,26 @@ const contact=z.object({name:z.string().trim().min(2).max(100),phone:z.string().
 export const deliveryPaymentDefaults={wallet:true,cash:false,payer:'sender',cashStage:'pickup',cod:false,codMaximum:0};
 export const deliveryPaymentSchema=z.object({wallet:z.boolean(),cash:z.boolean(),payer:z.enum(['sender','recipient']),cashStage:z.enum(['pickup','dropoff']),cod:z.boolean(),codMaximum:z.number().finite().min(0).max(100000)}).strict().refine(p=>p.wallet||p.cash,'Enable at least one payment method').refine(p=>!p.cod||(p.cash&&p.codMaximum>0),'COD requires cash and a positive limit').refine(p=>!p.cash||(p.payer==='sender'?p.cashStage==='pickup':p.cashStage==='dropoff'),'Cash collection stage must match the payer');
 export const deliveryBookingSchema=z.object({
+ vehicleType:z.enum(['economy','comfort','premium','xl']).optional(),
  mode:z.enum(['send','bring']).default('send'),recipientOverride:z.boolean().default(false),paymentMethod:z.enum(['wallet','cash']).default('wallet'),codAmount:z.number().finite().min(0).max(100000).default(0),alternatePickupContact:z.boolean().default(false),pickupContact:contact.optional(),pickup:deliveryPoint,dropoff:deliveryPoint,sender:contact,recipient:contact.extend({username:z.string().trim().min(3).max(30).optional()}),region:z.string().max(60),
  package:z.object({category:z.string().max(60),size:z.enum(['small','medium','large']),weight:z.number().positive().optional(),length:z.number().positive().optional(),width:z.number().positive().optional(),height:z.number().positive().optional(),description:z.string().trim().min(3).max(500),handling:z.string().max(500).default(''),photoId:z.string().regex(/^[a-f\d]{24}$/i).optional()}),
  acknowledged:z.literal(true),idempotencyKey:z.uuid(),
 }).strict();
-export function deliveryPrice(settings,route,size,waitingMinutes=0){
+export function deliveryPrice(settings,route,size,waitingMinutes=0,vehicleType){
  const currency=settings.currency||'EGP',factor=10**currencyDigits[currency],round=n=>Math.round(n*factor)/factor;
- const p=settings.pricing;const distance=round(route.distanceMeters/1000*p.perKm);
+ const p=settings.pricing,vehicle=vehicleType?(p[vehicleType+'Surcharge']??p.vehicleSurcharge):p.vehicleSurcharge;const distance=round(route.distanceMeters/1000*p.perKm);
  const waiting=round(Math.max(0,waitingMinutes-p.waitingFreeMinutes)*p.waitingPerMinute);
- const total=round(Math.max(p.minimum,p.base+distance+p.vehicleSurcharge+p[size])+waiting);
+ const total=round(Math.max(p.minimum,p.base+distance+vehicle+p[size])+waiting);
  const commission=round(total*p.commission/100);
- return {currency,base:p.base,distance,vehicle:p.vehicleSurcharge,size:p[size],waiting,total,commission,earnings:round(total-commission)};
+ return {currency,base:p.base,distance,vehicle,size:p[size],waiting,total,commission,earnings:round(total-commission)};
 }
 
 export const packageBounds={small:{weight:2,length:30,width:20,height:15},medium:{weight:5,length:40,width:30,height:30},large:{weight:10,length:60,width:40,height:40}};
 export function selectedPackageBounds(size,settings){const preset=packageBounds[size];if(!preset)return null;return Object.fromEntries(Object.entries(preset).map(([key,value])=>[key,Math.min(value,settings['max'+key[0].toUpperCase()+key.slice(1)])]));}
+
+// Empty candidate snapshots are not a completed search. Retry within the
+// saved offer budget; do not extend it using client timestamps or new settings.
+export function deliverySearchPending(order,now=Date.now()){
+ const policy=order.policy,dispatch=policy?.dispatch,created=new Date(order.createdAt).getTime();
+ return policy?.eligibility?.available===true&&Number.isFinite(created)&&Number.isFinite(dispatch?.acceptanceSeconds)&&Number.isFinite(dispatch?.maxAttempts)&&(order.attempts||0)<dispatch.maxAttempts&&now<created+dispatch.acceptanceSeconds*dispatch.maxAttempts*1000;
+}

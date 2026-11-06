@@ -3,6 +3,7 @@ import {t as tr} from '@/lib/i18n';
 import {useI18n} from '@/context/LanguageProvider';
 
 import Link from 'next/link';
+import {Fragment} from 'react';
 import NotificationInbox from '@/components/NotificationInbox';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -30,13 +31,13 @@ export default function AppShell({ nav, children }) {
         </div>
 
         <nav className={`sidebar-nav${nav.length > 6 ? ' sidebar-nav--extended' : ''}`} aria-label={tr("Main")}>
-          {nav.map(({ href, label, icon: Icon }) => {
+          {nav.map(({ href, label, icon: Icon, sectionLabel }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
-              <Link key={href} href={href} className={`nav-item ${active ? 'active' : ''}`}>
+              <Fragment key={href}>{sectionLabel&&<p className="tiny muted" style={{padding:'18px 12px 6px',textTransform:'uppercase',letterSpacing:'.08em'}}>{tr(sectionLabel)}</p>}<Link href={href} className={`nav-item ${active ? 'active' : ''}`}>
                 <Icon size={19} strokeWidth={2} />
                 <span>{tr(label)}</span>
-              </Link>
+              </Link></Fragment>
             );
           })}
         </nav>

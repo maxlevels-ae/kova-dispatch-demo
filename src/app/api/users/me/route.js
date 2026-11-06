@@ -1,3 +1,4 @@
+import {activeOperations} from '@/lib/operating-areas';
 import {validSettingsOrigin} from '@/lib/settings-origin';
 import { walletAccount, walletAccounts } from '@/lib/currency';
 import { z } from 'zod';
@@ -42,6 +43,7 @@ export async function GET() {
     const user = await User.findById(session.user.id).lean();
     if (!user) return Response.json({ error: 'User not found' }, { status: 404 });
 
+    const country=(await activeOperations()).country;
     return Response.json({
       user: {
         id: String(user._id),
@@ -52,7 +54,7 @@ export async function GET() {
         email: user.email || '',
         avatar: user.avatar || '',
         role: user.role,
-        wallet: walletAccount(user) || { balance: 0, currency: null },
+        wallet: walletAccount(user,country.currency) || { balance: 0, currency: country.currency },
         accounts: walletAccounts(user),
         rating: user.rating,
         savedPlaces: user.savedPlaces || [],
@@ -104,6 +106,7 @@ export async function PATCH(request) {
       },
       { new: true, runValidators: true }
     ).lean();
+
 
     return Response.json({
       user: {
