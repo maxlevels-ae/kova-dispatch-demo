@@ -1,5 +1,5 @@
 # Replace with your real domain (its DNS A record must point at this server).
-{$APP_DOMAIN:srv1.maxride.com} {
+{$APP_DOMAIN:ride.maxlevels.net} {
 	encode zstd gzip
 	reverse_proxy app:3000
 }

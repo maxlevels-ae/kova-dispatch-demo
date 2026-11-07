@@ -1,6 +1,6 @@
 # Move Maxride to the new server
 
-1. DNS: point an A record (e.g. srv1.maxride.com) at the server IP.
+1. DNS: point an A record (e.g. ride.maxlevels.net) at the server IP.
 2. Server (as root): `ufw allow 22,80,443/tcp && ufw enable`; create a non-root sudo user and use SSH keys.
 3. `git clone https://github.com/maxlevels-ae/kova-dispatch-demo.git /opt/maxride && cd /opt/maxride`
 4. `cp deploy/.env.production.example .env.production` and fill it in (copy values from the Render dashboard).
