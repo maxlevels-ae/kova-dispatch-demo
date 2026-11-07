@@ -6,6 +6,7 @@ import {
 import SiteHeader from '@/components/shell/SiteHeader';
 import SiteFooter from '@/components/shell/SiteFooter';
 import ServicesSection from '@/components/landing/ServicesSection';
+import DemoSection from '@/components/landing/DemoSection';
 
 export const metadata = {
   title: 'Maxride — Ride with confidence',
@@ -160,6 +161,8 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      <DemoSection />
 
       {/* ── Tiers ── */}
       <section style={{ background: 'var(--ink-950)', color: 'var(--text-invert)' }}>

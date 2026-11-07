@@ -17,6 +17,7 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [background,setBackground]=useState('');
+  useEffect(()=>{const d=searchParams.get('demo');if(['admin','driver1','rider1'].includes(d)){setUsername(d);setPassword('kovademo1');}},[searchParams]);
   useEffect(()=>{let active=true;fetch('/api/rider-content/login',{cache:'no-store'}).then(r=>r.json()).then(d=>{if(active&&/^\/api\/rider-content\/media\/[a-f0-9]{24}$/.test(d.image))setBackground(d.image);}).catch(()=>{});return()=>{active=false;};},[]);
 
   async function handleSubmit(e) {
