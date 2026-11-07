@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import SiteHeader from '@/components/shell/SiteHeader';
 import SiteFooter from '@/components/shell/SiteFooter';
+import ServicesSection from '@/components/landing/ServicesSection';
 
 export const metadata = {
   title: 'Maxride — Ride with confidence',
@@ -119,6 +120,8 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      <ServicesSection />
 
       {/* ── Features ── */}
       <section style={{ background: 'var(--surface)', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }}>
