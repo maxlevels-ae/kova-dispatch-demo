@@ -19,7 +19,7 @@ export default function SiteHeader() {
         aria-label="Primary"
       >
         <Link href="/" aria-label="Maxride home">
-          <KovaLogo size={32} />
+          <KovaLogo size={28} wordmark />
         </Link>
         <div className="flex items-center gap-3">
           <Link href="/login" className="btn btn-ghost btn-sm">

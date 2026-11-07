@@ -41,10 +41,14 @@ export function KovaIcon({ size = 32, className = '' }) {
   );
 }
 
-export function KovaLogo({ size = 32, showText = true, className = '', light = false }) {
+export function KovaLogo({ size = 32, showText = true, className = '', light = false, wordmark = false }) {
   const { branding } = useBranding();
   const pathname = usePathname();
   const logo = (pathname === '/login' || pathname === '/signup') ? branding.loginLogo || branding.logo : branding.logo;
+  if (wordmark && !logo) {
+    /* eslint-disable-next-line @next/next/no-img-element */
+    return <img className={className} src={'/brand/maxride-wordmark-' + (light ? 'light' : 'dark') + '.png'} alt={branding.name || 'Maxride'} height={size} style={{ height: size, width: 'auto', display: 'block' }} />;
+  }
   return (
     <span
       className={className}

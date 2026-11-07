@@ -46,7 +46,7 @@ export default function SiteFooter() {
         >
           <div>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-              <KovaLogo size={30} />
+              <KovaLogo size={26} wordmark />
             </span>
             <p className="small muted mt-3" style={{ maxWidth: 260, lineHeight: 1.6 }}>
               Premium ride-hailing with upfront fares, live tracking and
