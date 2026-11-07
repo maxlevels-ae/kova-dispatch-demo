@@ -9,8 +9,9 @@ services:
         NEXT_PUBLIC_CARTO_BASEMAP_KEY: ${NEXT_PUBLIC_CARTO_BASEMAP_KEY:-}
     env_file: ../.env.production
     environment:
-      MONGODB_URI: mongodb://mongodb:27017/kova
+      # MONGODB_URI comes from .env.production (Atlas). Switch it to mongodb://mongodb:27017/kova after copying the data.
       REDIS_URL: redis://redis:6379
+      PORT: "3000"
     depends_on: [mongodb, redis]
     restart: unless-stopped
     healthcheck:
